@@ -5,6 +5,4 @@ app_name = "dashboard"
 
 urlpatterns = [
     path("", views.index, name="index"),
-    path("profitability/", views.profitability, name="profitability"),
-    path("report/", views.report_view, name="report"),
 ]

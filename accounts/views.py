@@ -1,6 +1,6 @@
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.contrib.auth import login
+from django.contrib.auth import login, logout
 from django.contrib import messages
 from django.shortcuts import render, redirect
 from django.db import IntegrityError
@@ -89,3 +89,9 @@ def register(request):
 
     coaches = Coach.objects.all()
     return render(request, "accounts/register.html", {"coaches": coaches})
+
+@login_required
+def logout_view(request):
+    """Odhlásí uživatele (funguje i na GET) a přesměruje na login."""
+    logout(request)
+    return redirect("accounts:login")  # nebo "home"

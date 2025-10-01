@@ -4,13 +4,16 @@ from .models import Document, FinancialStatement
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
-    list_display = ("file", "owner", "year", "doc_type", "uploaded_at")
-    list_filter = ("doc_type", "year")
+    list_display = ("owner", "file", "year", "doc_type", "uploaded_at")
+    list_filter = ("year", "doc_type", "owner")
     search_fields = ("file", "owner__username")
 
 
 @admin.register(FinancialStatement)
 class FinancialStatementAdmin(admin.ModelAdmin):
-    list_display = ("owner", "year", "document", "created_at")
-    list_filter = ("year", "document__doc_type")
-    search_fields = ("owner__username",)
+    list_display = ("owner", "year", "document", "uploaded_at")
+
+    def uploaded_at(self, obj):
+        return obj.document.uploaded_at
+    uploaded_at.admin_order_field = "document__uploaded_at"
+    uploaded_at.short_description = "Uploaded at"

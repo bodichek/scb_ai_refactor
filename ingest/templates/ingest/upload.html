@@ -1,23 +1,22 @@
 {% extends "base.html" %}
 {% block content %}
-<h3>Nahrát nový PDF</h3>
-<form method="post" enctype="multipart/form-data">
-  {% csrf_token %}
-  <div class="mb-3">
-    <label>Soubor</label>
-    <input type="file" name="pdf_file" class="form-control" required>
-  </div>
-  <div class="mb-3">
-    <label>Rok</label>
-    <input type="number" name="year" class="form-control" value="2025">
-  </div>
-  <div class="mb-3">
-    <label>Typ výkazu</label>
-    <select name="doc_type" class="form-control">
-      <option value="income">Income Statement</option>
-      <option value="balance">Balance Sheet</option>
-    </select>
-  </div>
-  <button type="submit" class="btn btn-success">Nahrát</button>
-</form>
+<div class="container">
+  <h3>➕ Nahrát nový soubor</h3>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="mb-3">
+      <label for="year">Rok:</label>
+      <select name="year" class="form-select" required>
+        {% for y in years %}
+          <option value="{{ y }}">{{ y }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-3">
+      <label for="pdf_file">Soubor PDF:</label>
+      <input type="file" name="pdf_file" class="form-control" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Nahrát a analyzovat</button>
+  </form>
+</div>
 {% endblock %}

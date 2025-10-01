@@ -1,73 +1,222 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container">
-  <h2>📊 Přehled finančních výkazů</h2>
+  <h2>📊 Dashboard</h2>
 
-  {% if statements %}
-    <table class="table table-bordered table-striped table-sm">
-      <thead>
-        <tr>
-          <th>Rok</th>
-          <!-- Income Statement -->
-          <th>Revenue</th>
-          <th>COGS</th>
-          <th>Gross Margin</th>
-          <th>EBIT</th>
-          <th>Net Profit</th>
-          <th>Depreciation</th>
-          <th>Interest Paid</th>
-          <th>Income Tax Paid</th>
-          <th>Extraordinary Items</th>
-          <th>Dividends Paid</th>
-          <!-- Balance Sheet -->
-          <th>Cash</th>
-          <th>Receivables</th>
-          <th>Inventory</th>
-          <th>Current Assets</th>
-          <th>Tangible Assets</th>
-          <th>Total Assets</th>
-          <th>Equity</th>
-          <th>Total Liabilities</th>
-          <th>Trade Payables</th>
-          <th>Short-term Liabilities</th>
-          <th>Short-term Loans</th>
-          <th>Long-term Loans</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for s in statements %}
-          <tr>
-            <td>{{ s.year }}</td>
-            <!-- Income -->
-            <td>{{ s.data.Revenue|default:"-" }}</td>
-            <td>{{ s.data.COGS|default:"-" }}</td>
-            <td>{{ s.data.GrossMargin|default:"-" }}</td>
-            <td>{{ s.data.EBIT|default:"-" }}</td>
-            <td>{{ s.data.NetProfit|default:"-" }}</td>
-            <td>{{ s.data.Depreciation|default:"-" }}</td>
-            <td>{{ s.data.InterestPaid|default:"-" }}</td>
-            <td>{{ s.data.IncomeTaxPaid|default:"-" }}</td>
-            <td>{{ s.data.ExtraordinaryItems|default:"-" }}</td>
-            <td>{{ s.data.DividendsPaid|default:"-" }}</td>
-            <!-- Balance -->
-            <td>{{ s.data.Cash|default:"-" }}</td>
-            <td>{{ s.data.Receivables|default:"-" }}</td>
-            <td>{{ s.data.Inventory|default:"-" }}</td>
-            <td>{{ s.data.CurrentAssets|default:"-" }}</td>
-            <td>{{ s.data.TangibleAssets|default:"-" }}</td>
-            <td>{{ s.data.TotalAssets|default:"-" }}</td>
-            <td>{{ s.data.Equity|default:"-" }}</td>
-            <td>{{ s.data.TotalLiabilities|default:"-" }}</td>
-            <td>{{ s.data.TradePayables|default:"-" }}</td>
-            <td>{{ s.data.ShortTermLiabilities|default:"-" }}</td>
-            <td>{{ s.data.ShortTermLoans|default:"-" }}</td>
-            <td>{{ s.data.LongTermLoans|default:"-" }}</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p>⚠️ Zatím nemáte žádné nahrané výkazy.</p>
-  {% endif %}
+  <!-- Filtrování roků -->
+  <div class="mb-3">
+    <strong>Vyber roky:</strong><br>
+    {% for y in table_rows %}
+      <label class="me-2">
+        <input type="checkbox" class="year-filter" value="{{ y.year }}" checked>
+        {{ y.year }}
+      </label>
+    {% endfor %}
+  </div>
+
+  <!-- Grafy -->
+  <h3>Your Profit Story</h3>
+  <canvas id="profitStoryChart"></canvas>
+
+  <h3 class="mt-5">Profitability Trends</h3>
+  <canvas id="profitabilityTrendsChart"></canvas>
+
+  <h3 class="mt-5">Revenue Growth vs Cost of Goods Growth</h3>
+  <canvas id="revCogsGrowthChart"></canvas>
+
+  <h3 class="mt-5">Revenue Growth vs Overheads Growth</h3>
+  <canvas id="revOverheadsGrowthChart"></canvas>
+
+  <!-- Tabulkový přehled -->
+  <h3 class="mt-5">📑 Přehled dat</h3>
+  <table class="table table-bordered">
+    <thead>
+      <tr>
+        <th>Rok</th>
+        <th>Revenue</th>
+        <th>COGS</th>
+        <th>Gross Margin</th>
+        <th>Overheads</th>
+        <th>EBIT</th>
+        <th>Net Profit</th>
+        <th>GM %</th>
+        <th>OP %</th>
+        <th>NP %</th>
+        <th>Revenue Growth %</th>
+        <th>COGS Growth %</th>
+        <th>Overheads Growth %</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in table_rows %}
+      <tr>
+        <td>{{ r.year }}</td>
+        <td>{{ r.revenue }}</td>
+        <td>{{ r.cogs }}</td>
+        <td>{{ r.gross_margin }}</td>
+        <td>{{ r.overheads }}</td>
+        <td>{{ r.ebit }}</td>
+        <td>{{ r.net_profit }}</td>
+        <td>{{ r.profitability.gm_pct|floatformat:2 }}%</td>
+        <td>{{ r.profitability.op_pct|floatformat:2 }}%</td>
+        <td>{{ r.profitability.np_pct|floatformat:2 }}%</td>
+        <td>{{ r.growth.revenue|floatformat:2 }}%</td>
+        <td>{{ r.growth.cogs|floatformat:2 }}%</td>
+        <td>{{ r.growth.overheads|floatformat:2 }}%</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Line chart pro všechny metriky -->
+  <h3 class="mt-5">📈 Year-over-Year Overview (All Metrics)</h3>
+  <canvas id="allMetricsChart"></canvas>
 </div>
+
+<!-- Chart.js knihovna -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+  const rows = {{ rows|safe }};
+  const years = {{ years|safe }};
+
+  function getSelectedYears() {
+    return Array.from(document.querySelectorAll(".year-filter:checked")).map(cb => parseInt(cb.value));
+  }
+  function filterRowsByYears(selectedYears) {
+    return rows.filter(r => selectedYears.includes(r.year));
+  }
+
+  let profitStoryChart, profitabilityTrendsChart, revCogsGrowthChart, revOverheadsGrowthChart, allMetricsChart;
+
+  function renderCharts() {
+    const selectedYears = getSelectedYears();
+    const dataRows = filterRowsByYears(selectedYears);
+
+    const labels = dataRows.map(r => r.year);
+
+    // ---------------- Your Profit Story ----------------
+    const categoriesProfitStory = ["Revenue", "COGS", "Gross Margin", "Overheads", "EBIT", "Net Profit"];
+    const datasetsProfitStory = selectedYears.map((year, idx) => {
+      const row = dataRows.find(r => r.year === year) || {};
+      return {
+        label: year,
+        data: [
+          row.revenue || 0,
+          row.cogs || 0,
+          row.gross_margin || 0,
+          row.overheads || 0,
+          row.ebit || 0,
+          row.net_profit || 0
+        ],
+        backgroundColor: `hsl(${(idx * 70) % 360},70%,50%)`
+      };
+    });
+
+    if (profitStoryChart) profitStoryChart.destroy();
+    profitStoryChart = new Chart(document.getElementById("profitStoryChart"), {
+      type: "bar",
+      data: { labels: categoriesProfitStory, datasets: datasetsProfitStory },
+      options: { responsive: true, plugins: { legend: { position: "top" } }, scales: { y: { beginAtZero: true } } }
+    });
+
+    // ---------------- Profitability Trends ----------------
+    if (profitabilityTrendsChart) profitabilityTrendsChart.destroy();
+    profitabilityTrendsChart = new Chart(document.getElementById("profitabilityTrendsChart"), {
+      type: "bar",
+      data: {
+        labels: ["Gross Margin %", "Operating Profit %", "Net Profit %"],
+        datasets: selectedYears.map((year, idx) => {
+          const row = dataRows.find(r => r.year === year) || {};
+          return {
+            label: year,
+            data: [row.profitability.gm_pct, row.profitability.op_pct, row.profitability.np_pct],
+            backgroundColor: `hsl(${(idx * 70) % 360},70%,50%)`
+          };
+        })
+      },
+      options: { responsive: true, plugins: { legend: { position: "top" } }, scales: { y: { ticks: { callback: v => v + "%" } } } }
+    });
+
+    // ---------------- Revenue Growth vs COGS Growth ----------------
+    const revGrowth = dataRows.map(r => r.growth.revenue);
+    const cogsGrowth = dataRows.map(r => r.growth.cogs);
+
+    if (revCogsGrowthChart) revCogsGrowthChart.destroy();
+    revCogsGrowthChart = new Chart(document.getElementById("revCogsGrowthChart"), {
+      type: "bar",
+      data: {
+        labels: selectedYears,
+        datasets: [
+          { label: "Revenue Growth %", data: revGrowth, backgroundColor: "rgba(75,192,192,0.7)" },
+          { label: "COGS Growth %", data: cogsGrowth, backgroundColor: "rgba(255,99,132,0.7)" }
+        ]
+      },
+      options: { scales: { y: { ticks: { callback: v => v + "%" } } } }
+    });
+
+    // ---------------- Revenue Growth vs Overheads Growth ----------------
+    const overheadsGrowth = dataRows.map(r => r.growth.overheads);
+
+    if (revOverheadsGrowthChart) revOverheadsGrowthChart.destroy();
+    revOverheadsGrowthChart = new Chart(document.getElementById("revOverheadsGrowthChart"), {
+      type: "bar",
+      data: {
+        labels: selectedYears,
+        datasets: [
+          { label: "Revenue Growth %", data: revGrowth, backgroundColor: "rgba(75,192,192,0.7)" },
+          { label: "Overheads Growth %", data: overheadsGrowth, backgroundColor: "rgba(255,206,86,0.7)" }
+        ]
+      },
+      options: { scales: { y: { ticks: { callback: v => v + "%" } } } }
+    });
+
+    // ---------------- All Metrics Line Chart ----------------
+    const revenues = dataRows.map(r => r.revenue);
+    const cogs = dataRows.map(r => r.cogs);
+    const grossMargins = dataRows.map(r => r.gross_margin);
+    const overheads = dataRows.map(r => r.overheads);
+    const ebits = dataRows.map(r => r.ebit);
+    const netProfits = dataRows.map(r => r.net_profit);
+
+    const gmPct = dataRows.map(r => r.profitability.gm_pct);
+    const opPct = dataRows.map(r => r.profitability.op_pct);
+    const npPct = dataRows.map(r => r.profitability.np_pct);
+
+    if (allMetricsChart) allMetricsChart.destroy();
+    allMetricsChart = new Chart(document.getElementById("allMetricsChart"), {
+      type: "line",
+      data: {
+        labels: selectedYears,
+        datasets: [
+          { label: "Revenue", data: revenues, borderColor: "rgba(75,192,192,1)", tension: 0.3 },
+          { label: "COGS", data: cogs, borderColor: "rgba(255,99,132,1)", tension: 0.3 },
+          { label: "Gross Margin", data: grossMargins, borderColor: "rgba(54,162,235,1)", tension: 0.3 },
+          { label: "Overheads", data: overheads, borderColor: "rgba(255,206,86,1)", tension: 0.3 },
+          { label: "EBIT", data: ebits, borderColor: "rgba(153,102,255,1)", tension: 0.3 },
+          { label: "Net Profit", data: netProfits, borderColor: "rgba(255,159,64,1)", tension: 0.3 },
+
+          { label: "Gross Margin %", data: gmPct, borderDash: [5,5], borderColor: "rgba(54,162,235,0.8)", tension: 0.3, yAxisID: "percent" },
+          { label: "Operating Profit %", data: opPct, borderDash: [5,5], borderColor: "rgba(255,206,86,0.8)", tension: 0.3, yAxisID: "percent" },
+          { label: "Net Profit %", data: npPct, borderDash: [5,5], borderColor: "rgba(75,192,192,0.8)", tension: 0.3, yAxisID: "percent" },
+
+          { label: "Revenue Growth %", data: revGrowth, borderDash: [2,2], borderColor: "rgba(0,128,128,1)", tension: 0.3, yAxisID: "percent" },
+          { label: "COGS Growth %", data: cogsGrowth, borderDash: [2,2], borderColor: "rgba(178,34,34,1)", tension: 0.3, yAxisID: "percent" },
+          { label: "Overheads Growth %", data: overheadsGrowth, borderDash: [2,2], borderColor: "rgba(218,165,32,1)", tension: 0.3, yAxisID: "percent" }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: "top" } },
+        scales: {
+          y: { beginAtZero: true, title: { display: true, text: "Absolute values" } },
+          percent: { position: "right", beginAtZero: true, title: { display: true, text: "%" }, grid: { drawOnChartArea: false } }
+        }
+      }
+    });
+  }
+
+  document.querySelectorAll(".year-filter").forEach(cb => cb.addEventListener("change", renderCharts));
+  renderCharts();
+</script>
 {% endblock %}

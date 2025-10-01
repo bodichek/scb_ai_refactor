@@ -30,7 +30,7 @@
               <a class="nav-link" href="{% url 'ingest:upload_pdf' %}">⬆️ Nahrát soubor</a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" href="{% url 'accounts:logout' %}">🚪 Odhlásit se</a>
+              <a href="{% url 'accounts:logout' %}">🚪 Odhlásit</a>
             </li>
           {% else %}
             <li class="nav-item">

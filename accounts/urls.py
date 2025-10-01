@@ -9,12 +9,10 @@ urlpatterns = [
         template_name="accounts/login.html"
     ), name="login"),
 
-    path("logout/", auth_views.LogoutView.as_view(
-        next_page="accounts:login"   # po odhlášení zpět na login
-    ), name="logout"),
+    # ⬅️ vlastní logout přes GET
+    path("logout/", views.logout_view, name="logout"),
 
-    path("register/", views.register, name="register"),   # ✅ registrace
-
+    path("register/", views.register, name="register"),
     path("profile/", views.profile_view, name="profile"),
     path("profile/edit/", views.edit_profile, name="edit_profile"),
 ]

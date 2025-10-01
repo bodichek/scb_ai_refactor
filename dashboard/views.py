@@ -1,10 +1,6 @@
+import json
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
-from ingest.models import FinancialStatement
-
-from django.shortcuts import render, redirect, get_object_or_404
-from accounts.models import CompanyProfile, UserRole
-from coaching.models import UserCoachAssignment
 from ingest.models import FinancialStatement
 
 @login_required
@@ -13,75 +9,85 @@ def index(request):
 
     rows = []
     for s in statements:
+        d = s.data or {}
+
+        # Základní výpočty
+        revenue = d.get("Revenue", 0)
+        cogs = d.get("COGS", 0)
+        gross_margin = revenue - cogs
+        overheads = d.get("Overheads", 0)
+        depreciation = d.get("Depreciation", 0)
+        ebit = d.get("EBIT", gross_margin - overheads - depreciation)
+        net_profit = d.get("NetProfit", 0)
+
+        # Cashflow (jen základní bloky)
+        cash_from_customers = d.get("CashFromCustomers", revenue)
+        cash_to_suppliers = d.get("CashToSuppliers", cogs)
+        gross_cash_profit = cash_from_customers - cash_to_suppliers
+        cash_overheads = d.get("Overheads", overheads)
+        operating_cf = gross_cash_profit - cash_overheads
+
+        interest = d.get("InterestPaid", 0)
+        tax = d.get("IncomeTaxPaid", 0)
+        extraordinary = d.get("ExtraordinaryItems", 0)
+        dividends = d.get("DividendsPaid", 0)
+        capex = d.get("Capex", 0)
+        other_assets = d.get("OtherAssets", 0)
+
+        net_cf = operating_cf - interest - tax - extraordinary - dividends - capex + other_assets
+
         rows.append({
             "year": s.year,
-            "revenue": s.data.get("Revenue", 0),
-            "cogs": s.data.get("COGS", 0),
-            "ebit": s.data.get("EBIT", 0),
-            "net_profit": s.data.get("NetProfit", 0),
-            "gross_margin": s.data.get("GrossMargin", 0),
-            "cash": s.data.get("Cash", 0),
-            "total_assets": s.data.get("TotalAssets", 0),
-            "total_liabilities": s.data.get("TotalLiabilities", 0),
+            "revenue": revenue,
+            "cogs": cogs,
+            "gross_margin": gross_margin,
+            "overheads": overheads,
+            "depreciation": depreciation,
+            "ebit": ebit,
+            "net_profit": net_profit,
+
+            # Profitability % (poměrové ukazatele)
+            "profitability": {
+                "gm_pct": (gross_margin / revenue * 100) if revenue else 0,
+                "op_pct": (ebit / revenue * 100) if revenue else 0,
+                "np_pct": (net_profit / revenue * 100) if revenue else 0,
+            },
+
+            # Cashflow
+            "cash_from_customers": cash_from_customers,
+            "cash_to_suppliers": cash_to_suppliers,
+            "gross_cash_profit": gross_cash_profit,
+            "cash_overheads": cash_overheads,
+            "operating_cf": operating_cf,
+            "interest": interest,
+            "tax": tax,
+            "extraordinary": extraordinary,
+            "dividends": dividends,
+            "capex": capex,
+            "other_assets": other_assets,
+            "net_cf": net_cf,
+
+            "growth": {}  # doplníme níže
         })
 
+    # Seřadit a připravit roky
+    rows = sorted(rows, key=lambda r: r["year"])
     years = [r["year"] for r in rows]
-    revenue = [r["revenue"] for r in rows]
-    ebit = [r["ebit"] for r in rows]
-    net_profit = [r["net_profit"] for r in rows]
+
+    # Meziroční růsty
+    for i, r in enumerate(rows):
+        if i == 0:
+            r["growth"] = {"revenue": 0, "cogs": 0, "overheads": 0}
+        else:
+            prev = rows[i - 1]
+            r["growth"] = {
+                "revenue": ((r["revenue"] - prev["revenue"]) / prev["revenue"] * 100) if prev["revenue"] else 0,
+                "cogs": ((r["cogs"] - prev["cogs"]) / prev["cogs"] * 100) if prev["cogs"] else 0,
+                "overheads": ((r["overheads"] - prev["overheads"]) / prev["overheads"] * 100) if prev["overheads"] else 0,
+            }
 
     return render(request, "dashboard/index.html", {
-        "statements": statements, # ⬅️ musí se poslat, jinak {% if statements %} bude vždy False
-        "rows": rows,
-        "years": years,
-        "revenue": revenue,
-        "ebit": ebit,
-        "net_profit": net_profit,
+        "rows": json.dumps(rows),   # JSON pro grafy
+        "years": json.dumps(years),
+        "table_rows": rows,         # pro tabulkový přehled
     })
-
-@login_required
-def profitability(request):
-    statements = FinancialStatement.objects.filter(owner=request.user).order_by("year")
-    return render(request, "dashboard/profitability.html", {"statements": statements})
-
-@login_required
-def report_view(request):
-    statements = FinancialStatement.objects.filter(owner=request.user).order_by("year")
-    return render(request, "dashboard/report.html", {"statements": statements})
-
-@login_required
-def dashboard(request):
-    role = getattr(request.user.userrole, "role", "company")
-
-    if role == "company":
-        # firma → svoje data
-        statements = FinancialStatement.objects.filter(owner=request.user)
-        company = CompanyProfile.objects.filter(user=request.user).first()
-        return render(request, "dashboard/company_dashboard.html", {
-            "company": company,
-            "statements": statements,
-        })
-
-    elif role == "coach":
-        # kouč → seznam klientů
-        assignments = UserCoachAssignment.objects.filter(coach__user=request.user)
-        clients = [a.client for a in assignments]
-
-        selected_client_id = request.GET.get("client")
-        if selected_client_id:
-            selected_client = get_object_or_404(assignments, client__id=selected_client_id).client
-            statements = FinancialStatement.objects.filter(owner=selected_client)
-            company = CompanyProfile.objects.filter(user=selected_client).first()
-            return render(request, "dashboard/coach_dashboard.html", {
-                "clients": clients,
-                "selected_client": selected_client,
-                "company": company,
-                "statements": statements,
-            })
-
-        # kouč, ale nevybral ještě klienta
-        return render(request, "dashboard/coach_dashboard.html", {
-            "clients": clients,
-            "statements": [],
-            "selected_client": None,
-        })
