@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>Nahrát výkaz</h3>
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  <div class="mb-2">
+    <label>Soubor PDF</label>
+    <input type="file" name="file" class="form-control" required>
+  </div>
+  <div class="mb-2">
+    <label>Rok</label>
+    <input type="number" name="year" class="form-control" required>
+  </div>
+  <div class="mb-2">
+    <label>Typ výkazu</label>
+    <select name="doc_type" class="form-select">
+      <option value="income">Výsledovka (P&L)</option>
+      <option value="balance">Rozvaha (Balance)</option>
+    </select>
+  </div>
+  <button class="btn btn-primary">Nahrát a analyzovat</button>
+</form>
+{% endblock %}

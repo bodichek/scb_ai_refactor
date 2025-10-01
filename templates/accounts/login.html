@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Přihlášení</h2>
+
+  {% if form.errors %}
+    <div class="alert alert-danger">
+      ⚠️ Nesprávný e-mail nebo heslo, zkuste to znovu.
+    </div>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="mb-3">
+      <label for="username" class="form-label">E-mail</label>
+      <input type="email" class="form-control" id="username" name="username" required>
+    </div>
+
+    <div class="mb-3">
+      <label for="password" class="form-label">Heslo</label>
+      <input type="password" class="form-control" id="password" name="password" required>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Přihlásit se</button>
+  </form>
+
+  <p class="mt-3">
+    Ještě nemáte účet? <a href="{% url 'accounts:register' %}">Registrujte se zde</a>.
+  </p>
+</div>
+{% endblock %}

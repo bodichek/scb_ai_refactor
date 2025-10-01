@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% block content %}
+<h3>Profitability</h3>
+<table class="table table-striped">
+  <thead><tr><th>Year</th><th>Revenue</th><th>GrossMargin</th><th>NetProfit</th></tr></thead>
+  <tbody>
+  {% for s in statements %}
+    <tr>
+      <td>{{ s.year }}</td>
+      <td>{{ s.data.Revenue|default:0 }}</td>
+      <td>{{ s.data.GrossMargin|default:0 }}</td>
+      <td>{{ s.data.NetProfit|default:0 }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container text-center mt-5">
+    <h1 class="mb-4">📊 Vítejte v aplikaci FinApp</h1>
+    <p class="lead">Sledujte a analyzujte své finanční výkazy jednoduše a přehledně.</p>
+
+    <div class="mt-4">
+        <a href="{% url 'accounts:login' %}" class="btn btn-primary btn-lg mx-2">Přihlásit se</a>
+        <a href="{% url 'accounts:register' %}" class="btn btn-success btn-lg mx-2">Registrovat firmu</a>
+    </div>
+</div>
+{% endblock %}

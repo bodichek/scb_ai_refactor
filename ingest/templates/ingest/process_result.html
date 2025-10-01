@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>Výsledek analýzy</h3>
+<p><b>Soubor:</b> {{ document.file.name }} | <b>Rok:</b> {{ document.year }} | <b>Typ:</b> {{ document.doc_type }}</p>
+
+<pre class="p-3 bg-light border rounded">{{ statement.data|json_script:"result_json" }}</pre>
+<script>
+  const data = JSON.parse(document.getElementById('result_json').textContent);
+  console.log("Parsed data:", data);
+</script>
+
+<a class="btn btn-success mt-3" href="/dashboard/">Zobrazit v dashboardu</a>
+{% endblock %}

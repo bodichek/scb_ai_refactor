@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Dashboard - {{ company.company_name }}</h2>
+
+<p>👤 Přihlášený uživatel: {{ request.user.username }}</p>
+
+<h4>Moje výkazy</h4>
+<ul>
+  {% for s in statements %}
+    <li>{{ s.year }} – {{ s.document.doc_type }} – {{ s.data }}</li>
+  {% empty %}
+    <li>Žádná data</li>
+  {% endfor %}
+</ul>
+{% endblock %}

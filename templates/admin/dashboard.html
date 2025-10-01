@@ -1,0 +1,39 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block content %}
+<h1>{{ title }}</h1>
+
+<div style="margin-bottom:20px;">
+  <strong>Počet firem:</strong> {{ companies_count }} <br>
+  <strong>Počet koučů:</strong> {{ coaches_count }} <br>
+  <strong>Firmy bez kouče:</strong> {{ companies_without_coach }}
+</div>
+
+<table class="admin-table" style="width:100%; border-collapse: collapse; margin-top:20px;">
+  <thead>
+    <tr style="background:#f4f4f4;">
+      <th style="padding:8px; border:1px solid #ccc;">Firma</th>
+      <th style="padding:8px; border:1px solid #ccc;">IČO</th>
+      <th style="padding:8px; border:1px solid #ccc;">Kouč</th>
+      <th style="padding:8px; border:1px solid #ccc;">Výkazy</th>
+      <th style="padding:8px; border:1px solid #ccc;">Poslední dokument</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <td style="padding:8px; border:1px solid #ccc;">{{ row.company|safe }}</td>
+      <td style="padding:8px; border:1px solid #ccc;">{{ row.ico }}</td>
+      <td style="padding:8px; border:1px solid #ccc;">{{ row.coach|safe }}</td>
+      <td style="padding:8px; border:1px solid #ccc;">{{ row.statements }}</td>
+      <td style="padding:8px; border:1px solid #ccc;">{{ row.last_doc }}</td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="5" style="text-align:center; padding:10px;">❌ Žádné firmy zatím nejsou registrované.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

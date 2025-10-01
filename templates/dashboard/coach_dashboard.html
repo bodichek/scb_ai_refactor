@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Dashboard Kouče</h2>
+
+<p>👤 Kouč: {{ request.user.username }}</p>
+
+<form method="get">
+  <label>Vyber klienta:</label>
+  <select name="client" onchange="this.form.submit()">
+    <option value="">-- Vyber --</option>
+    {% for c in clients %}
+      <option value="{{ c.id }}" {% if selected_client and selected_client.id == c.id %}selected{% endif %}>
+        {{ c.username }} ({{ c.companyprofile.company_name }})
+      </option>
+    {% endfor %}
+  </select>
+</form>
+
+{% if selected_client %}
+  <h4>Data pro: {{ company.company_name }}</h4>
+  <ul>
+    {% for s in statements %}
+      <li>{{ s.year }} – {{ s.document.doc_type }} – {{ s.data }}</li>
+    {% empty %}
+      <li>Žádná data</li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p>Vyberte klienta pro zobrazení dat.</p>
+{% endif %}
+{% endblock %}

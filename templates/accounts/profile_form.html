@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Upravit profil firmy</h2>
+
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="mb-3">
+      <label for="company_name" class="form-label">Název firmy</label>
+      <input type="text" class="form-control" id="company_name" name="company_name" value="{{ profile.company_name }}">
+    </div>
+
+    <div class="mb-3">
+      <label for="ico" class="form-label">IČO</label>
+      <input type="text" class="form-control" id="ico" name="ico" value="{{ profile.ico }}">
+    </div>
+
+    <div class="mb-3">
+      <label for="contact_person" class="form-label">Kontaktní osoba</label>
+      <input type="text" class="form-control" id="contact_person" name="contact_person" value="{{ profile.contact_person }}">
+    </div>
+
+    <div class="mb-3">
+      <label for="phone" class="form-label">Telefon</label>
+      <input type="text" class="form-control" id="phone" name="phone" value="{{ profile.phone }}">
+    </div>
+
+    <div class="mb-3">
+      <label for="email" class="form-label">E-mail</label>
+      <input type="email" class="form-control" id="email" name="email" value="{{ profile.email }}">
+    </div>
+
+    <div class="mb-3">
+      <label for="industry" class="form-label">Odvětví</label>
+      <input type="text" class="form-control" id="industry" name="industry" value="{{ profile.industry }}">
+    </div>
+
+    <div class="mb-3">
+      <label for="employees_count" class="form-label">Počet zaměstnanců</label>
+      <input type="number" class="form-control" id="employees_count" name="employees_count" value="{{ profile.employees_count }}">
+    </div>
+
+    <div class="mb-3">
+      <label for="linkedin" class="form-label">LinkedIn</label>
+      <input type="url" class="form-control" id="linkedin" name="linkedin" value="{{ profile.linkedin }}">
+    </div>
+
+    <div class="mb-3">
+      <label for="website" class="form-label">Webové stránky</label>
+      <input type="url" class="form-control" id="website" name="website" value="{{ profile.website }}">
+    </div>
+
+    <div class="mb-3">
+      <label for="assigned_coach" class="form-label">Přiřazený kouč</label>
+      <select class="form-select" id="assigned_coach" name="assigned_coach">
+        <option value="">-- bez kouče --</option>
+        {% for coach in coaches %}
+          <option value="{{ coach.id }}" {% if profile.assigned_coach and profile.assigned_coach.id == coach.id %}selected{% endif %}>
+            {{ coach.user.email }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <button type="submit" class="btn btn-success">Uložit změny</button>
+  </form>
+</div>
+{% endblock %}
