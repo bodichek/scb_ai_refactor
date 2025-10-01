@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h2>📋 Detail dotazníku</h2>
+  <p><b>Vyplněno:</b> {{ submission.created_at|date:"d.m.Y H:i" }}</p>
+
+  <!-- Seznam odpovědí -->
+  <ul class="list-group mb-3">
+    {% for r in responses %}
+      <li class="list-group-item d-flex justify-content-between">
+        <span>{{ r.question }}</span>
+        <span class="badge bg-primary">{{ r.score }}</span>
+      </li>
+    {% endfor %}
+  </ul>
+
+  <!-- Průměr -->
+  <div class="alert alert-info">
+    <b>Průměrné skóre:</b> {{ avg_score|floatformat:1 }}
+  </div>
+
+  <!-- 🔹 Graf vývoje průměrného skóre -->
+  <div class="mt-5">
+    <h3>📈 Vývoj průměrného skóre v čase</h3>
+    <canvas id="historyChart"></canvas>
+  </div>
+
+  <a href="{% url 'survey:summary' %}" class="btn btn-secondary mt-4">← Zpět na přehled</a>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const ctx = document.getElementById('historyChart').getContext('2d');
+  const historyChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: {{ chart_labels|safe }},
+      datasets: [{
+        label: 'Průměrné skóre',
+        data: {{ chart_data|safe }},
+        borderColor: 'blue',
+        backgroundColor: 'rgba(0,123,255,0.2)',
+        fill: true,
+        tension: 0.2,
+        pointRadius: 5,
+        pointHoverRadius: 7
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        y: {
+          min: 1,
+          max: 10,
+          ticks: { stepSize: 1 }
+        }
+      }
+    }
+  });
+</script>
+{% endblock %}

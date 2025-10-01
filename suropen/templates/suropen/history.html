@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h2 class="mb-4">📖 Historie osobní analýzy</h2>
+
+  {% for batch in batches %}
+    <div class="card my-4 shadow-sm">
+      <div class="card-header">
+        <b>Vyplněno:</b> {{ batch.created_at|date:"d.m.Y H:i" }}
+      </div>
+      <div class="card-body">
+        <!-- Moje odpovědi -->
+        <h5 class="mb-3">✍️ Moje odpovědi</h5>
+        <ul class="list-group mb-3">
+          {% for item in batch.items %}
+            <li class="list-group-item">
+              <b>[{{ item.section }}]</b> {{ item.question }}<br>
+              <span class="text-muted">Odpověď:</span> {{ item.answer }}
+            </li>
+          {% endfor %}
+        </ul>
+
+        <!-- Shrnutí od AI -->
+        {% if batch.ai_response %}
+          <h5 class="mt-4">🧠 Shrnutí od AI</h5>
+          <div class="alert alert-info">
+            <pre style="white-space: pre-wrap;">{{ batch.ai_response }}</pre>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  {% empty %}
+    <p class="text-muted">Zatím nemáš žádné odeslané analýzy.</p>
+  {% endfor %}
+</div>
+{% endblock %}

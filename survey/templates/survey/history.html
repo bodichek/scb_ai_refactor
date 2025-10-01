@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div>
+  <h2>📚 Moje historie dotazníků (hodnocení)</h2>
+
+  {% if not batches %}
+    <div>Zatím nemáš žádné odeslané záznamy.</div>
+  {% else %}
+    {% for b in batches %}
+      <div style="border: 1px solid #ddd; padding: 1em; margin-bottom: 1.5em;">
+        <div style="display: flex; justify-content: space-between; font-size: small; color: gray;">
+          <span><b>Batch:</b> {{ b.batch_id }}</span>
+          <span>{{ b.created_at|date:"d.m.Y H:i" }}</span>
+        </div>
+
+        {% if b.ai_response %}
+          <h5>💡 AI shrnutí</h5>
+          <pre style="white-space:pre-wrap;">{{ b.ai_response }}</pre>
+          <hr>
+        {% endif %}
+
+        {% for item in b.items %}
+          <div style="margin-bottom: 1em;">
+            <div><b>{{ item.question }}</b></div>
+            <div>{{ item.answer }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}

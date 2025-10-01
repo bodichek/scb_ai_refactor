@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h2>📤 Export do PDF</h2>
+
+  <form method="post" action="{% url 'exports:export_pdf' %}">
+    {% csrf_token %}
+    <table class="table">
+      <thead>
+        <tr><th>Vyber</th><th>Obsah</th><th>Popis</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><input type="checkbox" name="sections" value="charts"></td>
+          <td>📊 Grafy</td>
+          <td>Finanční grafy z dashboardu</td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" name="sections" value="tables"></td>
+          <td>📑 Tabulky</td>
+          <td>Srovnávací tabulky s metrikami</td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" name="sections" value="survey"></td>
+          <td>📝 Dotazník</td>
+          <td>Poslední vyplněný dotazník</td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" name="sections" value="suropen"></td>
+          <td>🔎 Osobní analýza</td>
+          <td>Odpovědi + shrnutí od AI</td>
+        </tr>
+      </tbody>
+    </table>
+    <button type="submit" class="btn btn-success">📥 Vygenerovat PDF</button>
+  </form>
+</div>
+{% endblock %}

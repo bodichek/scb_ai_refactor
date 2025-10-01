@@ -1,3 +1,5 @@
+{% load static %}
+
 <!DOCTYPE html>
 <html lang="cs">
 <head>
@@ -17,25 +19,52 @@
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ms-auto">
           {% if user.is_authenticated %}
+            <!-- Dashboard -->
             <li class="nav-item">
               <a class="nav-link" href="{% url 'dashboard:index' %}">📊 Dashboard</a>
             </li>
-            <li class="nav-item">
-              <a class="nav-link" href="{% url 'accounts:profile' %}">👤 Profil</a>
-            </li>
+
+            <!-- Dokumenty -->
             <li class="nav-item">
               <a class="nav-link" href="{% url 'ingest:documents' %}">📂 Dokumenty</a>
             </li>
+
+            <!-- Upload PDF -->
             <li class="nav-item">
               <a class="nav-link" href="{% url 'ingest:upload_pdf' %}">⬆️ Nahrát soubor</a>
             </li>
+
+            <!-- Dotazník -->
             <li class="nav-item">
-              <a href="{% url 'accounts:logout' %}">🚪 Odhlásit</a>
+              <a class="nav-link" href="{% url 'survey:questionnaire' %}">📝 Dotazník</a>
+            </li>
+
+            <!-- Osobní analýza -->
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'suropen:form' %}">🔎 Osobní analýza</a>
+            </li>
+
+            <!-- Exporty -->
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'exports:export_form' %}">📤 Exporty</a>
+            </li>
+
+            <!-- Profil -->
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'accounts:profile' %}">👤 Profil</a>
+            </li>
+
+            <!-- Odhlášení -->
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'accounts:logout' %}">🚪 Odhlásit</a>
             </li>
           {% else %}
+            <!-- Přihlášení -->
             <li class="nav-item">
               <a class="nav-link" href="{% url 'accounts:login' %}">🔑 Přihlášení</a>
             </li>
+
+            <!-- Registrace -->
             <li class="nav-item">
               <a class="nav-link" href="{% url 'accounts:register' %}">📝 Registrace</a>
             </li>

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<div>
+  <h2>📝 Dotazník – hodnocení</h2>
+
+  {% if error %}
+    <div style="color: darkred;">{{ error }}</div>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    {% for q in questions %}
+      <div style="margin-bottom: 1em;">
+        <label><b>{{ q.text }}</b></label><br>
+        <input type="range" name="q-{{ forloop.counter0 }}" min="1" max="10" value="5">
+      </div>
+    {% endfor %}
+    <button type="submit">Odeslat</button>
+  </form>
+
+  {% if ai_text %}
+    <div style="margin-top: 2em; border: 1px solid blue; padding: 1em;">
+      <h4>💡 Doporučení od AI</h4>
+      <pre style="white-space:pre-wrap;">{{ ai_text }}</pre>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

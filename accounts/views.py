@@ -11,7 +11,8 @@ from .models import CompanyProfile, UserRole
 
 @login_required
 def profile_view(request):
-    return render(request, "accounts/profile.html")
+    profile, _ = CompanyProfile.objects.get_or_create(user=request.user)
+    return render(request, "accounts/profile.html", {"profile": profile})
 
 
 @login_required

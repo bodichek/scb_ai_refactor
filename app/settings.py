@@ -23,6 +23,9 @@ INSTALLED_APPS = [
     "coaching",
     "ingest",
     "dashboard",
+    "survey",
+    "suropen",
+    "exports",
 ]
 
 MIDDLEWARE = [

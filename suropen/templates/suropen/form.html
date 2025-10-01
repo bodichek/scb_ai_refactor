@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h2 class="mb-4">🔎 Osobní analýza</h2>
+
+  {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" class="card p-4 shadow-sm">
+    {% csrf_token %}
+    {% for block in questions %}
+      <div class="mb-5">
+        <h4 class="text-primary">{{ block.section }}</h4>
+        {% for q in block.items %}
+          <div class="mb-3">
+            <label class="form-label fw-bold">{{ q }}</label>
+            <textarea name="q-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}" 
+                      rows="3" class="form-control" placeholder="Tvoje odpověď..."></textarea>
+          </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-success">Odeslat</button>
+  </form>
+
+  {% if ai_text %}
+    <div class="card mt-5 p-4 bg-light">
+      <h4>🧠 Shrnutí od AI</h4>
+      <pre style="white-space: pre-wrap;">{{ ai_text }}</pre>
+    </div>
+  {% endif %}
+
+  {% if submissions %}
+    <div class="card mt-5 p-3">
+      <h3>📊 Moje předchozí analýzy</h3>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Datum</th>
+            <th>Akce</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in submissions %}
+            <tr>
+              <td>{{ s.created_at|date:"d.m.Y H:i" }}</td>
+              <td>
+                <a href="{% url 'suropen:history' %}?batch={{ s.batch_id }}" class="btn btn-sm btn-primary">
+                  Zobrazit detail
+                </a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="2" class="text-muted">Zatím nemáš žádné záznamy.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
