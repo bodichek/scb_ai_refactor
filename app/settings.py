@@ -1,12 +1,15 @@
 # app/settings.py
 from pathlib import Path
 import os
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
-SECRET_KEY = "change-me"
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")  # fallback pro vývoj
 DEBUG = True
-ALLOWED_HOSTS = ["*"]  # pro vývoj
+ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -50,6 +53,9 @@ TEMPLATES = [
     },
 ]
 
+CSRF_FAILURE_VIEW = "django.views.csrf.csrf_failure"
+
+
 WSGI_APPLICATION = "app.wsgi.application"
 
 # SQLite pro MVP
@@ -88,5 +94,5 @@ AUTH_USER_MODEL = "auth.User"  # pro MVP zůstane default
 LOGOUT_REDIRECT_URL = "home"
 
 # OpenAI – čistě z prostředí (žádné knihovny navíc)
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")

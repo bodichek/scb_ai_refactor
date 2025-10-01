@@ -1,7 +1,12 @@
+import os
+import json
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import Document, FinancialStatement
 from .openai_parser import analyze_income, analyze_balance
+from django.http import HttpResponse
+
+
 
 
 @login_required
@@ -13,40 +18,47 @@ def documents_list(request):
 
 @login_required
 def upload_pdf(request):
-    """
-    Upload PDF souboru – uživatel vybere rok a typ výkazu (income/balance).
-    """
-    if request.method == "POST" and request.FILES.get("file"):
-        year = int(request.POST.get("year") or 0) or 2024
-        doc_type = request.POST.get("doc_type") or "income"
+    if request.method == "POST" and request.FILES.get("pdf_file"):
+        file = request.FILES["pdf_file"]
+        year = request.POST.get("year") or 2025  # TODO: doplnit formulář na rok
+        doc_type = request.POST.get("doc_type") or "income"  # income / balance
 
-        doc = Document.objects.create(
+        # uložíme originální dokument
+        doc = Document.objects.create(owner=request.user, file=file, year=year, doc_type=doc_type)
+
+        # cesta k uloženému souboru
+        pdf_path = doc.file.path
+
+        # pošleme do OpenAI podle typu
+        if doc_type == "income":
+            data = analyze_income(pdf_path)
+        else:
+            data = analyze_balance(pdf_path)
+
+        # uložíme výsledek
+        FinancialStatement.objects.create(
             owner=request.user,
-            file=request.FILES["file"],
+            document=doc,
             year=year,
+            data=data
         )
-        # musíme mít v Document modelu pole doc_type = models.CharField(...)
-        doc.doc_type = doc_type
-        doc.save()
 
-        return redirect("process_pdf", document_id=doc.id)
+        return redirect("dashboard:index")
 
     return render(request, "ingest/upload.html")
 
 
 @login_required
 def process_pdf(request, document_id: int):
-    """
-    Zpracuje PDF → zavolá správný OpenAI parser → uloží metriky do DB.
-    """
     document = get_object_or_404(Document, id=document_id, owner=request.user)
     pdf_path = document.file.path
 
-    # Rozhodnutí podle typu výkazu
-    if getattr(document, "doc_type", "income") == "income":
+    if document.doc_type == "income":
         data = analyze_income(pdf_path)
     else:
         data = analyze_balance(pdf_path)
+
+    print(">>> Saving FS:", document.year, request.user, data)  # ⬅️ Debug výpis
 
     FinancialStatement.objects.update_or_create(
         owner=request.user,
@@ -54,4 +66,4 @@ def process_pdf(request, document_id: int):
         defaults={"document": document, "data": data},
     )
 
-    return redirect("dashboard")
+    return redirect("dashboard:index")

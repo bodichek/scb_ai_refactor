@@ -1,18 +1,15 @@
-import os
-import openai
-import pdfplumber
-import json, re
+import json
+import re
+from openai import OpenAI
 from django.conf import settings
 
-openai.api_key = settings.OPENAI_API_KEY
-MODEL = settings.OPENAI_MODEL or "gpt-4o-mini"
+client = OpenAI(api_key=settings.OPENAI_API_KEY)
+MODEL = settings.OPENAI_MODEL or "gpt-4.1-mini"
 
-# Prompt pro výsledovku (Profit & Loss)
 PROMPT_INCOME = """
-You are an expert in Czech accounting. 
-Extract financial metrics from the provided INCOME STATEMENT (výkaz zisku a ztráty).
-Map Czech line items to the following JSON structure (missing values as 0).
-Return ONLY valid JSON.
+You are an expert in Czech accounting.
+You receive an INCOME STATEMENT (výkaz zisku a ztráty).
+Extract the following metrics and return ONLY valid JSON:
 
 {
   "Revenue": number,
@@ -22,16 +19,20 @@ Return ONLY valid JSON.
   "InterestPaid": number,
   "IncomeTaxPaid": number,
   "ExtraordinaryItems": number,
-  "DividendsPaid": number
+  "DividendsPaid": number,
+  "COGS": number,
+  "EBIT": number
 }
+
+Rules:
+- If a value is missing, set it to 0.
+- No extra text, just JSON.
 """
 
-# Prompt pro rozvahu (Balance Sheet)
 PROMPT_BALANCE = """
-You are an expert in Czech accounting. 
-Extract financial metrics from the provided BALANCE SHEET (rozvaha).
-Map Czech line items to the following JSON structure (missing values as 0).
-Return ONLY valid JSON.
+You are an expert in Czech accounting.
+You receive a BALANCE SHEET (rozvaha).
+Extract the following metrics and return ONLY valid JSON:
 
 {
   "TotalAssets": number,
@@ -44,36 +45,38 @@ Return ONLY valid JSON.
   "TradePayables": number,
   "ShortTermLiabilities": number,
   "ShortTermLoans": number,
-  "LongTermLoans": number
+  "LongTermLoans": number,
+  "Equity": number
 }
+
+Rules:
+- If a value is missing, set it to 0.
+- No extra text, just JSON.
 """
 
-def extract_text_from_pdf(pdf_path: str) -> str:
-    """Načte text z PDF souboru pomocí pdfplumber (fallback: binární načtení)."""
-    text = ""
-    try:
-        with pdfplumber.open(pdf_path) as pdf:
-            for page in pdf.pages:
-                text += page.extract_text() or ""
-    except Exception:
-        with open(pdf_path, "rb") as f:
-            text = f.read().decode(errors="ignore")
-    return text
 
+def _call_openai(prompt: str, pdf_path: str) -> dict:
+    """📩 Nahraje PDF → pošle do OpenAI Responses API → vrátí JSON."""
+    # 1️⃣ nahraj PDF jako asset
+    with open(pdf_path, "rb") as f:
+        file_obj = client.files.create(file=f, purpose="assistants")
 
-def _call_openai(prompt: str, text: str) -> dict:
-    """Společný helper pro volání OpenAI a načtení JSON."""
-    client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
-    response = client.chat.completions.create(
+    # 2️⃣ zavolej Responses API s file_id
+    response = client.responses.create(
         model=MODEL,
-        messages=[
-            {"role": "system", "content": "You are a financial statement parser."},
-            {"role": "user", "content": prompt + "\n\nText:\n" + text[:12000]}
+        input=[
+            {"role": "system", "content": "You are a financial statement parser. Always return JSON."},
+            {"role": "user", "content": [
+                {"type": "input_text", "text": prompt},
+                {"type": "input_file", "file_id": file_obj.id}
+            ]}
         ],
         temperature=0,
     )
-    content = response.choices[0].message.content.strip()
 
+    content = response.output_text.strip()
+
+    # 3️⃣ validace JSON
     try:
         return json.loads(content)
     except Exception:
@@ -84,41 +87,34 @@ def _call_openai(prompt: str, text: str) -> dict:
 
 
 def analyze_income(pdf_path: str) -> dict:
-    """Analyzuje výsledovku (výkaz zisku a ztráty)."""
-    text = extract_text_from_pdf(pdf_path)
-    data = _call_openai(PROMPT_INCOME, text)
-
-    metrics = {
-        "Revenue": 0,
-        "GrossMargin": 0,
-        "NetProfit": 0,
-        "Depreciation": 0,
-        "InterestPaid": 0,
-        "IncomeTaxPaid": 0,
-        "ExtraordinaryItems": 0,
-        "DividendsPaid": 0,
+    data = _call_openai(PROMPT_INCOME, pdf_path)
+    return {
+        "Revenue": data.get("Revenue", 0),
+        "GrossMargin": data.get("GrossMargin", 0),
+        "NetProfit": data.get("NetProfit", 0),
+        "Depreciation": data.get("Depreciation", 0),
+        "InterestPaid": data.get("InterestPaid", 0),
+        "IncomeTaxPaid": data.get("IncomeTaxPaid", 0),
+        "ExtraordinaryItems": data.get("ExtraordinaryItems", 0),
+        "DividendsPaid": data.get("DividendsPaid", 0),
+        "COGS": data.get("COGS", 0),
+        "EBIT": data.get("EBIT", 0),
     }
-    metrics.update(data)
-    return metrics
 
 
 def analyze_balance(pdf_path: str) -> dict:
-    """Analyzuje rozvahu (balance sheet)."""
-    text = extract_text_from_pdf(pdf_path)
-    data = _call_openai(PROMPT_BALANCE, text)
-
-    metrics = {
-        "TotalAssets": 0,
-        "Cash": 0,
-        "Receivables": 0,
-        "Inventory": 0,
-        "CurrentAssets": 0,
-        "TangibleAssets": 0,
-        "TotalLiabilities": 0,
-        "TradePayables": 0,
-        "ShortTermLiabilities": 0,
-        "ShortTermLoans": 0,
-        "LongTermLoans": 0,
+    data = _call_openai(PROMPT_BALANCE, pdf_path)
+    return {
+        "TotalAssets": data.get("TotalAssets", 0),
+        "Cash": data.get("Cash", 0),
+        "Receivables": data.get("Receivables", 0),
+        "Inventory": data.get("Inventory", 0),
+        "CurrentAssets": data.get("CurrentAssets", 0),
+        "TangibleAssets": data.get("TangibleAssets", 0),
+        "TotalLiabilities": data.get("TotalLiabilities", 0),
+        "TradePayables": data.get("TradePayables", 0),
+        "ShortTermLiabilities": data.get("ShortTermLiabilities", 0),
+        "ShortTermLoans": data.get("ShortTermLoans", 0),
+        "LongTermLoans": data.get("LongTermLoans", 0),
+        "Equity": data.get("Equity", 0),
     }
-    metrics.update(data)
-    return metrics

@@ -38,7 +38,7 @@ def edit_profile(request):
 
 
 def landing(request):
-    return render(request, "base_landing.html")
+    return render(request, "home.html")
 
 
 def register(request):

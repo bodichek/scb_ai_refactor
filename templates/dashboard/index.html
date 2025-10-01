@@ -1,17 +1,73 @@
-{% extends "base.html" %}{% block content %}
-<h3>Dashboard</h3>
-<canvas id="chart" height="100"></canvas>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-new Chart(document.getElementById('chart'), {
-  type: 'line',
-  data: {
-    labels: {{ years|safe }},
-    datasets: [
-      { label: "Revenue", data: {{ revenue|safe }}, borderColor: "blue", fill: false },
-      { label: "Net Profit", data: {{ net_profit|safe }}, borderColor: "green", fill: false }
-    ]
-  }
-});
-</script>
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h2>📊 Přehled finančních výkazů</h2>
+
+  {% if statements %}
+    <table class="table table-bordered table-striped table-sm">
+      <thead>
+        <tr>
+          <th>Rok</th>
+          <!-- Income Statement -->
+          <th>Revenue</th>
+          <th>COGS</th>
+          <th>Gross Margin</th>
+          <th>EBIT</th>
+          <th>Net Profit</th>
+          <th>Depreciation</th>
+          <th>Interest Paid</th>
+          <th>Income Tax Paid</th>
+          <th>Extraordinary Items</th>
+          <th>Dividends Paid</th>
+          <!-- Balance Sheet -->
+          <th>Cash</th>
+          <th>Receivables</th>
+          <th>Inventory</th>
+          <th>Current Assets</th>
+          <th>Tangible Assets</th>
+          <th>Total Assets</th>
+          <th>Equity</th>
+          <th>Total Liabilities</th>
+          <th>Trade Payables</th>
+          <th>Short-term Liabilities</th>
+          <th>Short-term Loans</th>
+          <th>Long-term Loans</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in statements %}
+          <tr>
+            <td>{{ s.year }}</td>
+            <!-- Income -->
+            <td>{{ s.data.Revenue|default:"-" }}</td>
+            <td>{{ s.data.COGS|default:"-" }}</td>
+            <td>{{ s.data.GrossMargin|default:"-" }}</td>
+            <td>{{ s.data.EBIT|default:"-" }}</td>
+            <td>{{ s.data.NetProfit|default:"-" }}</td>
+            <td>{{ s.data.Depreciation|default:"-" }}</td>
+            <td>{{ s.data.InterestPaid|default:"-" }}</td>
+            <td>{{ s.data.IncomeTaxPaid|default:"-" }}</td>
+            <td>{{ s.data.ExtraordinaryItems|default:"-" }}</td>
+            <td>{{ s.data.DividendsPaid|default:"-" }}</td>
+            <!-- Balance -->
+            <td>{{ s.data.Cash|default:"-" }}</td>
+            <td>{{ s.data.Receivables|default:"-" }}</td>
+            <td>{{ s.data.Inventory|default:"-" }}</td>
+            <td>{{ s.data.CurrentAssets|default:"-" }}</td>
+            <td>{{ s.data.TangibleAssets|default:"-" }}</td>
+            <td>{{ s.data.TotalAssets|default:"-" }}</td>
+            <td>{{ s.data.Equity|default:"-" }}</td>
+            <td>{{ s.data.TotalLiabilities|default:"-" }}</td>
+            <td>{{ s.data.TradePayables|default:"-" }}</td>
+            <td>{{ s.data.ShortTermLiabilities|default:"-" }}</td>
+            <td>{{ s.data.ShortTermLoans|default:"-" }}</td>
+            <td>{{ s.data.LongTermLoans|default:"-" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>⚠️ Zatím nemáte žádné nahrané výkazy.</p>
+  {% endif %}
+</div>
 {% endblock %}
