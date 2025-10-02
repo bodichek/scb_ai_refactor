@@ -1,7 +1,17 @@
+import os
+import io
 import json
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
+import base64
 from ingest.models import FinancialStatement
+from django.shortcuts import render
+from django.conf import settings
+from django.http import JsonResponse, FileResponse
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt   # ⬅️ TOTO ti chybělo
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+
 
 @login_required
 def index(request):
@@ -91,3 +101,61 @@ def index(request):
         "years": json.dumps(years),
         "table_rows": rows,         # pro tabulkový přehled
     })
+
+
+@csrf_exempt
+def save_chart(request):
+    """
+    Uloží přijatý base64 PNG z frontendu do MEDIA_ROOT jako chart_<id>.png
+    """
+    if request.method == "POST":
+        data = json.loads(request.body)
+        image_data = data.get("image")
+        chart_id = data.get("chart_id")
+
+        if not image_data or not chart_id:
+            return JsonResponse({"status": "error", "message": "missing data"}, status=400)
+
+        # odstraň prefix data:image/png;base64,
+        if image_data.startswith("data:image/png;base64,"):
+            image_data = image_data.replace("data:image/png;base64,", "")
+
+        try:
+            image_binary = base64.b64decode(image_data)
+        except Exception as e:
+            return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+        file_name = f"chart_{chart_id}.png"
+        file_path = os.path.join(settings.MEDIA_ROOT, file_name)
+
+        with open(file_path, "wb") as f:
+            f.write(image_binary)
+
+        return JsonResponse({"status": "ok", "file": file_path})
+
+    return JsonResponse({"status": "error", "message": "invalid method"}, status=405)
+
+
+def export_full_pdf(request):
+    """
+    Vytvoří PDF, do kterého vloží všechny PNG grafy z MEDIA_ROOT
+    """
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    elements = []
+    styles = getSampleStyleSheet()
+
+    elements.append(Paragraph("📊 Financial Dashboard", styles["Title"]))
+    elements.append(Spacer(1, 12))
+
+    # projdi všechny chart_*.png v MEDIA_ROOT
+    for fname in sorted(os.listdir(settings.MEDIA_ROOT)):
+        if fname.startswith("chart_") and fname.endswith(".png"):
+            chart_path = os.path.join(settings.MEDIA_ROOT, fname)
+            elements.append(Image(chart_path, width=400, height=250))
+            elements.append(Spacer(1, 24))
+
+    doc.build(elements)
+    buffer.seek(0)
+
+    return FileResponse(buffer, as_attachment=True, filename="financial_dashboard.pdf")

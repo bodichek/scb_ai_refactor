@@ -1,145 +1,74 @@
-import io
 import os
-import base64
+import io
 import json
+import base64
+from django.conf import settings
+from django.http import JsonResponse, FileResponse
+from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
-from django.http import FileResponse, JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
-)
 from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib import colors
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.cidfonts import UnicodeCIDFont
-
-from survey.models import SurveySubmission
-from suropen.models import OpenAnswer
-
-# složka pro uložené grafy
-UPLOAD_DIR = "media/charts"
 
 
-@login_required
 def export_form(request):
-    """
-    Zobrazení formuláře s checkboxy.
-    """
+    """Jednoduchá stránka s tlačítkem pro export PDF."""
     return render(request, "exports/export_form.html")
+
+
+@csrf_exempt
+def upload_chart(request):
+    """Příjem base64 PNG z frontendu a uložení do MEDIA_ROOT."""
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            image_data = data.get("image")
+            chart_id = data.get("chart_id")
+        except Exception:
+            return JsonResponse({"status": "error", "message": "Invalid JSON"}, status=400)
+
+        if not image_data or not chart_id:
+            return JsonResponse({"status": "error", "message": "Missing data"}, status=400)
+
+        if image_data.startswith("data:image/png;base64,"):
+            image_data = image_data.replace("data:image/png;base64,", "")
+
+        try:
+            image_binary = base64.b64decode(image_data)
+        except Exception as e:
+            return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+        file_name = f"chart_{chart_id}.png"
+        file_path = os.path.join(settings.MEDIA_ROOT, file_name)
+        os.makedirs(settings.MEDIA_ROOT, exist_ok=True)
+
+        with open(file_path, "wb") as f:
+            f.write(image_binary)
+
+        return JsonResponse({"status": "ok", "file": file_path})
+
+    return JsonResponse({"status": "error", "message": "Invalid method"}, status=405)
 
 
 @login_required
 def export_pdf(request):
-    """
-    Sestavení PDF podle vybraných checkboxů.
-    """
+    """Generuje PDF s grafy uloženými v MEDIA_ROOT."""
     buffer = io.BytesIO()
-
-    # Registrace fontu pro češtinu
-    pdfmetrics.registerFont(UnicodeCIDFont("HeiseiMin-W3"))
-
     doc = SimpleDocTemplate(buffer, pagesize=A4)
-    styles = getSampleStyleSheet()
-    normal = styles["Normal"]
-    normal.fontName = "HeiseiMin-W3"
-    heading = styles["Heading2"]
-    heading.fontName = "HeiseiMin-W3"
-    title = styles["Title"]
-    title.fontName = "HeiseiMin-W3"
-
     elements = []
+    styles = getSampleStyleSheet()
 
-    # Hlavička s údaji o uživateli
-    elements.append(Paragraph(f"Export pro: {request.user.username} ({request.user.email})", title))
-    elements.append(Spacer(1, 20))
+    elements.append(Paragraph("📊 Financial Dashboard", styles["Title"]))
+    elements.append(Spacer(1, 12))
 
-    # Co bylo zaškrtnuto
-    selected = request.POST.getlist("sections")
-
-    # 📊 Grafy
-    if "charts" in selected:
-        elements.append(Paragraph("📊 Grafy", heading))
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-        # Pro jednoduchost vezmeme 1 uložený graf s ID 'myChart'
-        chart_file = f"{UPLOAD_DIR}/{request.user.id}_myChart.png"
-        if os.path.exists(chart_file):
-            elements.append(Image(chart_file, width=400, height=250))
-        else:
-            elements.append(Paragraph("Žádný graf zatím nebyl uložen.", normal))
-        elements.append(Spacer(1, 10))
-
-    # 📑 Tabulky
-    if "tables" in selected:
-        elements.append(Paragraph("📑 Srovnávací tabulky", heading))
-        data = [
-            ["Metrika", "2023", "2024"],
-            ["Revenue", "1 200 000", "1 450 000"],
-            ["EBIT", "150 000", "200 000"],
-        ]
-        t = Table(data, hAlign="LEFT")
-        t.setStyle(TableStyle([
-            ("GRID", (0,0), (-1,-1), 1, colors.black),
-            ("BACKGROUND", (0,0), (-1,0), colors.lightgrey)
-        ]))
-        elements.append(t)
-        elements.append(Spacer(1, 10))
-
-    # 📝 Dotazník
-    if "survey" in selected:
-        elements.append(Paragraph("📝 Dotazník", heading))
-        last_survey = SurveySubmission.objects.filter(user=request.user).order_by("-created_at").first()
-        if last_survey:
-            for r in last_survey.responses.all():
-                elements.append(Paragraph(f"{r.question}: {r.score}/10", normal))
-        else:
-            elements.append(Paragraph("Žádný dotazník zatím nebyl vyplněn.", normal))
-        elements.append(Spacer(1, 10))
-
-    # 🔎 Osobní analýza
-    if "suropen" in selected:
-        elements.append(Paragraph("🔎 Osobní analýza", heading))
-        last_batch = OpenAnswer.objects.filter(user=request.user).order_by("-created_at").first()
-        if last_batch:
-            elements.append(Paragraph("Odpovědi:", normal))
-            for oa in OpenAnswer.objects.filter(batch_id=last_batch.batch_id):
-                elements.append(Paragraph(f"[{oa.section}] {oa.question} → {oa.answer}", normal))
-            if last_batch.ai_response:
-                elements.append(Spacer(1, 10))
-                elements.append(Paragraph("🧠 Shrnutí AI:", heading))
-                elements.append(Paragraph(last_batch.ai_response, normal))
-        else:
-            elements.append(Paragraph("Žádná osobní analýza zatím není dostupná.", normal))
-        elements.append(Spacer(1, 10))
+    if os.path.exists(settings.MEDIA_ROOT):
+        for fname in sorted(os.listdir(settings.MEDIA_ROOT)):
+            if fname.startswith("chart_") and fname.endswith(".png"):
+                chart_path = os.path.join(settings.MEDIA_ROOT, fname)
+                elements.append(Image(chart_path, width=400, height=250))
+                elements.append(Spacer(1, 24))
 
     doc.build(elements)
     buffer.seek(0)
-    return FileResponse(buffer, as_attachment=True, filename="export.pdf")
-
-
-@csrf_exempt
-@login_required
-def upload_chart(request):
-    """
-    Uloží graf z frontendu (Chart.js → base64 PNG).
-    """
-    if request.method == "POST":
-        data = json.loads(request.body)
-        image_data = data.get("image", "")
-        chart_id = data.get("chart_id", "myChart")
-
-        if image_data.startswith("data:image/png;base64,"):
-            image_data = image_data.replace("data:image/png;base64,", "")
-        img_bytes = base64.b64decode(image_data)
-
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
-        filename = f"{UPLOAD_DIR}/{request.user.id}_{chart_id}.png"
-        with open(filename, "wb") as f:
-            f.write(img_bytes)
-
-        return JsonResponse({"status": "ok", "file": filename})
-
-    return JsonResponse({"status": "error"}, status=400)
+    return FileResponse(buffer, as_attachment=True, filename="financial_dashboard.pdf")

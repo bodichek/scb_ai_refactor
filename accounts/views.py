@@ -12,6 +12,20 @@ from .models import CompanyProfile, UserRole
 @login_required
 def profile_view(request):
     profile, _ = CompanyProfile.objects.get_or_create(user=request.user)
+
+    if request.method == "POST":
+        profile.company_name = request.POST.get("company_name")
+        profile.ico = request.POST.get("ico")
+        profile.contact_person = request.POST.get("contact_person")
+        profile.phone = request.POST.get("phone")
+        profile.email = request.POST.get("email")
+        profile.website = request.POST.get("website")
+        profile.linkedin = request.POST.get("linkedin")
+        profile.industry = request.POST.get("industry")
+        profile.employees_count = request.POST.get("employees_count") or None
+        profile.save()
+        return redirect("accounts:profile")
+
     return render(request, "accounts/profile.html", {"profile": profile})
 
 
@@ -32,7 +46,8 @@ def edit_profile(request):
         coach_id = request.POST.get("assigned_coach")
         profile.assigned_coach_id = coach_id if coach_id else None
         profile.save()
-        return redirect("accounts:edit_profile")
+        # ✅ Po uložení přesměrování zpět na profil
+        return redirect("accounts:profile")
 
     coaches = Coach.objects.all()
     return render(request, "accounts/profile_form.html", {"profile": profile, "coaches": coaches})
