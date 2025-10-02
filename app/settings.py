@@ -7,8 +7,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")  # fallback pro vývoj
-DEBUG = True
-ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+DEBUG = os.getenv("DEBUG", "False") == "True"
+
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
+
 
 
 INSTALLED_APPS = [
@@ -18,7 +20,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    
+
     "accounts",
     "coaching",
     "ingest",
@@ -71,6 +73,7 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = []
 CSRF_TRUSTED_ORIGINS = [
+    "https://bodichek.pythonanywhere.com",
     "http://127.0.0.1:8000",
     "http://localhost:8000",
 ]
@@ -82,7 +85,7 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_DIRS = [BASE_DIR / "static"]
+
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
