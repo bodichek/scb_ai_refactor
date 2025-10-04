@@ -7,6 +7,12 @@
     <div class="alert alert-danger">{{ error }}</div>
   {% endif %}
 
+  {% if just_submitted %}
+    <div class="alert alert-success">✅ Dotazník byl úspěšně odeslán.</div>
+  {% elif duplicate %}
+    <div class="alert alert-warning">⚠️ Odpověď byla již nedávno odeslána, počkej prosím pár sekund.</div>
+  {% endif %}
+
   <form method="post" class="card p-4 shadow-sm">
     {% csrf_token %}
     {% for block in questions %}
@@ -38,6 +44,7 @@
         <thead>
           <tr>
             <th>Datum</th>
+            <th>Počet odpovědí</th>
             <th>Akce</th>
           </tr>
         </thead>
@@ -46,17 +53,33 @@
             <tr>
               <td>{{ s.created_at|date:"d.m.Y H:i" }}</td>
               <td>
+                {{ s.count|default:"—" }}
+              </td>
+              <td>
                 <a href="{% url 'suropen:history' %}?batch={{ s.batch_id }}" class="btn btn-sm btn-primary">
                   Zobrazit detail
                 </a>
               </td>
             </tr>
           {% empty %}
-            <tr><td colspan="2" class="text-muted">Zatím nemáš žádné záznamy.</td></tr>
+            <tr><td colspan="3" class="text-muted">Zatím nemáš žádné záznamy.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   {% endif %}
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.querySelector("form");
+  form.addEventListener("submit", () => {
+    const btn = form.querySelector("button[type=submit]");
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = "Odesílám...";
+    }
+  });
+});
+</script>
 {% endblock %}

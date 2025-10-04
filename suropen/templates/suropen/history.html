@@ -5,8 +5,13 @@
 
   {% for batch in batches %}
     <div class="card my-4 shadow-sm">
-      <div class="card-header">
-        <b>Vyplněno:</b> {{ batch.created_at|date:"d.m.Y H:i" }}
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+          <b>Vyplněno:</b> {{ batch.created_at|date:"d.m.Y H:i" }}
+        </div>
+        <div class="text-muted">
+          {{ batch.items|length }} odpovědí
+        </div>
       </div>
       <div class="card-body">
         <!-- Moje odpovědi -->
@@ -14,8 +19,8 @@
         <ul class="list-group mb-3">
           {% for item in batch.items %}
             <li class="list-group-item">
-              <b>[{{ item.section }}]</b> {{ item.question }}<br>
-              <span class="text-muted">Odpověď:</span> {{ item.answer }}
+              <p class="mb-1"><b>[{{ item.section }}]</b> {{ item.question }}</p>
+              <p class="mb-0"><span class="text-muted">Odpověď:</span> {{ item.answer }}</p>
             </li>
           {% endfor %}
         </ul>
@@ -23,8 +28,8 @@
         <!-- Shrnutí od AI -->
         {% if batch.ai_response %}
           <h5 class="mt-4">🧠 Shrnutí od AI</h5>
-          <div class="alert alert-info">
-            <pre style="white-space: pre-wrap;">{{ batch.ai_response }}</pre>
+          <div class="alert alert-info mb-0">
+            <pre style="white-space: pre-wrap; margin:0;">{{ batch.ai_response }}</pre>
           </div>
         {% endif %}
       </div>
