@@ -6,6 +6,6 @@ app_name = "ingest"
 urlpatterns = [
     path("documents/", views.documents_list, name="documents"),
     path("upload/", views.upload_pdf, name="upload_pdf"),
+    path("upload-many/", views.upload_many, name="upload_many"),
     path("delete/<int:document_id>/", views.delete_document, name="delete_document"),
-
 ]

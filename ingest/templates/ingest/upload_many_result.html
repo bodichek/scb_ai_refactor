@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h3>📊 Výsledek nahrávání</h3>
+  <table class="table table-striped mt-3">
+    <thead>
+      <tr>
+        <th>Soubor</th>
+        <th>Rok</th>
+        <th>Typ</th>
+        <th>Stav</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in results %}
+      <tr>
+        <td>{{ r.file }}</td>
+        <td>{{ r.year }}</td>
+        <td>{{ r.type }}</td>
+        <td>{{ r.status }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <a href="{% url 'ingest:documents' %}" class="btn btn-success mt-3">📂 Zpět na seznam dokumentů</a>
+</div>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4 text-center">
+  <h3>📁 Nahrát více souborů</h3>
+  <form id="uploadForm" method="post" enctype="multipart/form-data" onsubmit="startProgress()">
+    {% csrf_token %}
+    <div class="mb-3">
+      <input type="file" name="pdf_files" id="pdf_files" class="form-control" multiple required>
+    </div>
+    <button type="submit" class="btn btn-primary btn-lg">🚀 Nahrát a analyzovat</button>
+  </form>
+
+  <!-- Zábavný progressbar -->
+  <div id="progressSection" class="mt-5" style="display:none;">
+    <h4 id="progressText">📦 Nahrávám soubory...</h4>
+    <div class="progress" style="height: 25px;">
+      <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+           role="progressbar" style="width: 0%">0%</div>
+    </div>
+    <div id="funText" class="mt-3 text-muted"></div>
+  </div>
+</div>
+
+<script>
+const funMessages = [
+  "🧠 OpenAI přemýšlí, co je co...",
+  "📊 Detekujeme rok a typ výkazu...",
+  "💼 Počítáme tržby a aktiva...",
+  "📈 Skládáme výsledovku...",
+  "✨ Téměř hotovo – finální úpravy!"
+];
+
+function startProgress() {
+  document.getElementById("uploadForm").style.display = "none";
+  document.getElementById("progressSection").style.display = "block";
+
+  const bar = document.getElementById("progressBar");
+  const text = document.getElementById("progressText");
+  const funText = document.getElementById("funText");
+
+  let width = 0;
+  let step = 0;
+  const timer = setInterval(() => {
+    if (width >= 100) {
+      clearInterval(timer);
+      text.innerHTML = "✅ Zpracování dokončeno – načítám výsledky...";
+    } else {
+      width += Math.random() * 7;  // náhodné zrychlení
+      bar.style.width = Math.min(width, 100) + "%";
+      bar.innerHTML = Math.min(Math.round(width), 100) + "%";
+
+      // změna zábavných hlášek
+      if (step < funMessages.length && width > (step+1)*20) {
+        funText.innerHTML = funMessages[step];
+        step++;
+      }
+    }
+  }, 400);
+}
+</script>
+{% endblock %}
