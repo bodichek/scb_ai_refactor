@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container">
-  <h2>📤 Export do PDF</h2>
+  <h2>📤 Exportovat do PDF</h2>
 
   <form method="post" action="{% url 'exports:export_pdf' %}">
     {% csrf_token %}

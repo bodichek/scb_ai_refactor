@@ -3,7 +3,7 @@
 <ul class="list-group">
   {% for s in statements %}
     <li class="list-group-item">
-      <b>{{ s.year }}</b> — Revenue: {{ s.data.Revenue|default:0 }}, Net Profit: {{ s.data.NetProfit|default:0 }}
+      <b>{{ s.year }}</b> — Tržby: {{ s.data.Revenue|default:0 }}, Čistý zisk: {{ s.data.NetProfit|default:0 }}
     </li>
   {% endfor %}
 </ul>
