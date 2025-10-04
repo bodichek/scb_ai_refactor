@@ -204,7 +204,15 @@ def questionnaire(request):
                 )
         return redirect("survey:detail", batch_id=submission.batch_id)
 
-    submissions = SurveySubmission.objects.filter(user=request.user).order_by("-created_at")
+    # Přehled dřívějších submissionů i s průměrným skóre
+    submissions = []
+    for s in SurveySubmission.objects.filter(user=request.user).order_by("-created_at"):
+        avg_score = s.responses.aggregate(avg=Avg("score"))["avg"]
+        submissions.append({
+            "batch_id": s.batch_id,
+            "created_at": s.created_at,
+            "avg_score": round(avg_score, 1) if avg_score is not None else None,
+        })
 
     return render(
         request,
@@ -214,30 +222,52 @@ def questionnaire(request):
 
 @login_required
 def survey_summary(request):
-    """
-    Přehled všech odeslaných dotazníků.
-    """
     submissions = SurveySubmission.objects.filter(user=request.user).order_by("-created_at")
-    return render(request, "survey/summary.html", {"submissions": submissions})
 
+    batches = []
+    for s in submissions:
+        avg_score = s.responses.aggregate(avg=Avg("score"))["avg"]
+        items = [{"question": r.question, "answer": r.score} for r in s.responses.all()]
+        batches.append({
+            "batch_id": s.batch_id,
+            "created_at": s.created_at,
+            "ai_response": getattr(s, "ai_response", None),
+            "items": items,
+            "avg_score": round(avg_score, 1) if avg_score is not None else None
+        })
+
+    return render(request, "survey/summary.html", {"batches": batches})
 
 @login_required
 def survey_detail(request, batch_id):
-    """
-    Detail jednoho konkrétního dotazníku + graf historie odpovědí.
-    """
     submission = get_object_or_404(SurveySubmission, user=request.user, batch_id=batch_id)
     responses = submission.responses.all()
+
+    # Najdeme textové popisky podle otázky a score
+    enriched_responses = []
+    for r in responses:
+        label_text = None
+        for q in QUESTIONS:
+            if q["question"] == r.question:
+                for score_range, text in q["labels"].items():
+                    low, high = map(int, score_range.split("-"))
+                    if low <= r.score <= high:
+                        label_text = text
+                        break
+        enriched_responses.append({
+            "question": r.question,
+            "score": r.score,
+            "label": label_text,
+        })
+
     avg_score = responses.aggregate(avg=Avg("score"))["avg"]
 
-    # historie: všechny submissiony pro daného uživatele
     history = (
         SurveySubmission.objects.filter(user=request.user)
         .order_by("created_at")
         .prefetch_related("responses")
     )
 
-    # připravíme data pro graf: vývoj průměrů
     chart_labels = [s.created_at.strftime("%d.%m.%Y") for s in history]
     chart_data = [
         round(sum(r.score for r in s.responses.all()) / s.responses.count(), 2)
@@ -249,7 +279,7 @@ def survey_detail(request, batch_id):
         "survey/detail.html",
         {
             "submission": submission,
-            "responses": responses,
+            "responses": enriched_responses,  # << změněno
             "avg_score": avg_score,
             "chart_labels": chart_labels,
             "chart_data": chart_data,

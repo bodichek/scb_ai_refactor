@@ -13,6 +13,16 @@
           <span>{{ b.created_at|date:"d.m.Y H:i" }}</span>
         </div>
 
+        <!-- 🔹 Celkové hodnocení -->
+        {% if b.avg_score %}
+          <div style="margin-top: 0.5em;">
+            <b>Celkové hodnocení:</b>
+            <span class="badge score-badge" data-score="{{ b.avg_score }}">
+              {{ b.avg_score }}
+            </span>
+          </div>
+        {% endif %}
+
         {% if b.ai_response %}
           <h5>💡 AI shrnutí</h5>
           <pre style="white-space:pre-wrap;">{{ b.ai_response }}</pre>
@@ -29,4 +39,20 @@
     {% endfor %}
   {% endif %}
 </div>
+
+<!-- 🔹 Script na barvení badge -->
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll(".score-badge").forEach(el => {
+    const score = parseFloat(el.dataset.score); // 1–10
+    const ratio = (score - 1) / 9; // normalizace 0–1
+    const hue = 0 + (120 * ratio); // 0 = červená, 120 = zelená
+    el.style.backgroundColor = `hsl(${hue}, 80%, 40%)`;
+    el.style.color = "white";
+    el.style.fontWeight = "bold";
+    el.style.padding = "0.4em 0.7em";
+    el.style.borderRadius = "0.5em";
+  });
+});
+</script>
 {% endblock %}

@@ -7,9 +7,10 @@
   <!-- Seznam odpovědí -->
   <ul class="list-group mb-3">
     {% for r in responses %}
-      <li class="list-group-item d-flex justify-content-between">
+      <li class="list-group-item d-flex justify-content-between align-items-center">
         <span>{{ r.question }}</span>
-        <span class="badge bg-primary">{{ r.score }}</span>
+        <!-- 🔹 Barevný badge podle skóre -->
+        <span class="badge score-badge" data-score="{{ r.score }}">{{ r.label }}</span>
       </li>
     {% endfor %}
   </ul>
@@ -61,5 +62,25 @@
       }
     }
   });
+</script>
+
+<!-- 🔹 Barvení odpovědí podle skóre -->
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll(".score-badge").forEach(el => {
+    const score = parseFloat(el.dataset.score); // hodnota 1–10
+    const ratio = (score - 1) / 9; // převod na 0–1
+    const hue = 0 + (120 * ratio); // 0 = červená, 120 = zelená
+
+    el.style.backgroundColor = `hsl(${hue}, 80%, 40%)`;
+    el.style.color = "white";
+    el.style.fontWeight = "bold";
+    el.style.padding = "6px 10px";
+    el.style.borderRadius = "8px";
+    el.style.minWidth = "250px";
+    el.style.textAlign = "center";
+    el.style.whiteSpace = "normal";
+  });
+});
 </script>
 {% endblock %}

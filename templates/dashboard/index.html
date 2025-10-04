@@ -32,19 +32,58 @@
   <table class="table table-bordered">
     <thead>
       <tr>
-        <th>Rok</th>
-        <th>Tržby</th>
-        <th>Nákklady na prodané zboží</th>
-        <th>Hrubá marže</th>
-        <th>Provozní náklady</th>
-        <th>EBIT</th>
-        <th>Čistý zisk</th>
-        <th>Hrubá marže %</th>
-        <th>Provozní marže %</th>
-        <th>Čistá marže %</th>
-        <th>Růst třžeb %</th>
-        <th>Růst nákladů na prodané zboží %</th>
-        <th>Růst provozních nákladů %</th>
+        <th>
+          Rok
+          <span class="tooltip-icon" data-bs-toggle="tooltip" title="Účetní období (např. 2022, 2023)">❓</span>
+        </th>
+        <th>
+          Tržby
+          <span class="tooltip-icon" data-bs-toggle="tooltip" title="Celkové výnosy z prodeje zboží nebo služeb">❓</span>
+        </th>
+        <th>
+          Náklady na prodané zboží
+          <span class="tooltip-icon" data-bs-toggle="tooltip" title="Přímé náklady spojené s výrobou nebo nákupem zboží (COGS)">❓</span>
+        </th>
+        <th>
+          Hrubá marže
+          <span class="tooltip-icon" data-bs-toggle="tooltip" title="Rozdíl mezi tržbami a náklady na prodané zboží">❓</span>
+        </th>
+        <th>
+          Provozní náklady
+          <span class="tooltip-icon" data-bs-toggle="tooltip" title="Nepřímé náklady (mzdy, nájem, administrativa, marketing)">❓</span>
+        </th>
+        <th>
+          EBIT
+          <span class="tooltip-icon" data-bs-toggle="tooltip" title="Zisk před úroky a zdaněním (Operating Profit)">❓</span>
+        </th>
+        <th>
+          Čistý zisk
+          <span class="tooltip-icon" data-bs-toggle="tooltip" title="Zisk po odečtení všech nákladů, úroků a daní">❓</span>
+        </th>
+        <th>
+          Hrubá marže %
+          <span class="tooltip-icon" data-bs-toggle="tooltip" title="Hrubá marže dělená tržbami – kolik % zůstává po přímých nákladech">❓</span>
+        </th>
+        <th>
+          Provozní marže %
+          <span class="tooltip-icon" data-bs-toggle="tooltip" title="EBIT dělený tržbami – efektivita provozu">❓</span>
+        </th>
+        <th>
+          Čistá marže %
+          <span class="tooltip-icon" data-bs-toggle="tooltip" title="Čistý zisk dělený tržbami – kolik zůstane z každé koruny tržeb">❓</span>
+        </th>
+        <th>
+          Růst tržeb %
+          <span class="tooltip-icon" data-bs-toggle="tooltip" title="Meziroční změna tržeb">❓</span>
+        </th>
+        <th>
+          Růst nákladů na prodané zboží %
+          <span class="tooltip-icon" data-bs-toggle="tooltip" title="Meziroční změna přímých nákladů (COGS)">❓</span>
+        </th>
+        <th>
+          Růst provozních nákladů %
+          <span class="tooltip-icon" data-bs-toggle="tooltip" title="Meziroční změna provozních nákladů">❓</span>
+        </th>
       </tr>
     </thead>
     <tbody>
@@ -76,7 +115,29 @@
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+<!-- Bootstrap JS (jen kvůli tooltipům, žádné CSS!) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Vlastní styl pro otazníčky -->
+<style>
+  .tooltip-icon {
+    cursor: pointer;
+    color: #0d6efd;   /* modrá barva */
+    font-weight: bold;
+    margin-left: 4px;
+  }
+</style>
+
 <script>
+  // Aktivace tooltipů (desktop = hover, mobil = tap)
+  document.addEventListener("DOMContentLoaded", function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+      return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+  });
+
+  // ===== TVŮJ EXISTUJÍCÍ KÓD =====
   const rows = {{ rows|safe }};
   const years = {{ years|safe }};
 
@@ -166,13 +227,11 @@
   document.querySelectorAll(".year-filter").forEach(cb => cb.addEventListener("change", renderCharts));
   renderCharts();
 
-
   // ===== EXPORT FUNKCE =====
-
   function saveChartAsImage(chart, chartId) {
     if (!chart) return;
     const imageBase64 = chart.toBase64Image();
-    fetch("/exports/upload_chart/", {   // ⬅️ změna na exports app
+    fetch("/exports/upload_chart/", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -217,7 +276,7 @@
     exportBtn.onclick = () => {
       saveAllCharts();
       setTimeout(() => {
-        window.location.href = "/exports/pdf/";   // ⬅️ změna na exports app
+        window.location.href = "/exports/pdf/";
       }, 1000);
     };
     document.querySelector(".container").appendChild(exportBtn);

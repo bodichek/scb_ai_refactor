@@ -1,123 +1,93 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container">
-  <h2 class="mb-4">📋 Dotazník (slider)</h2>
+<div class="container mt-4">
+  <h2>📝 Nový dotazník</h2>
 
-  <form method="post" class="card p-4 shadow-sm">
-    {% csrf_token %}
-    {% for q in questions %}
-      <div class="mb-5">
-        <label class="form-label"><b>{{ q.category }}:</b> {{ q.question }}</label>
+  <!-- Formulář dotazníku -->
+<form method="post">
+  {% csrf_token %}
+  {% for q in questions %}
+    <div class="card p-3 mb-4 shadow-sm">
+      <h5><b>{{ q.category }}:</b> {{ q.question }}</h5>
 
-        <!-- Popisky odpovědí -->
-        <div class="row text-center small text-muted mb-2">
-          {% for range, label in q.labels.items %}
-            <div class="col">
-              <b>{{ range }}</b><br>
-              <span style="font-size: 0.85rem;">{{ label }}</span>
-            </div>
-          {% endfor %}
-        </div>
-
-        <!-- Slider s hodnotou vpravo -->
-        <div class="d-flex align-items-center">
-          <input type="range" min="1" max="10" value="5" 
-                 class="form-range flex-grow-1 me-3 slider-control thick-slider"
-                 name="q{{ forloop.counter0 }}" id="q{{ forloop.counter0 }}"
-                 oninput="updateValue({{ forloop.counter0 }}, this.value)">
-          <span class="badge bg-warning" id="val{{ forloop.counter0 }}">5</span>
-        </div>
+      <!-- Tabulka popisků pro hodnoty -->
+      <div class="row text-center mt-3 mb-2 small">
+        {% for range, label in q.labels.items %}
+          <div class="col">
+            <b>{{ range }}</b><br>
+            <span>{{ label }}</span>
+          </div>
+        {% endfor %}
       </div>
-    {% endfor %}
 
-    <button type="submit" class="btn btn-primary">Odeslat</button>
-  </form>
-
-  <!-- 🔹 Přehled vyplněných dotazníků -->
-  {% if submissions %}
-    <div class="card mt-5 p-3">
-      <h3>📊 Moje vyplněné dotazníky</h3>
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Datum</th>
-            <th>Akce</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for s in submissions %}
-            <tr>
-              <td>{{ s.created_at|date:"d.m.Y H:i" }}</td>
-              <td>
-                <a href="{% url 'survey:detail' s.batch_id %}" class="btn btn-sm btn-primary">
-                  Zobrazit detail s grafem
-                </a>
-              </td>
-            </tr>
-          {% empty %}
-            <tr>
-              <td colspan="2" class="text-muted">Zatím nemáš žádné záznamy.</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <!-- Slider s aktuální hodnotou -->
+      <div class="d-flex align-items-center">
+        <input type="range" class="form-range flex-grow-1"
+               name="q{{ forloop.counter0 }}"
+               min="1" max="10" value="5"
+               oninput="this.parentNode.querySelector('output').value = this.value">
+        <output class="badge bg-warning text-dark ms-3">5</output>
+      </div>
     </div>
-  {% endif %}
+  {% endfor %}
+  <button type="submit" class="btn btn-success">Odeslat dotazník</button>
+</form>
+
+
+  <!-- Přehled vyplněných dotazníků -->
+  <div class="card mt-5 p-3">
+    <h3>📊 Moje vyplněné dotazníky</h3>
+    <table class="table table-striped mt-3">
+      <thead>
+        <tr>
+          <th>Datum</th>
+          <th>Celkové hodnocení</th>
+          <th>Akce</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in submissions %}
+          <tr>
+            <td>{{ s.created_at|date:"d.m.Y H:i" }}</td>
+            <td>
+              {% if s.avg_score %}
+                <span class="badge score-badge" data-score="{{ s.avg_score }}">
+                  {{ s.avg_score }}
+                </span>
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td>
+              <a href="{% url 'survey:detail' s.batch_id %}" class="btn btn-sm btn-primary">
+                Zobrazit detail s grafem
+              </a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="3" class="text-muted">Zatím nemáš žádné záznamy.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 
-<!-- Skripty -->
+<!-- Barevné zvýraznění skóre -->
 <script>
-function updateValue(index, value) {
-    const badge = document.getElementById('val' + index);
-    badge.innerText = value;
-
-    badge.classList.remove("bg-danger", "bg-warning", "bg-success");
-
-    if (value <= 3) {
-        badge.classList.add("bg-danger");
-    } else if (value <= 6) {
-        badge.classList.add("bg-warning");
-    } else {
-        badge.classList.add("bg-success");
-    }
-}
-
-// umožní posouvání slideru kolečkem myši
-document.addEventListener("DOMContentLoaded", function() {
-    document.querySelectorAll(".slider-control").forEach(function(slider, index) {
-        slider.addEventListener("wheel", function(e) {
-            e.preventDefault();
-            let step = (e.deltaY < 0) ? 1 : -1;
-            let newValue = parseInt(slider.value) + step;
-
-            if (newValue >= slider.min && newValue <= slider.max) {
-                slider.value = newValue;
-                updateValue(index, newValue);
-            }
-        });
-    });
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll(".score-badge").forEach(el => {
+    const score = parseFloat(el.dataset.score);
+    if (isNaN(score)) return;
+    const ratio = (score - 1) / 9; // 0–1
+    const hue = 0 + (120 * ratio); // 0=červená → 120=zelená
+    el.style.backgroundColor = `hsl(${hue}, 80%, 40%)`;
+    el.style.color = "white";
+    el.style.fontWeight = "bold";
+    el.style.padding = "6px 10px";
+    el.style.borderRadius = "8px";
+  });
 });
 </script>
-
-<!-- CSS inline jen pro slider -->
-<style>
-.thick-slider {
-    height: 1.5rem;
-}
-.thick-slider::-moz-range-track {
-    height: 12px;
-}
-.thick-slider::-moz-range-thumb {
-    height: 24px;
-    width: 24px;
-}
-.thick-slider::-webkit-slider-runnable-track {
-    height: 12px;
-}
-.thick-slider::-webkit-slider-thumb {
-    height: 24px;
-    width: 24px;
-    margin-top: -6px;
-}
-</style>
 {% endblock %}
