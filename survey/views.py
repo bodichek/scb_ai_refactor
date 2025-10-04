@@ -3,6 +3,11 @@ from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Avg
 from .models import Response, SurveySubmission
+from openai import OpenAI
+from django.conf import settings
+
+# ✅ OpenAI klient
+client = OpenAI(api_key=getattr(settings, "OPENAI_API_KEY", None))
 
 
 
@@ -186,11 +191,67 @@ QUESTIONS = [
     }
 ]
 
+def generate_ai_summary(submission):
+    """
+    Vytvoří AI shrnutí pro jeden SurveySubmission a uloží jej do pole ai_response.
+    Používá otázky + jejich význam slovně (ne jen čísla).
+    """
+    responses = submission.responses.all()
+    if not responses.exists():
+        return None
+
+    # převod odpovědí na text s popisem významu skóre
+    text_blocks = []
+    for r in responses:
+        label_text = None
+        for q in QUESTIONS:
+            if q["question"] == r.question:
+                for score_range, meaning in q["labels"].items():
+                    low, high = map(int, score_range.split("-"))
+                    if low <= r.score <= high:
+                        label_text = meaning
+                        break
+        text_blocks.append(f"Otázka: {r.question}\nOdpověď: {label_text or r.score}/10")
+
+    combined_text = "\n\n".join(text_blocks)
+
+    prompt = f"""
+Na základě odpovědí z firemního dotazníku shrň hlavní zjištění.
+
+Nepiš rozbor ke každé otázce zvlášť, ale vytvoř celkový přehled:
+1. Shrň, jaký celkový obraz o firmě odpovědi vytvářejí (např. silné oblasti, slabiny, nálada ve firmě).
+2. Uveď 2-3 klíčové faktory, které firmě pomáhají.
+3. Uveď 2-3 největší výzvy nebo problémy, které mohou bránit růstu.
+4. Navrhni 2-3 konkrétní doporučení nebo kroky, které mohou situaci zlepšit.
+
+Buď stručný, konkrétní a piš přehledně v profesionálním tónu (max. 4 odstavce).
+
+Níže jsou otázky a odpovědi v textové formě podle významu skóre:
+
+{combined_text}
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "Jsi firemní analytik, který interpretuje odpovědi z interních dotazníků."},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.6,
+            max_tokens=800,
+        )
+        summary = response.choices[0].message.content.strip()
+        submission.ai_response = summary
+        submission.save(update_fields=["ai_response"])
+        return summary
+    except Exception as e:
+        print("❌ Chyba při generování AI shrnutí:", e)
+        return None
+
+# ✅ Vyplnění dotazníku a AI shrnutí
 @login_required
 def questionnaire(request):
-    """
-    Zobrazí dotazník a uloží odeslané odpovědi.
-    """
     if request.method == "POST":
         with transaction.atomic():
             submission = SurveySubmission.objects.create(user=request.user)
@@ -202,9 +263,12 @@ def questionnaire(request):
                     question=q["question"],
                     score=score,
                 )
+
+        # 🔹 Po odeslání vygeneruje shrnutí
+        generate_ai_summary(submission)
         return redirect("survey:detail", batch_id=submission.batch_id)
 
-    # Přehled dřívějších submissionů i s průměrným skóre
+    # Přehled dřívějších dotazníků s průměrnými výsledky
     submissions = []
     for s in SurveySubmission.objects.filter(user=request.user).order_by("-created_at"):
         avg_score = s.responses.aggregate(avg=Avg("score"))["avg"]
@@ -212,18 +276,19 @@ def questionnaire(request):
             "batch_id": s.batch_id,
             "created_at": s.created_at,
             "avg_score": round(avg_score, 1) if avg_score is not None else None,
+            "ai_response": s.ai_response,
         })
 
-    return render(
-        request,
-        "survey/questionnaire.html",
-        {"questions": QUESTIONS, "submissions": submissions},
-    )
+    return render(request, "survey/questionnaire.html", {"questions": QUESTIONS, "submissions": submissions})
 
+
+# ✅ Souhrn všech odeslaných dotazníků
 @login_required
 def survey_summary(request):
+    """
+    Přehled všech odeslaných dotazníků s průměrným hodnocením a shrnutím AI.
+    """
     submissions = SurveySubmission.objects.filter(user=request.user).order_by("-created_at")
-
     batches = []
     for s in submissions:
         avg_score = s.responses.aggregate(avg=Avg("score"))["avg"]
@@ -231,19 +296,22 @@ def survey_summary(request):
         batches.append({
             "batch_id": s.batch_id,
             "created_at": s.created_at,
-            "ai_response": getattr(s, "ai_response", None),
+            "ai_response": s.ai_response,
             "items": items,
-            "avg_score": round(avg_score, 1) if avg_score is not None else None
+            "avg_score": round(avg_score, 1) if avg_score is not None else None,
         })
 
+    # ✅ Vrací HTML šablonu, ne JSON
     return render(request, "survey/summary.html", {"batches": batches})
 
+
+
+# ✅ Detail jednoho dotazníku
 @login_required
 def survey_detail(request, batch_id):
     submission = get_object_or_404(SurveySubmission, user=request.user, batch_id=batch_id)
     responses = submission.responses.all()
 
-    # Najdeme textové popisky podle otázky a score
     enriched_responses = []
     for r in responses:
         label_text = None
@@ -262,26 +330,18 @@ def survey_detail(request, batch_id):
 
     avg_score = responses.aggregate(avg=Avg("score"))["avg"]
 
-    history = (
-        SurveySubmission.objects.filter(user=request.user)
-        .order_by("created_at")
-        .prefetch_related("responses")
-    )
-
+    # Historie dotazníků (pro graf trendu)
+    history = SurveySubmission.objects.filter(user=request.user).order_by("created_at").prefetch_related("responses")
     chart_labels = [s.created_at.strftime("%d.%m.%Y") for s in history]
     chart_data = [
         round(sum(r.score for r in s.responses.all()) / s.responses.count(), 2)
         for s in history
     ]
 
-    return render(
-        request,
-        "survey/detail.html",
-        {
-            "submission": submission,
-            "responses": enriched_responses,  # << změněno
-            "avg_score": avg_score,
-            "chart_labels": chart_labels,
-            "chart_data": chart_data,
-        },
-    )
+    return render(request, "survey/detail.html", {
+        "submission": submission,
+        "responses": enriched_responses,
+        "avg_score": avg_score,
+        "chart_labels": chart_labels,
+        "chart_data": chart_data,
+    })

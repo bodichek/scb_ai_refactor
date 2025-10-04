@@ -20,6 +20,20 @@
     <b>Průměrné skóre:</b> {{ avg_score|floatformat:1 }}
   </div>
 
+  <!-- 🧩 Shrnutí AI -->
+  {% if submission.ai_response %}
+    <div class="card shadow-sm mb-4 border-0">
+      <div class="card-body">
+        <h4 class="card-title">🧠 Shrnutí AI</h4>
+        <p class="card-text" style="white-space: pre-line;">{{ submission.ai_response }}</p>
+      </div>
+    </div>
+  {% else %}
+    <div class="alert alert-secondary mb-4">
+      <em>AI shrnutí zatím nebylo vygenerováno.</em>
+    </div>
+  {% endif %}
+
   <!-- 🔹 Graf vývoje průměrného skóre -->
   <div class="mt-5">
     <h3>📈 Vývoj průměrného skóre v čase</h3>

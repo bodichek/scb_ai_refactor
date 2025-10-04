@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container mt-4">
-  <h2>📊 Souhrn vyplněných dotazníků</h2>
+  <h2>📊 Moje vyplněné dotazníky</h2>
 
   <table class="table table-striped mt-3 align-middle">
     <thead>
       <tr>
         <th>Datum</th>
-        <th>Průměrné skóre</th>
+        <th>Celkové hodnocení</th>
         <th>AI Shrnutí</th>
         <th>Akce</th>
       </tr>
@@ -17,24 +17,21 @@
       <tr>
         <td>{{ batch.created_at|date:"d.m.Y H:i" }}</td>
         <td><strong>{{ batch.avg_score }}</strong></td>
-
-        <!-- 🔹 ikona místo textu -->
-        <td class="text-center">
-          {% if batch.ai_response and batch.ai_response|length > 5 %}
-            <span style="font-size: 1.3em; color: green;">✅</span>
+        <td style="max-width: 450px;">
+          {% if batch.ai_response %}
+            <div class="text-truncate" title="{{ batch.ai_response }}">
+              {{ batch.ai_response|truncatechars:200 }}
+            </div>
           {% else %}
-            <span style="font-size: 1.3em; color: red;">❌</span>
+            <span class="text-muted">Zatím bez shrnutí</span>
           {% endif %}
         </td>
-
         <td>
           <a href="{% url 'survey:detail' batch.batch_id %}" class="btn btn-sm btn-primary">Zobrazit</a>
         </td>
       </tr>
       {% empty %}
-      <tr>
-        <td colspan="4" class="text-center text-muted">Zatím žádné vyplněné dotazníky</td>
-      </tr>
+      <tr><td colspan="4" class="text-center text-muted">Zatím žádné vyplněné dotazníky</td></tr>
       {% endfor %}
     </tbody>
   </table>

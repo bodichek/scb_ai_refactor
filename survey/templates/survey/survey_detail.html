@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>🧠 Přehled odpovědí</h2>
+  <p><strong>Datum odeslání:</strong> {{ survey.created_at|date:"d.m.Y H:i" }}</p>
+  <p><strong>Průměrné skóre:</strong> {{ survey.avg_score }}</p>
+
+  <h4 class="mt-4">Otázky a odpovědi</h4>
+  <table class="table table-bordered mt-2">
+    <thead>
+      <tr>
+        <th>Otázka</th>
+        <th>Odpověď</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in survey.items %}
+      <tr>
+        <td>{{ item.question }}</td>
+        <td>{{ item.answer }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if survey.ai_response %}
+    <h4 class="mt-4">🧩 Souhrn AI</h4>
+    <p>{{ survey.ai_response }}</p>
+  {% endif %}
+
+  <a href="{% url 'my_surveys' %}" class="btn btn-secondary mt-3">← Zpět na přehled</a>
+</div>
+{% endblock %}

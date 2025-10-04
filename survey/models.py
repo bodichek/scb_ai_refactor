@@ -11,6 +11,7 @@ class SurveySubmission(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     batch_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    ai_response = models.TextField(blank=True, null=True)
 
     class Meta:
         ordering = ["-created_at"]

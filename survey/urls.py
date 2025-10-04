@@ -16,4 +16,6 @@ urlpatterns = [
 
     # detail jednoho konkrétního dotazníku
     path("detail/<uuid:batch_id>/", views.survey_detail, name="detail"),
+    
+    path("detail/<uuid:batch_id>/", views.survey_detail, name="survey_detail"),
 ]
