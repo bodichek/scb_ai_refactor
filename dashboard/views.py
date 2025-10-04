@@ -105,9 +105,7 @@ def index(request):
 
 @csrf_exempt
 def save_chart(request):
-    """
-    Uloží přijatý base64 PNG z frontendu do MEDIA_ROOT jako chart_<id>.png
-    """
+    """Uloží přijatý base64 PNG z frontendu do MEDIA_ROOT/charts/."""
     if request.method == "POST":
         data = json.loads(request.body)
         image_data = data.get("image")
@@ -116,7 +114,6 @@ def save_chart(request):
         if not image_data or not chart_id:
             return JsonResponse({"status": "error", "message": "missing data"}, status=400)
 
-        # odstraň prefix data:image/png;base64,
         if image_data.startswith("data:image/png;base64,"):
             image_data = image_data.replace("data:image/png;base64,", "")
 
@@ -125,15 +122,22 @@ def save_chart(request):
         except Exception as e:
             return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
+        # 🟢 Ujisti se, že složka charts existuje
+        charts_dir = os.path.join(settings.MEDIA_ROOT, "charts")
+        os.makedirs(charts_dir, exist_ok=True)
+
         file_name = f"chart_{chart_id}.png"
-        file_path = os.path.join(settings.MEDIA_ROOT, file_name)
+        file_path = os.path.join(charts_dir, file_name)
 
         with open(file_path, "wb") as f:
             f.write(image_binary)
 
+        print(f"✅ Graf uložen: {file_path}")  # volitelný log
         return JsonResponse({"status": "ok", "file": file_path})
 
     return JsonResponse({"status": "error", "message": "invalid method"}, status=405)
+
+
 
 
 def export_full_pdf(request):

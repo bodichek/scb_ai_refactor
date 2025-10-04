@@ -28,39 +28,36 @@ from accounts.models import CompanyProfile
 
 @csrf_exempt
 def upload_chart(request):
-    """Uloží base64 obrázek (graf z dashboardu) do MEDIA_ROOT."""
+    """Uloží base64 obrázek (graf z dashboardu) do MEDIA_ROOT/charts/."""
     if request.method != "POST":
         return JsonResponse({"error": "Invalid method."}, status=405)
 
-    img_data = None
-
-    # 🧩 1️⃣ Zkus JSON payload
-    if request.content_type == "application/json":
-        try:
-            body = json.loads(request.body.decode("utf-8"))
-            img_data = body.get("image")
-        except Exception as e:
-            return JsonResponse({"error": f"Invalid JSON: {str(e)}"}, status=400)
-
-    # 🧩 2️⃣ Fallback – zkus běžné POST pole
-    if not img_data:
-        img_data = request.POST.get("image")
-
-    if not img_data:
-        return JsonResponse({"error": "No image data provided."}, status=400)
-
     try:
-        format, imgstr = img_data.split(";base64,")
-        ext = format.split("/")[-1]
-        filename = f"chart_{timezone.now().strftime('%Y%m%d_%H%M%S')}.{ext}"
-        file_data = ContentFile(base64.b64decode(imgstr), name=filename)
-        file_path = os.path.join(settings.MEDIA_ROOT, filename)
-        with open(file_path, "wb") as f:
-            f.write(file_data.read())
+        body = json.loads(request.body.decode("utf-8"))
+        image_data = body.get("image")
+        chart_id = body.get("chart_id", "unknown")
 
-        return JsonResponse({"status": "ok", "filename": filename})
+        if not image_data:
+            return JsonResponse({"error": "Missing image data."}, status=400)
+
+        # 🧩 složka /media/charts
+        chart_dir = os.path.join(settings.MEDIA_ROOT, "charts")
+        os.makedirs(chart_dir, exist_ok=True)
+
+        # 🧩 odstraníme prefix data:image/png;base64,
+        image_data = re.sub("^data:image/[^;]+;base64,", "", image_data)
+        image_bytes = base64.b64decode(image_data)
+
+        # 🧩 název souboru podle chart_id
+        filename = f"chart_{chart_id}.png"
+        file_path = os.path.join(chart_dir, filename)
+
+        with open(file_path, "wb") as f:
+            f.write(image_bytes)
+
+        return JsonResponse({"success": True, "file": filename})
     except Exception as e:
-        return JsonResponse({"error": f"Failed to save image: {str(e)}"}, status=500)
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 @login_required
@@ -113,28 +110,31 @@ def export_pdf(request):
         story.append(Paragraph("Finanční přehled", styles["Heading1"]))
         story.append(Spacer(1, 8))
 
-        # Názvy grafů (v češtině, stejné jako v dashboardu)
+        # 🔹 Český seznam názvů grafů (stejné jako v dashboardu)
         chart_titles = [
-            "Váš příběh zisku",
-            "Trend ziskovosti",
-            "Růst tržeb vs. růst nákladů na prodané zboží",
-            "Růst tržeb vs. růst provozních nákladů",
-            "Meziroční přehled hlavních metrik"
+            "📈 Váš příběh zisku",
+            "📊 Trend ziskovosti",
+            "📈 Růst tržeb vs. růst nákladů na prodané zboží",
+            "📈 Růst tržeb vs. růst provozních nákladů",
+            "📊 Meziroční přehled hlavních metrik",
         ]
 
-        # 🔹 Vložíme grafy
+        # 🔹 Vložíme grafy z /media/charts/
         if "charts" in selected_sections:
-            chart_dir = settings.MEDIA_ROOT
-            charts = [f for f in os.listdir(chart_dir) if f.startswith("chart_") and f.endswith(".png")]
-            if charts:
-                for i, ch in enumerate(sorted(charts)):
-                    img_path = os.path.join(chart_dir, ch)
-                    title = chart_titles[i] if i < len(chart_titles) else f"Graf {i+1}"
-                    story.append(Paragraph(title, styles["Heading2"]))
-                    story.append(Image(img_path, width=460, height=210))
-                    story.append(Spacer(1, 10))
+            chart_dir = os.path.join(settings.MEDIA_ROOT, "charts")
+            if os.path.exists(chart_dir):
+                charts = [f for f in os.listdir(chart_dir) if f.startswith("chart_") and f.endswith(".png")]
+                if charts:
+                    for i, ch in enumerate(sorted(charts)):
+                        img_path = os.path.join(chart_dir, ch)
+                        title = chart_titles[i] if i < len(chart_titles) else f"Graf {i+1}"
+                        story.append(Paragraph(title, styles["Heading2"]))
+                        story.append(Image(img_path, width=460, height=210))
+                        story.append(Spacer(1, 10))
+                else:
+                    story.append(Paragraph("❗ Nebyly nalezeny žádné uložené grafy.", styles["Normal"]))
             else:
-                story.append(Paragraph("Žádné grafy nebyly nalezeny.", styles["Normal"]))
+                story.append(Paragraph("❗ Složka s grafy neexistuje.", styles["Normal"]))
             story.append(Spacer(1, 15))
 
         # 🔹 Tabulka – české názvy sloupců
@@ -149,25 +149,25 @@ def export_pdf(request):
                     d = s.data or {}
                     data.append([
                         s.year,
-                        f"{d.get('Revenue', 0):,.0f}".replace(",", " "),
-                        f"{d.get('COGS', 0):,.0f}".replace(",", " "),
-                        f"{d.get('EBIT', 0):,.0f}".replace(",", " "),
-                        f"{d.get('NetProfit', 0):,.0f}".replace(",", " "),
-                        f"{d.get('TotalAssets', 0):,.0f}".replace(",", " "),
-                        f"{d.get('Equity', 0):,.0f}".replace(",", " ")
+                        d.get("Revenue", 0),
+                        d.get("COGS", 0),
+                        d.get("EBIT", 0),
+                        d.get("NetProfit", 0),
+                        d.get("Assets", 0),
+                        d.get("Equity", 0),
                     ])
-                t = Table(data, hAlign="LEFT", colWidths=[50, 80, 100, 70, 70, 70, 80])
+                t = Table(data)
                 t.setStyle(TableStyle([
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
-                    ("FONTNAME", (0, 0), (-1, -1), "DejaVu"),
-                    ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
-                    ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                    ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
                 ]))
                 story.append(t)
+                story.append(Spacer(1, 20))
             else:
-                story.append(Paragraph("Žádné finanční výsledky nebyly nalezeny.", styles["Normal"]))
+                story.append(Paragraph("❗ Žádné finanční údaje nebyly nalezeny.", styles["Normal"]))
+
         story.append(PageBreak())
 
     # 🧭 SCORE MOJÍ FIRMY

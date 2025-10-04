@@ -252,8 +252,10 @@ function renderCharts() {
 
 document.querySelectorAll(".year-filter").forEach(cb => cb.addEventListener("change", renderCharts));
 renderCharts();
-
+</script>
+<script>
 // ===== EXPORT FUNKCE =====
+
 function getCookie(name) {
   let cookieValue = null;
   if (document.cookie && document.cookie !== '') {
@@ -269,43 +271,59 @@ function getCookie(name) {
   return cookieValue;
 }
 
-function saveChartAsImage(chart, chartId) {
-  if (!chart) return;
-  const imageBase64 = chart.toBase64Image();
-  fetch("/exports/upload_chart/", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CSRFToken": getCookie("csrftoken")
-    },
-    body: JSON.stringify({ image: imageBase64 })
-  })
-  .then(r => r.json())
-  .then(data => console.log("Graf uložen:", data))
-  .catch(e => console.error("Chyba při ukládání grafu:", e));
-}
-
+// =============================
+// 💾 Uložení jednoho grafu
+// =============================
 async function saveChartAsImage(chart, chartId) {
-  if (!chart) return;
-  const imageBase64 = chart.toBase64Image();
+  if (!chart) {
+    console.warn(`⚠️ Graf ${chartId} nebyl nalezen.`);
+    return;
+  }
+
+  const imgData = chart.toBase64Image();
+
+  if (!imgData || imgData.length < 100) {
+    console.error(`❌ Graf ${chartId} je prázdný nebo neplatný.`);
+    return;
+  }
+
   try {
-    const response = await fetch("/exports/upload_chart/", {
+    const response = await fetch("/dashboard/save_chart/", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-CSRFToken": getCookie("csrftoken")
       },
-      body: JSON.stringify({ image: imageBase64, chart_id: chartId })
+      body: JSON.stringify({
+        image: imgData,
+        chart_id: chartId
+      })
     });
-    const data = await response.json();
-    console.log("Graf uložen:", data);
-    // malá pauza, aby se zápis dokončil
-    await new Promise(resolve => setTimeout(resolve, 300));
+
+    const text = await response.text(); // načteme i v případě chyby
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      console.error("⚠️ Server nevrátil JSON:", text);
+      return;
+    }
+
+    if (data.status !== "ok") {
+      console.error(`❌ Chyba při ukládání grafu ${chartId}:`, data.message);
+    } else {
+      console.log(`✅ Graf uložen:`, data.file);
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 150)); // krátká pauza
   } catch (e) {
-    console.error("Chyba při ukládání grafu:", e);
+    console.error("❌ Fetch error:", e);
   }
 }
 
+// =============================
+// 💾 Uložení všech grafů
+// =============================
 async function saveAllCharts() {
   const charts = [
     { chart: profitStoryChart, id: "profit_story" },
@@ -315,22 +333,29 @@ async function saveAllCharts() {
     { chart: allMetricsChart, id: "all_metrics" }
   ];
 
-  // Ukládáme jeden po druhém
+  console.log(`🟡 Nahrávám ${charts.length} grafů…`);
   for (const c of charts) {
     await saveChartAsImage(c.chart, c.id);
   }
-  console.log("✅ Všechny grafy uloženy");
+  console.log("✅ Všechny grafy odeslány!");
 }
 
+// =============================
+// 📤 Tlačítko exportu
+// =============================
 document.addEventListener("DOMContentLoaded", () => {
   const exportBtn = document.createElement("button");
   exportBtn.textContent = "💾 Uložit grafy do PDF";
   exportBtn.className = "btn btn-primary mt-3";
+
   exportBtn.onclick = async () => {
-    await saveAllCharts();
-    // Po dokončení všech uploadů otevřeme PDF export
-    window.location.href = "/exports/pdf/";
+    // počkej, než se všechny grafy domalují
+    setTimeout(async () => {
+      await saveAllCharts();
+      window.location.href = "/exports/pdf/";
+    }, 800);
   };
+
   document.querySelector(".container").appendChild(exportBtn);
 });
 </script>
