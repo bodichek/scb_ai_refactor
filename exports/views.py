@@ -112,11 +112,11 @@ def export_pdf(request):
 
         # 🔹 Český seznam názvů grafů (stejné jako v dashboardu)
         chart_titles = [
-            "📈 Váš příběh zisku",
-            "📊 Trend ziskovosti",
-            "📈 Růst tržeb vs. růst nákladů na prodané zboží",
-            "📈 Růst tržeb vs. růst provozních nákladů",
-            "📊 Meziroční přehled hlavních metrik",
+            "Váš příběh zisku",
+            "Trend ziskovosti",
+            "Růst tržeb vs. růst nákladů na prodané zboží",
+            "Růst tržeb vs. růst provozních nákladů",
+            "Meziroční přehled hlavních metrik",
         ]
 
         # 🔹 Vložíme grafy z /media/charts/

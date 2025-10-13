@@ -27,46 +27,97 @@
   <h3 class="mt-5">Růst tržeb vs. růst provozních nákladů</h3>
   <canvas id="revOverheadsGrowthChart"></canvas>
 
+
+
   <!-- Tabulkový přehled -->
   <h3 class="mt-5">📑 Přehled dat</h3>
-  <table class="table table-bordered">
-    <thead>
-      <tr>
-        <th>Rok ❓</th>
-        <th>Tržby (Kč)</th>
-        <th>Náklady na prodané zboží (Kč)</th>
-        <th>Hrubá marže (Kč)</th>
-        <th>Provozní náklady (Kč)</th>
-        <th>EBIT (Kč)</th>
-        <th>Čistý zisk (Kč)</th>
-        <th>Hrubá marže %</th>
-        <th>Provozní marže %</th>
-        <th>Čistá marže %</th>
-        <th>Růst tržeb %</th>
-        <th>Růst nákladů na prodané zboží %</th>
-        <th>Růst provozních nákladů %</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for r in table_rows %}
-      <tr>
-        <td>{{ r.year }}</td>
-        <td>{{ r.revenue }}</td>
-        <td>{{ r.cogs }}</td>
-        <td>{{ r.gross_margin }}</td>
-        <td>{{ r.overheads }}</td>
-        <td>{{ r.ebit }}</td>
-        <td>{{ r.net_profit }}</td>
-        <td>{{ r.profitability.gm_pct|floatformat:2 }}%</td>
-        <td>{{ r.profitability.op_pct|floatformat:2 }}%</td>
-        <td>{{ r.profitability.np_pct|floatformat:2 }}%</td>
-        <td>{{ r.growth.revenue|floatformat:2 }}%</td>
-        <td>{{ r.growth.cogs|floatformat:2 }}%</td>
-        <td>{{ r.growth.overheads|floatformat:2 }}%</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <table class="table table-bordered align-middle text-center">
+  <thead class="table-light">
+    <tr>
+      <th>
+        Rok
+        <span data-bs-toggle="tooltip" title="Rok, ke kterému se vztahují finanční výsledky.">❓</span>
+      </th>
+      <th>
+        Tržby (Kč)
+        <span data-bs-toggle="tooltip" title="Celkové výnosy z prodeje zboží nebo služeb (Revenue).">❓</span>
+      </th>
+      <th>
+        Náklady na prodané zboží (Kč)
+        <span data-bs-toggle="tooltip" title="Náklady spojené přímo s výrobou nebo nákupem prodaného zboží (COGS).">❓</span>
+      </th>
+      <th>
+        Hrubá marže (Kč)
+        <span data-bs-toggle="tooltip" title="Rozdíl mezi tržbami a náklady na prodané zboží (Revenue - COGS).">❓</span>
+      </th>
+      <th>
+        Provozní náklady (Kč)
+        <span data-bs-toggle="tooltip" title="Fixní a variabilní náklady na provoz firmy (Overheads).">❓</span>
+      </th>
+      <th>
+        EBIT (Kč)
+        <span data-bs-toggle="tooltip" title="Zisk před úroky a zdaněním – ukazatel provozní výkonnosti firmy.">❓</span>
+      </th>
+      <th>
+        Čistý zisk (Kč)
+        <span data-bs-toggle="tooltip" title="Zisk po zdanění, finální hospodářský výsledek (Net Profit).">❓</span>
+      </th>
+      <th>
+        Hrubá marže %
+        <span data-bs-toggle="tooltip" title="Podíl hrubé marže na tržbách: (Hrubá marže / Tržby) × 100.">❓</span>
+      </th>
+      <th>
+        Provozní marže %
+        <span data-bs-toggle="tooltip" title="Podíl EBIT na tržbách: (EBIT / Tržby) × 100.">❓</span>
+      </th>
+      <th>
+        Čistá marže %
+        <span data-bs-toggle="tooltip" title="Podíl čistého zisku na tržbách: (Čistý zisk / Tržby) × 100.">❓</span>
+      </th>
+      <th>
+        Růst tržeb %
+        <span data-bs-toggle="tooltip" title="Meziroční změna tržeb oproti předchozímu roku.">❓</span>
+      </th>
+      <th>
+        Růst nákladů na prodané zboží %
+        <span data-bs-toggle="tooltip" title="Meziroční změna nákladů na prodané zboží.">❓</span>
+      </th>
+      <th>
+        Růst provozních nákladů %
+        <span data-bs-toggle="tooltip" title="Meziroční změna provozních nákladů.">❓</span>
+      </th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in table_rows %}
+    <tr>
+      <td>{{ r.year }}</td>
+      <td>{{ r.revenue }}</td>
+      <td>{{ r.cogs }}</td>
+      <td>{{ r.gross_margin }}</td>
+      <td>{{ r.overheads }}</td>
+      <td>{{ r.ebit }}</td>
+      <td>{{ r.net_profit }}</td>
+      <td>{{ r.profitability.gm_pct|floatformat:2 }}%</td>
+      <td>{{ r.profitability.op_pct|floatformat:2 }}%</td>
+      <td>{{ r.profitability.np_pct|floatformat:2 }}%</td>
+      <td>{{ r.growth.revenue|floatformat:2 }}%</td>
+      <td>{{ r.growth.cogs|floatformat:2 }}%</td>
+      <td>{{ r.growth.overheads|floatformat:2 }}%</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<!-- Bootstrap JS (nutné pro tooltipy) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Aktivace Bootstrap tooltipů -->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    [...tooltipTriggerList].map(el => new bootstrap.Tooltip(el));
+  });
+</script>
 
   <!-- Line chart pro všechny metriky -->
   <h3 class="mt-5">📈 Meziroční přehled</h3>
