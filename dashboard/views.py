@@ -7,10 +7,11 @@ from django.shortcuts import render
 from django.conf import settings
 from django.http import JsonResponse, FileResponse
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.csrf import csrf_exempt   # ⬅️ TOTO ti chybělo
+from django.views.decorators.csrf import csrf_exempt
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
+from .cashflow import calculate_cashflow
 
 
 @login_required
@@ -96,11 +97,30 @@ def index(request):
                 "overheads": ((r["overheads"] - prev["overheads"]) / prev["overheads"] * 100) if prev["overheads"] else 0,
             }
 
+    # 💰 Výpočet Cash Flow pro poslední rok (přidáno z původního kódu)
+    cf = None
+    selected_year = years[-1] if years else None
+    if selected_year:
+        try:
+            cf = calculate_cashflow(request.user, selected_year)
+        except Exception as e:
+            print(f"⚠️ Chyba výpočtu cashflow: {e}")
+
     return render(request, "dashboard/index.html", {
-        "rows": json.dumps(rows),   # JSON pro grafy
+        "rows": json.dumps(rows),
         "years": json.dumps(years),
-        "table_rows": rows,         # pro tabulkový přehled
+        "table_rows": rows,
+        "cashflow": cf,  # ✅ přidáno
+        "selected_year": selected_year,
     })
+
+
+@login_required
+def cashflow_view(request, year):
+    data = calculate_cashflow(request.user, year)
+    if not data:
+        return render(request, "dashboard/cashflow_empty.html", {"year": year})
+    return render(request, "dashboard/cashflow.html", {"data": data, "year": year})
 
 
 @csrf_exempt
@@ -136,8 +156,6 @@ def save_chart(request):
         return JsonResponse({"status": "ok", "file": file_path})
 
     return JsonResponse({"status": "error", "message": "invalid method"}, status=405)
-
-
 
 
 def export_full_pdf(request):

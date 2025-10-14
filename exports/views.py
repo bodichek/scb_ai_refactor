@@ -25,7 +25,14 @@ from survey.models import SurveySubmission, Response
 from suropen.models import OpenAnswer
 from accounts.models import CompanyProfile
 
+# ✅ import výpočtu Cash Flow (nový modul)
+try:
+    from dashboard.cashflow import calculate_cashflow
+except ImportError:
+    calculate_cashflow = None
 
+
+# 🧩 Grafy z dashboardu
 @csrf_exempt
 def upload_chart(request):
     """Uloží base64 obrázek (graf z dashboardu) do MEDIA_ROOT/charts/."""
@@ -40,15 +47,12 @@ def upload_chart(request):
         if not image_data:
             return JsonResponse({"error": "Missing image data."}, status=400)
 
-        # 🧩 složka /media/charts
         chart_dir = os.path.join(settings.MEDIA_ROOT, "charts")
         os.makedirs(chart_dir, exist_ok=True)
 
-        # 🧩 odstraníme prefix data:image/png;base64,
         image_data = re.sub("^data:image/[^;]+;base64,", "", image_data)
         image_bytes = base64.b64decode(image_data)
 
-        # 🧩 název souboru podle chart_id
         filename = f"chart_{chart_id}.png"
         file_path = os.path.join(chart_dir, filename)
 
@@ -60,29 +64,35 @@ def upload_chart(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
+# 🧾 Formulář pro export PDF
 @login_required
 def export_form(request):
-    return render(request, "exports/export_form.html")
+    """Formulář s volbou sekcí + nově i výběrem roku."""
+    statements = FinancialStatement.objects.filter(owner=request.user).order_by("year")
+    available_years = [s.year for s in statements]
+    return render(request, "exports/export_form.html", {"years": available_years})
 
 
+# 📘 Generování PDF exportu
 @login_required
 def export_pdf(request):
-    """Generuje profesionální PDF report."""
+    """Generuje profesionální PDF report s možností výběru roku a Profit vs Cash Flow."""
     user = request.user
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40
     )
-    selected_sections = request.POST.getlist("sections") or ["charts", "tables", "survey", "suropen"]
 
-    # 🧱 Font a styly
+    selected_sections = request.POST.getlist("sections") or ["charts", "tables", "survey", "suropen"]
+    year = int(request.POST.get("year", 0)) or None
+
+    # 📑 Fonty a styly
     pdfmetrics.registerFont(TTFont("DejaVu", "DejaVuSans.ttf"))
     styles = getSampleStyleSheet()
     for s in styles.byName.values():
         s.fontName = "DejaVu"
     styles.add(ParagraphStyle(name="WrapText", fontName="DejaVu", leading=14, fontSize=10))
 
-    # Pomocná funkce pro vyčištění textu (bez markdown znaků)
     def clean_text(text):
         if not text:
             return ""
@@ -92,7 +102,7 @@ def export_pdf(request):
 
     story = []
 
-    # 🏢 HLAVIČKA
+    # 🏢 HLAVIČKA (beze změn)
     company = CompanyProfile.objects.filter(user=user).first()
     story.append(Paragraph("Firemní přehled", styles["Heading1"]))
     story.append(Spacer(1, 10))
@@ -110,7 +120,6 @@ def export_pdf(request):
         story.append(Paragraph("Finanční přehled", styles["Heading1"]))
         story.append(Spacer(1, 8))
 
-        # 🔹 Český seznam názvů grafů (stejné jako v dashboardu)
         chart_titles = [
             "Váš příběh zisku",
             "Trend ziskovosti",
@@ -119,7 +128,7 @@ def export_pdf(request):
             "Meziroční přehled hlavních metrik",
         ]
 
-        # 🔹 Vložíme grafy z /media/charts/
+        # 🧩 Grafy (beze změn)
         if "charts" in selected_sections:
             chart_dir = os.path.join(settings.MEDIA_ROOT, "charts")
             if os.path.exists(chart_dir):
@@ -137,42 +146,67 @@ def export_pdf(request):
                 story.append(Paragraph("❗ Složka s grafy neexistuje.", styles["Normal"]))
             story.append(Spacer(1, 15))
 
-        # 🔹 Tabulka – české názvy sloupců
-        if "tables" in selected_sections:
-            statements = FinancialStatement.objects.filter(owner=user).order_by("year")
-            if statements.exists():
-                story.append(Paragraph("Přehled finančních ukazatelů", styles["Heading2"]))
-                data = [
-                    ["Rok", "Tržby", "Náklady na prodané zboží", "EBIT", "Čistý zisk", "Aktiva", "Vlastní kapitál"]
-                ]
-                for s in statements:
-                    d = s.data or {}
-                    data.append([
-                        s.year,
-                        d.get("Revenue", 0),
-                        d.get("COGS", 0),
-                        d.get("EBIT", 0),
-                        d.get("NetProfit", 0),
-                        d.get("Assets", 0),
-                        d.get("Equity", 0),
-                    ])
-                t = Table(data)
-                t.setStyle(TableStyle([
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                    ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
-                ]))
-                story.append(t)
-                story.append(Spacer(1, 20))
-            else:
-                story.append(Paragraph("❗ Žádné finanční údaje nebyly nalezeny.", styles["Normal"]))
+        # 🧾 Finanční tabulky (rozšířeno o Profit vs Cash Flow)
+        statements = FinancialStatement.objects.filter(owner=user).order_by("year")
+        if statements.exists():
+            story.append(Paragraph("Přehled finančních ukazatelů", styles["Heading2"]))
+            data = [["Rok", "Tržby", "Náklady na prodané zboží", "EBIT", "Čistý zisk", "Aktiva", "Vlastní kapitál"]]
+            for s in statements:
+                d = s.data or {}
+                data.append([
+                    s.year,
+                    d.get("Revenue", 0),
+                    d.get("COGS", 0),
+                    d.get("EBIT", 0),
+                    d.get("NetProfit", 0),
+                    d.get("Assets", 0),
+                    d.get("Equity", 0),
+                ])
+            t = Table(data)
+            t.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
+            ]))
+            story.append(t)
+            story.append(Spacer(1, 20))
+
+            # ✅ NOVÁ SEKCE: Profit vs Cash Flow
+            if calculate_cashflow:
+                try:
+                    if not year:
+                        year = statements.last().year
+                    cf = calculate_cashflow(user, year)
+                    if cf:
+                        story.append(Paragraph(f"Profit vs Cash Flow ({year})", styles["Heading2"]))
+                        cf_table = [
+                            ["Položka", "Profit", "Cash Flow", "Rozdíl"],
+                            ["Tržby", f"{cf['revenue']:.0f}", f"{cf['gross_cash_profit']:.0f}", f"{cf['variance']['gross']:.0f}"],
+                            ["Provozní zisk", f"{cf['operating_cash_profit']:.0f}", f"{cf['operating_cash_flow']:.0f}", f"{cf['variance']['operating']:.0f}"],
+                            ["Čistý zisk", f"{cf['retained_profit']:.0f}", f"{cf['net_cash_flow']:.0f}", f"{cf['variance']['net']:.0f}"],
+                        ]
+                        tcf = Table(cf_table)
+                        tcf.setStyle(TableStyle([
+                            ("BACKGROUND", (0, 0), (-1, 0), colors.darkgrey),
+                            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                            ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+                            ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
+                            ("FONTNAME", (0, 0), (-1, -1), "DejaVu"),
+                        ]))
+                        story.append(tcf)
+                        story.append(Spacer(1, 20))
+                except Exception as e:
+                    story.append(Paragraph(f"⚠️ Nepodařilo se spočítat Cash Flow: {e}", styles["Italic"]))
+
+        else:
+            story.append(Paragraph("❗ Žádné finanční údaje nebyly nalezeny.", styles["Normal"]))
 
         story.append(PageBreak())
 
-    # 🧭 SCORE MOJÍ FIRMY
+    # 🧭 SCORE MOJÍ FIRMY (beze změn)
     if "survey" in selected_sections:
-        from survey.views import QUESTIONS  # načteme mapu otázek s textovými popisy
+        from survey.views import QUESTIONS
 
         last_submission = SurveySubmission.objects.filter(user=user).order_by("-created_at").first()
         story.append(Paragraph("Score mojí firmy", styles["Heading1"]))
@@ -204,13 +238,12 @@ def export_pdf(request):
                     if line.strip():
                         story.append(Paragraph(line.strip(), styles["WrapText"]))
             else:
-                story.append(Spacer(1, 6))
                 story.append(Paragraph("AI analýza zatím nebyla provedena.", styles["Italic"]))
         else:
             story.append(Paragraph("Zatím nebyl vyplněn žádný dotazník.", styles["Normal"]))
         story.append(PageBreak())
 
-    # 💬 BARIÉRY ŠKÁLOVÁNÍ FIRMY
+    # 💬 BARIÉRY ŠKÁLOVÁNÍ FIRMY (beze změn)
     if "suropen" in selected_sections:
         last_batch = OpenAnswer.objects.filter(user=user).order_by("-created_at").first()
         story.append(Paragraph("Bariéry škálování firmy", styles["Heading1"]))

@@ -5,6 +5,22 @@
 
   <form method="post" action="{% url 'exports:export_pdf' %}">
     {% csrf_token %}
+
+    <!-- 🧭 Výběr roku -->
+    <div class="mb-3">
+      <label for="year" class="form-label"><strong>Vyber rok pro export:</strong></label>
+      <select name="year" id="year" class="form-select" required>
+        {% if years %}
+          {% for y in years %}
+            <option value="{{ y }}">{{ y }}</option>
+          {% endfor %}
+        {% else %}
+          <option disabled>Žádná data nejsou k dispozici</option>
+        {% endif %}
+      </select>
+    </div>
+
+    <!-- 📦 Výběr sekcí (původní tabulka zachována 1:1) -->
     <table class="table">
       <thead>
         <tr><th>Vyber</th><th>Obsah</th><th>Popis</th></tr>
@@ -18,7 +34,7 @@
         <tr>
           <td><input type="checkbox" name="sections" value="tables"></td>
           <td>📑 Tabulky</td>
-          <td>Srovnávací tabulky s metrikami</td>
+          <td>Srovnávací tabulky s metrikami + Profit vs Cash Flow</td>
         </tr>
         <tr>
           <td><input type="checkbox" name="sections" value="survey"></td>
@@ -32,6 +48,7 @@
         </tr>
       </tbody>
     </table>
+
     <button type="submit" class="btn btn-success">📥 Vygenerovat PDF</button>
   </form>
 </div>

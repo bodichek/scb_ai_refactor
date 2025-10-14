@@ -122,6 +122,61 @@
   <!-- Line chart pro všechny metriky -->
   <h3 class="mt-5">📈 Meziroční přehled</h3>
   <canvas id="allMetricsChart"></canvas>
+ <!-- 💰 Přehled Cash Flow -->
+<h3 class="mt-5">💰 Výkaz Cash Flow ({{ selected_year }})</h3>
+
+{% if cashflow %}
+  <table class="table table-bordered align-middle mt-3">
+    <thead class="table-dark text-center">
+      <tr>
+        <th>Položka</th>
+        <th>Částka (Kč)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Provozní činnost -->
+      <tr class="table-secondary"><td colspan="2"><strong>🔹 Cash Flow z provozní činnosti</strong></td></tr>
+      <tr><td>Zisk po zdanění</td><td class="text-end">{{ cashflow.net_profit|floatformat:0 }}</td></tr>
+      <tr><td>Odpisy</td><td class="text-end">{{ cashflow.depreciation|floatformat:0 }}</td></tr>
+      <tr><td>Změna pracovního kapitálu</td><td class="text-end">{{ cashflow.working_capital_change|floatformat:0 }}</td></tr>
+      <tr><td>Úroky zaplacené</td><td class="text-end">{{ cashflow.interest_paid|floatformat:0 }}</td></tr>
+      <tr><td>Daň z příjmů zaplacená</td><td class="text-end">{{ cashflow.income_tax_paid|floatformat:0 }}</td></tr>
+      <tr><td><strong>💼 Čisté CF z provozní činnosti</strong></td><td class="text-end"><strong>{{ cashflow.operating_cf|floatformat:0 }}</strong></td></tr>
+
+      <!-- Investiční činnost -->
+      <tr class="table-secondary"><td colspan="2"><strong>🔹 Cash Flow z investiční činnosti</strong></td></tr>
+      <tr><td>Nákup dlouhodobého majetku (CapEx)</td><td class="text-end">{{ cashflow.capex|floatformat:0 }}</td></tr>
+      <tr><td>Prodej dlouhodobého majetku</td><td class="text-end">{{ cashflow.asset_sales|floatformat:0 }}</td></tr>
+      <tr><td><strong>🏗️ Čisté CF z investiční činnosti</strong></td><td class="text-end"><strong>{{ cashflow.investing_cf|floatformat:0 }}</strong></td></tr>
+
+      <!-- Finanční činnost -->
+      <tr class="table-secondary"><td colspan="2"><strong>🔹 Cash Flow z finanční činnosti</strong></td></tr>
+      <tr><td>Nové úvěry</td><td class="text-end">{{ cashflow.loans_received|floatformat:0 }}</td></tr>
+      <tr><td>Splacené úvěry</td><td class="text-end">{{ cashflow.loans_repaid|floatformat:0 }}</td></tr>
+      <tr><td>Vyplacené dividendy</td><td class="text-end">{{ cashflow.dividends_paid|floatformat:0 }}</td></tr>
+      <tr><td><strong>🏦 Čisté CF z finanční činnosti</strong></td><td class="text-end"><strong>{{ cashflow.financing_cf|floatformat:0 }}</strong></td></tr>
+
+      <!-- Souhrn -->
+      <tr class="table-dark">
+        <td><strong>💰 Celková změna peněžních prostředků</strong></td>
+        <td class="text-end"><strong>{{ cashflow.net_cash_flow|floatformat:0 }}</strong></td>
+      </tr>
+      <tr>
+        <td>Počáteční stav hotovosti</td>
+        <td class="text-end">{{ cashflow.cash_begin|floatformat:0 }}</td>
+      </tr>
+      <tr>
+        <td>Konečný stav hotovosti</td>
+        <td class="text-end"><strong>{{ cashflow.cash_end|floatformat:0 }}</strong></td>
+      </tr>
+    </tbody>
+  </table>
+{% else %}
+  <div class="alert alert-warning mt-3">
+    ⚠️ Cash Flow zatím nebylo možné vypočítat – zkontrolujte, že máte nahrané výkazy pro vybraný rok.
+  </div>
+{% endif %}
+
 </div>
 
 <!-- Chart.js -->
