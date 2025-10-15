@@ -205,8 +205,8 @@
               {% if surveys %}
                 {% for survey in surveys %}
                 <div class="border-bottom pb-2 mb-2">
-                  <strong>{{ survey.survey_name }}</strong><br>
-                  <small class="text-muted">Dokončen: {{ survey.submitted_at|date:"d.m.Y H:i" }}</small>
+                  <strong>Dotazník #{{ survey.id }}</strong><br>
+                  <small class="text-muted">Dokončen: {{ survey.created_at|date:"d.m.Y H:i" }}</small>
                   {% if survey.ai_response %}
                     <br><small class="text-success">✅ AI analýza dostupná</small>
                   {% endif %}

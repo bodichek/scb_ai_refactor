@@ -26,48 +26,40 @@ def my_clients(request):
         for client in clients:
             # Počet dokumentů
             statements_count = Document.objects.filter(
-                user=client.user,
-                doc_type__in=['rozvaha', 'vysledovka', 'cashflow']
+                owner=client.user,
+                doc_type__in=['income', 'balance', 'rozvaha', 'vysledovka', 'cashflow']
             ).count()
             
             # Poslední aktivita
-            last_document = Document.objects.filter(user=client.user).order_by('-uploaded_at').first()
+            last_document = Document.objects.filter(owner=client.user).order_by('-uploaded_at').first()
             last_activity = last_document.uploaded_at if last_document else None
             
-            clients_data.append({
-                'id': client.id,
-                'company_name': client.company_name,
-                'ico': client.ico,
-                'city': client.city,
-                'contact_person': client.contact_person,
-                'phone': client.phone,
-                'industry': client.industry,
-                'user': client.user,
-                'statements_count': statements_count,
-                'last_activity': last_activity
-            })
+            # Přidej statistiky přímo k client objektu
+            client.statements_count = statements_count
+            client.last_activity = last_activity
+            clients_data.append(client)
         
         # Celkové statistiky
         clients_count = len(clients_data)
-        active_clients = len([c for c in clients_data if c['last_activity'] and 
-                             c['last_activity'] > timezone.now() - timedelta(days=30)])
-        statements_total = sum(c['statements_count'] for c in clients_data)
+        active_clients = len([c for c in clients_data if c.last_activity and 
+                             c.last_activity > timezone.now() - timedelta(days=30)])
+        statements_total = sum(c.statements_count for c in clients_data)
         recent_uploads = Document.objects.filter(
-            user__in=[c.user for c in clients],
+            owner__in=[c.user for c in clients],
             uploaded_at__gte=timezone.now() - timedelta(days=30)
         ).count()
         
         # Nedávná aktivita
         recent_activities = []
         recent_docs = Document.objects.filter(
-            user__in=[c.user for c in clients],
+            owner__in=[c.user for c in clients],
             uploaded_at__gte=timezone.now() - timedelta(days=7)
-        ).select_related('user', 'user__companyprofile').order_by('-uploaded_at')[:5]
+        ).select_related('owner', 'owner__companyprofile').order_by('-uploaded_at')[:5]
         
         for doc in recent_docs:
             recent_activities.append({
                 'date': doc.uploaded_at,
-                'client_name': doc.user.companyprofile.company_name,
+                'client_name': doc.owner.companyprofile.company_name,
                 'description': f'Nahrál dokument: {doc.get_doc_type_display()}'
             })
         
@@ -100,22 +92,22 @@ def client_dashboard(request, client_id):
     
     # Finanční výkazy
     financial_statements = Document.objects.filter(
-        user=client.user,
-        doc_type__in=['rozvaha', 'vysledovka', 'cashflow']
+        owner=client.user,
+        doc_type__in=['income', 'balance', 'rozvaha', 'vysledovka', 'cashflow']
     ).order_by('-uploaded_at')
     
     # Ostatní dokumenty
     other_documents = Document.objects.filter(
-        user=client.user
-    ).exclude(doc_type__in=['rozvaha', 'vysledovka', 'cashflow']).count()
+        owner=client.user
+    ).exclude(doc_type__in=['income', 'balance', 'rozvaha', 'vysledovka', 'cashflow']).count()
     
     # Dotazníky
-    surveys = SurveySubmission.objects.filter(user=client.user).order_by('-submitted_at')
+    surveys = SurveySubmission.objects.filter(user=client.user).order_by('-created_at')
     surveys_completed = surveys.count()
     
     # Poslední aktivita
     last_activity = None
-    last_document = Document.objects.filter(user=client.user).order_by('-uploaded_at').first()
+    last_document = Document.objects.filter(owner=client.user).order_by('-uploaded_at').first()
     if last_document:
         last_activity = last_document.uploaded_at
         days_since_activity = (timezone.now() - last_activity).days
@@ -180,7 +172,7 @@ def client_documents(request, client_id):
         messages.error(request, 'Nemáte oprávnění k zobrazení tohoto klienta.')
         return redirect('coaching:my_clients')
     
-    documents = Document.objects.filter(user=client.user).order_by('-uploaded_at')
+    documents = Document.objects.filter(owner=client.user).order_by('-uploaded_at')
     
     context = {
         'client': client,
