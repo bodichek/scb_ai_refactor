@@ -9,6 +9,12 @@ class CompanyProfile(models.Model):
     # Identifikace
     company_name = models.CharField("Název firmy", max_length=255)
     ico = models.CharField("IČO", max_length=20, blank=True, null=True)
+    legal_form = models.CharField("Právní forma", max_length=100, blank=True, null=True)
+
+    # Adresa
+    address = models.CharField("Adresa", max_length=500, blank=True, null=True)
+    city = models.CharField("Město", max_length=100, blank=True, null=True)
+    postal_code = models.CharField("PSČ", max_length=10, blank=True, null=True)
 
     # Kontaktní údaje
     contact_person = models.CharField("Kontaktní osoba", max_length=255, blank=True, null=True)

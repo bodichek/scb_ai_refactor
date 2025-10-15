@@ -4,15 +4,27 @@ from django.core.exceptions import ValidationError
 from accounts.models import CompanyProfile
 
 class RegisterForm(forms.ModelForm):
-    password = forms.CharField(widget=forms.PasswordInput)
-    password2 = forms.CharField(widget=forms.PasswordInput, label="Potvrzení hesla")
+    password = forms.CharField(
+        widget=forms.PasswordInput,
+        min_length=8,
+        help_text="Heslo musí mít alespoň 8 znaků"
+    )
+    password2 = forms.CharField(
+        widget=forms.PasswordInput, 
+        label="Potvrzení hesla",
+        help_text="Zadej heslo znovu pro kontrolu"
+    )
 
     company_name = forms.CharField(label="Název firmy")
     ico = forms.CharField(label="IČO")
+    legal_form = forms.CharField(label="Právní forma", required=False)
+    address = forms.CharField(label="Adresa", required=False)
+    city = forms.CharField(label="Město", required=False)
+    postal_code = forms.CharField(label="PSČ", required=False)
     contact_person = forms.CharField(label="Kontaktní osoba")
     phone = forms.CharField(label="Telefon")
-    industry = forms.CharField(label="Odvětví působnosti")
-    employees_count = forms.IntegerField(label="Počet zaměstnanců")
+    industry = forms.CharField(label="Odvětví působnosti", required=False)
+    employees_count = forms.IntegerField(label="Počet zaměstnanců", required=False)
     linkedin = forms.URLField(label="LinkedIn", required=False)
     website = forms.URLField(label="Webové stránky", required=False)
 
@@ -25,6 +37,12 @@ class RegisterForm(forms.ModelForm):
         if User.objects.filter(email=email).exists():
             raise ValidationError("Tento e-mail je již registrován.")
         return email
+
+    def clean_password(self):
+        password = self.cleaned_data.get('password')
+        if password and len(password) < 8:
+            raise ValidationError("Heslo musí mít alespoň 8 znaků.")
+        return password
 
     def clean(self):
         cleaned_data = super().clean()

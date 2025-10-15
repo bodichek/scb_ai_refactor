@@ -61,8 +61,13 @@ def register(request):
     if request.method == "POST":
         email = request.POST.get("email")
         password = request.POST.get("password")
+        password2 = request.POST.get("password2")
         company_name = request.POST.get("company_name")
         ico = request.POST.get("ico")
+        legal_form = request.POST.get("legal_form")
+        address = request.POST.get("address")
+        city = request.POST.get("city")
+        postal_code = request.POST.get("postal_code")
         contact_person = request.POST.get("contact_person")
         phone = request.POST.get("phone")
         website = request.POST.get("website")
@@ -70,6 +75,15 @@ def register(request):
         industry = request.POST.get("industry")
         employees_count = request.POST.get("employees_count") or None
         coach_id = request.POST.get("assigned_coach")
+
+        # Validace hesla
+        if len(password) < 8:
+            messages.error(request, "Heslo musí mít alespoň 8 znaků.")
+            return redirect("accounts:register")
+        
+        if password != password2:
+            messages.error(request, "Hesla se neshodují.")
+            return redirect("accounts:register")
 
         if User.objects.filter(username=email).exists():
             messages.error(request, "Tento e-mail je již registrován.")
@@ -90,6 +104,10 @@ def register(request):
             user=user,
             company_name=company_name,
             ico=ico,
+            legal_form=legal_form,
+            address=address,
+            city=city,
+            postal_code=postal_code,
             contact_person=contact_person,
             phone=phone,
             email=email,

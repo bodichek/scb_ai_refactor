@@ -20,7 +20,14 @@
 
     <div class="mb-3">
       <label for="password" class="form-label">Heslo</label>
-      <input type="password" class="form-control" id="password" name="password" required>
+      <input type="password" class="form-control" id="password" name="password" required minlength="8">
+      <small class="form-text text-muted">Heslo musí mít alespoň 8 znaků</small>
+    </div>
+
+    <div class="mb-3">
+      <label for="password2" class="form-label">Potvrzení hesla</label>
+      <input type="password" class="form-control" id="password2" name="password2" required>
+      <div id="password-status" class="mt-2"></div>
     </div>
 
     <!-- Firemní údaje -->
@@ -31,7 +38,15 @@
 
     <div class="mb-3">
       <label for="ico" class="form-label">IČO</label>
-      <input type="text" class="form-control" id="ico" name="ico" required>
+      <div class="input-group">
+        <input type="text" class="form-control" id="ico" name="ico" required maxlength="8" placeholder="12345678">
+        <button type="button" class="btn btn-outline-secondary" id="load-company-btn" disabled>
+          <span id="load-spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+          📋 Načíst údaje
+        </button>
+      </div>
+      <small class="form-text text-muted">Zadej 8-místné IČO a automaticky se načtou údaje z obchodního rejstříku</small>
+      <div id="ico-status" class="mt-2"></div>
     </div>
 
     <div class="mb-3">
@@ -45,8 +60,29 @@
     </div>
 
     <div class="mb-3">
+      <label for="address" class="form-label">Adresa</label>
+      <input type="text" class="form-control" id="address" name="address" placeholder="Načte se automaticky z IČO">
+    </div>
+
+    <div class="row">
+      <div class="col-md-8 mb-3">
+        <label for="city" class="form-label">Město</label>
+        <input type="text" class="form-control" id="city" name="city" placeholder="Načte se automaticky z IČO">
+      </div>
+      <div class="col-md-4 mb-3">
+        <label for="postal_code" class="form-label">PSČ</label>
+        <input type="text" class="form-control" id="postal_code" name="postal_code" placeholder="Načte se automaticky z IČO">
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label for="legal_form" class="form-label">Právní forma</label>
+      <input type="text" class="form-control" id="legal_form" name="legal_form" placeholder="Načte se automaticky z IČO">
+    </div>
+
+    <div class="mb-3">
       <label for="industry" class="form-label">Odvětví působnosti</label>
-      <input type="text" class="form-control" id="industry" name="industry">
+      <input type="text" class="form-control" id="industry" name="industry" placeholder="Načte se automaticky z IČO">
     </div>
 
     <div class="mb-3">
@@ -78,4 +114,201 @@
     <button type="submit" class="btn btn-success">Registrovat</button>
   </form>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const icoInput = document.getElementById('ico');
+    const loadBtn = document.getElementById('load-company-btn');
+    const loadSpinner = document.getElementById('load-spinner');
+    const icoStatus = document.getElementById('ico-status');
+    
+    const passwordInput = document.getElementById('password');
+    const password2Input = document.getElementById('password2');
+    const passwordStatus = document.getElementById('password-status');
+    const submitBtn = document.querySelector('button[type="submit"]');
+    
+    // Validace IČO při psaní
+    icoInput.addEventListener('input', function() {
+        const ico = this.value.trim();
+        
+        // Povolí pouze číslice
+        this.value = ico.replace(/\D/g, '');
+        
+        if (this.value.length === 8) {
+            loadBtn.disabled = false;
+            icoStatus.innerHTML = '<small class="text-success">✅ IČO má správný formát</small>';
+        } else {
+            loadBtn.disabled = true;
+            if (this.value.length > 0) {
+                icoStatus.innerHTML = '<small class="text-warning">⚠️ IČO musí mít 8 číslic</small>';
+            } else {
+                icoStatus.innerHTML = '';
+            }
+        }
+    });
+    
+    // Načtení dat při stisku tlačítka
+    loadBtn.addEventListener('click', async function() {
+        const ico = icoInput.value.trim();
+        
+        if (ico.length !== 8) {
+            alert('IČO musí obsahovat přesně 8 číslic');
+            return;
+        }
+        
+        // Zobraz loading
+        loadBtn.disabled = true;
+        loadSpinner.classList.remove('d-none');
+        icoStatus.innerHTML = '<small class="text-info">🔄 Načítám údaje z obchodního rejstříku...</small>';
+        
+        try {
+            const response = await fetch(`/accounts/api/company-data/?ico=${ico}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // Vyplň formulář daty z API
+                const companyData = data.data;
+                
+                if (companyData.company_name) {
+                    document.getElementById('company_name').value = companyData.company_name;
+                }
+                
+                if (companyData.address) {
+                    document.getElementById('address').value = companyData.address;
+                }
+                
+                if (companyData.city) {
+                    document.getElementById('city').value = companyData.city;
+                }
+                
+                if (companyData.postal_code) {
+                    document.getElementById('postal_code').value = companyData.postal_code;
+                }
+                
+                if (companyData.legal_form) {
+                    document.getElementById('legal_form').value = companyData.legal_form;
+                }
+                
+                if (companyData.industry) {
+                    document.getElementById('industry').value = companyData.industry;
+                }
+                
+                // Zobraz úspěch
+                icoStatus.innerHTML = `
+                    <div class="alert alert-success alert-sm mt-2">
+                        ✅ Údaje úspěšně načteny z registru ARES
+                        <br><small>Zkontroluj a případně uprav načtené údaje</small>
+                    </div>
+                `;
+                
+                // Aktivní/neaktivní firma
+                if (companyData.active === false) {
+                    icoStatus.innerHTML += '<div class="alert alert-warning alert-sm">⚠️ Pozor: Firma není aktivní v obchodním rejstříku</div>';
+                }
+                
+            } else {
+                // Zobraz chybu
+                icoStatus.innerHTML = `
+                    <div class="alert alert-danger alert-sm mt-2">
+                        ❌ ${data.error}
+                    </div>
+                `;
+            }
+            
+        } catch (error) {
+            console.error('Error loading company data:', error);
+            icoStatus.innerHTML = `
+                <div class="alert alert-danger alert-sm mt-2">
+                    ❌ Chyba při načítání dat: ${error.message}
+                </div>
+            `;
+        } finally {
+            // Skryj loading
+            loadSpinner.classList.add('d-none');
+            loadBtn.disabled = false;
+        }
+    });
+    
+    // Enter key v IČO poli spustí načítání
+    icoInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' && !loadBtn.disabled) {
+            e.preventDefault();
+            loadBtn.click();
+        }
+    });
+    
+    // Validace hesla
+    function validatePasswords() {
+        const password = passwordInput.value;
+        const password2 = password2Input.value;
+        
+        // Reset stavu
+        passwordInput.classList.remove('is-valid', 'is-invalid');
+        password2Input.classList.remove('is-valid', 'is-invalid');
+        passwordStatus.innerHTML = '';
+        
+        // Validace délky hesla
+        if (password.length > 0) {
+            if (password.length < 8) {
+                passwordInput.classList.add('is-invalid');
+                passwordStatus.innerHTML = '<small class="text-danger">❌ Heslo musí mít alespoň 8 znaků</small>';
+                return false;
+            } else {
+                passwordInput.classList.add('is-valid');
+            }
+        }
+        
+        // Validace shody hesel
+        if (password2.length > 0) {
+            if (password !== password2) {
+                password2Input.classList.add('is-invalid');
+                passwordStatus.innerHTML = '<small class="text-danger">❌ Hesla se neshodují</small>';
+                return false;
+            } else if (password.length >= 8) {
+                password2Input.classList.add('is-valid');
+                passwordStatus.innerHTML = '<small class="text-success">✅ Hesla se shodují</small>';
+                return true;
+            }
+        }
+        
+        return password.length >= 8 && password === password2;
+    }
+    
+    // Event listenery pro hesla
+    passwordInput.addEventListener('input', validatePasswords);
+    password2Input.addEventListener('input', validatePasswords);
+    
+    // Kontrola před odesláním formuláře
+    const form = document.querySelector('form');
+    form.addEventListener('submit', function(e) {
+        if (!validatePasswords()) {
+            e.preventDefault();
+            alert('Zkontroluj prosím hesla před odesláním formuláře.');
+            return false;
+        }
+        
+        const password = passwordInput.value;
+        const password2 = password2Input.value;
+        
+        if (password !== password2) {
+            e.preventDefault();
+            alert('Hesla se neshodují!');
+            return false;
+        }
+        
+        if (password.length < 8) {
+            e.preventDefault();
+            alert('Heslo musí mít alespoň 8 znaků!');
+            return false;
+        }
+    });
+});
+</script>
+
 {% endblock %}
