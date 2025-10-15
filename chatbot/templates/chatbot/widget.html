@@ -1,0 +1,326 @@
+<!-- Chatbot Widget -->
+<div id="chatbot-widget" class="chatbot-widget">
+  <!-- Tlačítko pro otevření/zavření chatu -->
+  <button id="chatbot-toggle" class="chatbot-toggle" title="Zeptej se na finanční pojmy">
+    💬
+  </button>
+  
+  <!-- Chat okno -->
+  <div id="chatbot-window" class="chatbot-window" style="display: none;">
+    <div class="chatbot-header">
+      <h6 class="mb-0">🤖 Finanční asistent</h6>
+      <button id="chatbot-close" class="btn-close btn-sm" aria-label="Zavřít"></button>
+    </div>
+    
+    <div id="chatbot-messages" class="chatbot-messages">
+      <div class="chatbot-message bot-message">
+        👋 Ahoj! Jsem tvůj finanční asistent. Pomůžu ti s vyplňováním dat a vysvětlím účetní pojmy. Na co se chceš zeptat?
+      </div>
+    </div>
+    
+    <div class="chatbot-input-area">
+      <div class="input-group">
+        <input type="text" id="chatbot-input" class="form-control form-control-sm" 
+               placeholder="Zeptej se na finanční pojmy..." maxlength="500">
+        <button id="chatbot-send" class="btn btn-primary btn-sm" disabled>
+          Odeslat
+        </button>
+      </div>
+      <div id="chatbot-loading" class="text-center mt-2" style="display: none;">
+        <div class="spinner-border spinner-border-sm" role="status">
+          <span class="visually-hidden">Načítání...</span>
+        </div>
+        <small class="text-muted">AI přemýšlí...</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Chatbot CSS -->
+<style>
+.chatbot-widget {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1050;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.chatbot-toggle {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #007bff, #0056b3);
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.chatbot-toggle:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(0, 123, 255, 0.4);
+}
+
+.chatbot-window {
+  position: absolute;
+  bottom: 80px;
+  right: 0;
+  width: 350px;
+  max-width: 90vw;
+  height: 450px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chatbot-header {
+  background: linear-gradient(135deg, #007bff, #0056b3);
+  color: white;
+  padding: 12px 16px;
+  border-radius: 12px 12px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chatbot-header .btn-close {
+  filter: invert(1);
+  opacity: 0.8;
+}
+
+.chatbot-messages {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  max-height: 320px;
+}
+
+.chatbot-message {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  max-width: 85%;
+  word-wrap: break-word;
+  line-height: 1.4;
+}
+
+.user-message {
+  background: #007bff;
+  color: white;
+  margin-left: auto;
+  border-bottom-right-radius: 6px;
+}
+
+.bot-message {
+  background: #f8f9fa;
+  color: #333;
+  border: 1px solid #e9ecef;
+  border-bottom-left-radius: 6px;
+}
+
+.chatbot-input-area {
+  padding: 12px 16px;
+  border-top: 1px solid #e9ecef;
+  border-radius: 0 0 12px 12px;
+}
+
+.chatbot-input-area .input-group {
+  margin-bottom: 0;
+}
+
+.chatbot-input-area input {
+  border-radius: 20px 0 0 20px;
+  border-right: none;
+}
+
+.chatbot-input-area button {
+  border-radius: 0 20px 20px 0;
+  border-left: none;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .chatbot-window {
+    width: 320px;
+    bottom: 70px;
+    right: 10px;
+  }
+  
+  .chatbot-widget {
+    bottom: 15px;
+    right: 15px;
+  }
+}
+
+/* Scrollbar styling */
+.chatbot-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chatbot-messages::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.chatbot-messages::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 10px;
+}
+
+.chatbot-messages::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+</style>
+
+<!-- Chatbot JavaScript v2.0 - FIXED -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const widget = document.getElementById('chatbot-widget');
+  const toggle = document.getElementById('chatbot-toggle');
+  const window = document.getElementById('chatbot-window');
+  const close = document.getElementById('chatbot-close');
+  const messages = document.getElementById('chatbot-messages');
+  const input = document.getElementById('chatbot-input');
+  const send = document.getElementById('chatbot-send');
+  const loading = document.getElementById('chatbot-loading');
+  
+  let isOpen = false;
+  
+  // Get CSRF cookie helper
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+  
+  // Kontext je nyní pevně nastaven
+  const currentContext = 'dashboard';
+  
+  // Otevření/zavření chatu
+  function toggleChat() {
+    isOpen = !isOpen;
+    window.style.display = isOpen ? 'flex' : 'none';
+    if (isOpen) {
+      input.focus();
+    }
+  }
+  
+  toggle.addEventListener('click', toggleChat);
+  close.addEventListener('click', toggleChat);
+  
+  // Povolení/zakázání tlačítka Odeslat
+  input.addEventListener('input', function() {
+    send.disabled = !input.value.trim();
+  });
+  
+  // Odeslání zprávy
+  async function sendMessage() {
+    const message = input.value.trim();
+    if (!message) return;
+    
+    // Přidej uživatelskou zprávu
+    addMessage(message, 'user');
+    input.value = '';
+    send.disabled = true;
+    
+    // Zobraz loading
+    loading.style.display = 'block';
+    
+    try {
+      // Get CSRF token
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                        document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || 
+                        getCookie('csrftoken') || '';
+      
+      console.log('CSRF Token:', csrfToken ? 'Found' : 'Not found');
+      console.log('Sending message:', message);
+      
+      const response = await fetch('/chatbot/api/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({
+          message: message,
+          context: 'dashboard'
+        })
+      });
+      
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('Response data:', data);
+      
+      if (data.success) {
+        addMessage(data.response, 'bot');
+      } else {
+        addMessage('⚠️ ' + (data.error || 'Nastala chyba při komunikaci s AI.'), 'bot');
+      }
+    } catch (error) {
+      console.error('Chatbot error:', error);
+      addMessage(`⚠️ Chyba: ${error.message}`, 'bot');
+    } finally {
+      loading.style.display = 'none';
+    }
+  }
+  
+  // Přidání zprávy do chatu
+  function addMessage(text, type) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chatbot-message ${type}-message`;
+    messageDiv.textContent = text;
+    
+    messages.appendChild(messageDiv);
+    messages.scrollTop = messages.scrollHeight;
+  }
+  
+  // Event listenery
+  send.addEventListener('click', sendMessage);
+  
+  input.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter' && !send.disabled) {
+      sendMessage();
+    }
+  });
+  
+  // Zavření při kliku mimo widget
+  document.addEventListener('click', function(e) {
+    if (isOpen && !widget.contains(e.target)) {
+      toggleChat();
+    }
+  });
+});
+</script>

@@ -14,4 +14,5 @@ urlpatterns = [
     path("survey/", include("survey.urls")),
     path("suropen/", include("suropen.urls")),
     path("exports/", include("exports.urls")),
+    path("chatbot/", include("chatbot.urls")),
 ]

@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     "survey",
     "suropen",
     "exports",
+    "chatbot",
 ]
 
 MIDDLEWARE = [
