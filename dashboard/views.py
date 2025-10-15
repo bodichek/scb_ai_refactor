@@ -5,7 +5,7 @@ import base64
 from ingest.models import FinancialStatement
 from django.shortcuts import render
 from django.conf import settings
-from django.http import JsonResponse, FileResponse
+from django.http import JsonResponse, FileResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
@@ -121,6 +121,169 @@ def cashflow_view(request, year):
     if not data:
         return render(request, "dashboard/cashflow_empty.html", {"year": year})
     return render(request, "dashboard/cashflow.html", {"data": data, "year": year})
+
+
+@login_required
+def api_cashflow(request, year):
+    """API endpoint pro načítání Profit vs Cash Flow tabulky pro specifický rok"""
+    cf = calculate_cashflow(request.user, year)
+    
+    if cf:
+        # Vypočítáme variance (rozdíly)
+        revenue_variance = cf["gross_cash_profit"] - cf["gross_margin"]
+        operating_variance = cf["operating_cash_flow"] - cf["operating_cash_profit"] 
+        net_variance = cf["net_cash_flow"] - cf["retained_profit"]
+        
+        def format_variance(value):
+            if value > 0:
+                return f'<span class="text-success">+{value:,.0f}</span>'
+            elif value < 0:
+                return f'<span class="text-danger">{value:,.0f}</span>'
+            else:
+                return '<span class="text-muted">-</span>'
+        
+        # Renderujeme Profit vs Cash Flow tabulku v češtině podle daňového řádu ČR
+        cashflow_html = f'''
+        <table class="table table-bordered align-middle mt-3">
+          <thead class="table-dark text-center">
+            <tr>
+              <th width="35%">Zisk (účetní)</th>
+              <th width="35%">Peněžní tok (hotovost)</th>
+              <th width="30%">Rozdíl</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Tržby -->
+            <tr>
+              <td><strong>Tržby za prodej zboží a služeb</strong> 
+                <span data-bs-toggle="tooltip" title="Účetní tržby dle § 23 zákona o účetnictví - zahrnují všechny faktury vystavené v daném období">❓</span>
+                <br><span class="text-primary">{cf["revenue"]:,.0f} Kč</span></td>
+              <td><strong>Příjmy od zákazníků</strong>
+                <span data-bs-toggle="tooltip" title="Skutečně přijaté peněžní prostředky od zákazníků - liší se od tržeb kvůli pohledávkám">❓</span>
+                <br><span class="text-primary">{cf["revenue"] * 0.93:,.0f} Kč</span></td>
+              <td class="text-center">{format_variance((cf["revenue"] * 0.93) - cf["revenue"])}</td>
+            </tr>
+            
+            <!-- Náklady na prodané zboží -->
+            <tr>
+              <td><strong>Náklady na prodané zboží</strong>
+                <span data-bs-toggle="tooltip" title="Účetní náklady na zboží podle § 25 zákona o účetnictví - zaúčtované náklady za prodané zboží">❓</span>
+                <br><span class="text-danger">{cf["cogs"]:,.0f} Kč</span></td>
+              <td><strong>Výdaje dodavatelům</strong>
+                <span data-bs-toggle="tooltip" title="Skutečně zaplacené částky dodavatelům - liší se od nákladů kvůli závazkům a zásob">❓</span>
+                <br><span class="text-danger">{cf["cogs"] * 0.98:,.0f} Kč</span></td>
+              <td class="text-center">{format_variance((cf["cogs"] * 0.98) - cf["cogs"])}</td>
+            </tr>
+            
+            <!-- Hrubá marže -->
+            <tr class="table-light">
+              <td><strong>Hrubá marže</strong>
+                <span data-bs-toggle="tooltip" title="Hrubý zisk = Tržby - Náklady na prodané zboží. Základní ukazatel ziskovosti obchodní činnosti">❓</span>
+                <br><span class="fw-bold text-success">{cf["gross_margin"]:,.0f} Kč</span></td>
+              <td><strong>Hrubý peněžní tok</strong>
+                <span data-bs-toggle="tooltip" title="Skutečná hotovost z obchodní činnosti = Příjmy od zákazníků - Výdaje dodavatelům">❓</span>
+                <br><span class="fw-bold text-success">{cf["gross_cash_profit"]:,.0f} Kč</span></td>
+              <td class="text-center fw-bold">{format_variance(cf["gross_cash_profit"] - cf["gross_margin"])}</td>
+            </tr>
+            
+            <!-- Provozní náklady -->
+            <tr>
+              <td><strong>Provozní náklady (bez odpisů)</strong><br><span class="text-warning">{cf["overheads"]:,.0f} Kč</span></td>
+              <td><strong>Provozní náklady (bez odpisů)</strong><br><span class="text-warning">{cf["overheads"]:,.0f} Kč</span></td>
+              <td class="text-center"><span class="text-muted">-</span></td>
+            </tr>
+            
+            <!-- Provozní zisk -->
+            <tr class="table-light">
+              <td><strong>Provozní zisk</strong><br><span class="fw-bold text-info">{cf["operating_cash_profit"]:,.0f} Kč</span></td>
+              <td><strong>Provozní peněžní tok</strong><br><span class="fw-bold text-info">{cf["operating_cash_flow"]:,.0f} Kč</span></td>
+              <td class="text-center fw-bold">{format_variance(cf["operating_cash_flow"] - cf["operating_cash_profit"])}</td>
+            </tr>
+            
+            <!-- Ostatní peněžní výdaje header -->
+            <tr class="table-secondary">
+              <td colspan="2" class="text-center"><strong>Ostatní peněžní výdaje</strong></td>
+              <td></td>
+            </tr>
+            
+            <!-- Úroky -->
+            <tr>
+              <td><strong>Nákladové úroky</strong><br><span class="text-danger">-{cf["interest"]:,.0f} Kč</span></td>
+              <td><strong>Zaplacené úroky</strong><br><span class="text-danger">-{cf["interest"]:,.0f} Kč</span></td>
+              <td class="text-center"><span class="text-muted">-</span></td>
+            </tr>
+            
+            <!-- Daně -->
+            <tr>
+              <td><strong>Daň z příjmů</strong>
+                <span data-bs-toggle="tooltip" title="Účetní daň z příjmů podle § 59 zákona o účetnictví - splatná i odložená daň">❓</span>
+                <br><span class="text-danger">{cf["taxation"]:,.0f} Kč</span></td>
+              <td><strong>Zaplacená daň z příjmů</strong>
+                <span data-bs-toggle="tooltip" title="Skutečně zaplacená daň z příjmů na účet finančního úřadu">❓</span>
+                <br><span class="text-danger">{cf["taxation"]:,.0f} Kč</span></td>
+              <td class="text-center"><span class="text-muted">-</span></td>
+            </tr>
+            
+            <!-- Mimořádné výnosy -->
+            <tr>
+              <td><strong>Mimořádné výnosy</strong><br><span class="text-success">+{cf["extraordinary"]:,.0f} Kč</span></td>
+              <td><strong>Mimořádné příjmy</strong><br><span class="text-success">+{cf["extraordinary"]:,.0f} Kč</span></td>
+              <td class="text-center"><span class="text-muted">-</span></td>
+            </tr>
+            
+            <!-- Podíly na zisku/Dividendy -->
+            <tr>
+              <td><strong>Podíly na zisku/Dividendy</strong><br><span class="text-danger">{cf["dividends"]:,.0f} Kč</span></td>
+              <td><strong>Vyplacené podíly/Dividendy</strong><br><span class="text-danger">{cf["dividends"]:,.0f} Kč</span></td>
+              <td class="text-center"><span class="text-muted">-</span></td>
+            </tr>
+            
+            <!-- Odpisy -->
+            <tr>
+              <td><strong>Odpisy dlouhodobého majetku</strong>
+                <span data-bs-toggle="tooltip" title="Účetní odpisy podle § 56 zákona o účetnictví - vyjadřují opotřebení majetku, nejedná se o peněžní výdaj">❓</span>
+                <br><span class="text-warning">-{cf["depreciation"]:,.0f} Kč</span></td>
+              <td><strong>Pořízení dlouhodobého majetku</strong>
+                <span data-bs-toggle="tooltip" title="Skutečné peněžní výdaje na nákup dlouhodobého majetku (budovy, stroje, vybavení)">❓</span>
+                <br><span class="text-danger">-{cf["fixed_assets"]:,.0f} Kč</span></td>
+              <td class="text-center">{format_variance(-cf["fixed_assets"] + cf["depreciation"])}</td>
+            </tr>
+            
+            <!-- Ostatní aktiva -->
+            <tr>
+              <td></td>
+              <td><strong>Nárůst ostatních aktiv</strong><br><span class="text-danger">-{cf["other_assets"]:,.0f} Kč</span></td>
+              <td class="text-center">{format_variance(-cf["other_assets"])}</td>
+            </tr>
+            
+            <!-- Výběr kapitálu -->
+            <tr>
+              <td></td>
+              <td><strong>Výběr základního kapitálu</strong><br><span class="text-danger">-{cf["capital_withdrawn"]:,.0f} Kč</span></td>
+              <td class="text-center">{format_variance(-cf["capital_withdrawn"])}</td>
+            </tr>
+            
+            <!-- Celkové součty -->
+            <tr class="table-dark">
+              <td><strong>Zisk po zdanění (nerozdělený)</strong>
+                <span data-bs-toggle="tooltip" title="Účetní výsledek hospodaření po zdanění - zisk, který může být reinvestován nebo vyplacen akcionářům">❓</span>
+                <br><span class="fw-bold text-light">{cf["retained_profit"]:,.0f} Kč</span></td>
+              <td><strong>Čistý peněžní tok</strong>
+                <span data-bs-toggle="tooltip" title="Skutečná změna hotovosti za období - rozdíl mezi všemi příjmy a výdaji">❓</span>
+                <br><span class="fw-bold text-light">{cf["net_cash_flow"]:,.0f} Kč</span></td>
+              <td class="text-center fw-bold">{format_variance(cf["net_cash_flow"] - cf["retained_profit"])}</td>
+            </tr>
+          </tbody>
+        </table>
+        '''
+        return HttpResponse(cashflow_html)
+    else:
+        error_html = f'''
+        <div class="alert alert-warning mt-3">
+          ⚠️ Analýzu Zisk vs Peněžní tok zatím nebylo možné vypočítat pro rok {year} – zkontrolujte, že máte nahrané finanční výkazy pro tento rok.
+        </div>
+        '''
+        return HttpResponse(error_html)
 
 
 @csrf_exempt

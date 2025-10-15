@@ -13,6 +13,9 @@ urlpatterns = [
     # 💰 Cashflow přehled
     path("cashflow/", views_cashflow.cashflow_view, name="cashflow"),              # výchozí stránka s výběrem roku
     path("cashflow/<int:year>/", views_cashflow.cashflow_view, name="cashflow_view"),  # zachováno pro přímý odkaz
+    
+    # API pro dynamické načítání cashflow
+    path("api/cashflow/<int:year>/", views.api_cashflow, name="api_cashflow"),
 
     # hlavní dashboard
 ]
