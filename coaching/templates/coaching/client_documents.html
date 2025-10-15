@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12">
+      <!-- Breadcrumb -->
+      <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a href="{% url 'coaching:my_clients' %}">Moji klienti</a></li>
+          <li class="breadcrumb-item active">{{ client.company_name }} - Dokumenty</li>
+        </ol>
+      </nav>
+
+      <!-- Hlavička -->
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2>📄 Dokumenty klienta</h2>
+          <p class="text-muted">{{ client.company_name }} (IČO: {{ client.ico|default:"Neznámé" }})</p>
+        </div>
+        <div>
+          <a href="{% url 'coaching:client_dashboard' client.id %}" class="btn btn-outline-primary">
+            ← Zpět na dashboard
+          </a>
+        </div>
+      </div>
+
+      <!-- Filtr dokumentů -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-4">
+              <label class="form-label">Filtr podle typu:</label>
+              <select class="form-select" id="docTypeFilter">
+                <option value="">Všechny dokumenty</option>
+                <option value="rozvaha">Rozvaha</option>
+                <option value="vysledovka">Výsledovka</option>
+                <option value="cashflow">Cash Flow</option>
+                <option value="other">Ostatní dokumenty</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Seřadit podle:</label>
+              <select class="form-select" id="sortBy">
+                <option value="date_desc">Nejnovější první</option>
+                <option value="date_asc">Nejstarší první</option>
+                <option value="type">Podle typu</option>
+                <option value="name">Podle názvu</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Hledat:</label>
+              <input type="text" class="form-control" id="searchInput" placeholder="Hledat v názvu dokumentu...">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Seznam dokumentů -->
+      <div class="card">
+        <div class="card-header">
+          <h5>📋 Všechny dokumenty ({{ documents.count }})</h5>
+        </div>
+        <div class="card-body">
+          {% if documents %}
+            <div class="table-responsive">
+              <table class="table table-hover" id="documentsTable">
+                <thead>
+                  <tr>
+                    <th>Název souboru</th>
+                    <th>Typ dokumentu</th>
+                    <th>Velikost</th>
+                    <th>Nahráno</th>
+                    <th>Status</th>
+                    <th>Akce</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for document in documents %}
+                  <tr data-doc-type="{{ document.doc_type }}" data-filename="{{ document.filename }}">
+                    <td>
+                      <strong>{{ document.filename }}</strong>
+                      {% if document.description %}
+                        <br><small class="text-muted">{{ document.description|truncatechars:50 }}</small>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <span class="badge bg-{% if document.doc_type == 'rozvaha' %}primary{% elif document.doc_type == 'vysledovka' %}success{% elif document.doc_type == 'cashflow' %}info{% else %}secondary{% endif %}">
+                        {{ document.get_doc_type_display }}
+                      </span>
+                    </td>
+                    <td>
+                      {% if document.file.size %}
+                        {{ document.file.size|filesizeformat }}
+                      {% else %}
+                        -
+                      {% endif %}
+                    </td>
+                    <td>
+                      {{ document.uploaded_at|date:"d.m.Y H:i" }}
+                      <br><small class="text-muted">{{ document.uploaded_at|timesince }} ago</small>
+                    </td>
+                    <td>
+                      {% if document.analyzed %}
+                        <span class="badge bg-success">✅ Analyzováno</span>
+                      {% else %}
+                        <span class="badge bg-warning">⏳ Čeká na analýzu</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <div class="btn-group btn-group-sm">
+                        <a href="{{ document.file.url }}" 
+                           class="btn btn-outline-primary" 
+                           target="_blank" 
+                           title="Zobrazit dokument">
+                          👁️ Zobrazit
+                        </a>
+                        <a href="{{ document.file.url }}" 
+                           class="btn btn-outline-secondary" 
+                           download="{{ document.filename }}"
+                           title="Stáhnout dokument">
+                          💾 Stáhnout
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Statistiky dokumentů -->
+            <div class="row mt-4">
+              <div class="col-md-3">
+                <div class="text-center">
+                  <h6 class="text-primary">Rozvahy</h6>
+                  <h4>{{ documents|dictsort:"doc_type"|dictsortreversed:"doc_type"|first:"rozvaha"|length|default:0 }}</h4>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="text-center">
+                  <h6 class="text-success">Výsledovky</h6>
+                  <h4>{{ documents|dictsort:"doc_type"|dictsortreversed:"doc_type"|first:"vysledovka"|length|default:0 }}</h4>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="text-center">
+                  <h6 class="text-info">Cash Flow</h6>
+                  <h4>{{ documents|dictsort:"doc_type"|dictsortreversed:"doc_type"|first:"cashflow"|length|default:0 }}</h4>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="text-center">
+                  <h6 class="text-secondary">Ostatní</h6>
+                  <h4>
+                    {% with total=documents.count rozvaha=0 vysledovka=0 cashflow=0 %}
+                      {% for doc in documents %}
+                        {% if doc.doc_type == 'rozvaha' %}{% add rozvaha 1 %}{% endif %}
+                        {% if doc.doc_type == 'vysledovka' %}{% add vysledovka 1 %}{% endif %}
+                        {% if doc.doc_type == 'cashflow' %}{% add cashflow 1 %}{% endif %}
+                      {% endfor %}
+                      {{ total|add:rozvaha|add:vysledovka|add:cashflow|add:"-"|add:total }}
+                    {% endwith %}
+                  </h4>
+                </div>
+              </div>
+            </div>
+
+          {% else %}
+            <div class="text-center py-5">
+              <h4 class="text-muted">Žádné dokumenty nebyly nalezeny</h4>
+              <p class="text-muted">Tento klient zatím nenahrál žádné dokumenty.</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Funkce pro filtrování a vyhledávání dokumentů
+document.addEventListener('DOMContentLoaded', function() {
+    const docTypeFilter = document.getElementById('docTypeFilter');
+    const sortBy = document.getElementById('sortBy');
+    const searchInput = document.getElementById('searchInput');
+    const table = document.getElementById('documentsTable');
+    const tbody = table ? table.querySelector('tbody') : null;
+    
+    if (!tbody) return;
+    
+    const originalRows = Array.from(tbody.querySelectorAll('tr'));
+    
+    function filterAndSort() {
+        const filterType = docTypeFilter.value;
+        const sortType = sortBy.value;
+        const searchTerm = searchInput.value.toLowerCase();
+        
+        // Filtrování
+        let filteredRows = originalRows.filter(row => {
+            const docType = row.getAttribute('data-doc-type');
+            const filename = row.getAttribute('data-filename').toLowerCase();
+            
+            // Filter podle typu
+            let typeMatch = true;
+            if (filterType) {
+                if (filterType === 'other') {
+                    typeMatch = !['rozvaha', 'vysledovka', 'cashflow'].includes(docType);
+                } else {
+                    typeMatch = docType === filterType;
+                }
+            }
+            
+            // Filter podle hledání
+            const searchMatch = filename.includes(searchTerm);
+            
+            return typeMatch && searchMatch;
+        });
+        
+        // Řazení
+        filteredRows.sort((a, b) => {
+            switch (sortType) {
+                case 'date_asc':
+                    const dateA = new Date(a.cells[3].textContent.split('\n')[0].trim());
+                    const dateB = new Date(b.cells[3].textContent.split('\n')[0].trim());
+                    return dateA - dateB;
+                case 'date_desc':
+                    const dateA2 = new Date(a.cells[3].textContent.split('\n')[0].trim());
+                    const dateB2 = new Date(b.cells[3].textContent.split('\n')[0].trim());
+                    return dateB2 - dateA2;
+                case 'type':
+                    return a.getAttribute('data-doc-type').localeCompare(b.getAttribute('data-doc-type'));
+                case 'name':
+                    return a.getAttribute('data-filename').localeCompare(b.getAttribute('data-filename'));
+                default:
+                    return 0;
+            }
+        });
+        
+        // Aktualizace tabulky
+        tbody.innerHTML = '';
+        filteredRows.forEach(row => tbody.appendChild(row));
+        
+        // Zobrazení počtu výsledků
+        const resultCount = filteredRows.length;
+        const totalCount = originalRows.length;
+        
+        if (resultCount !== totalCount) {
+            const cardHeader = table.closest('.card').querySelector('.card-header h5');
+            cardHeader.textContent = `📋 Dokumenty (${resultCount} z ${totalCount})`;
+        }
+    }
+    
+    // Event listenery
+    docTypeFilter.addEventListener('change', filterAndSort);
+    sortBy.addEventListener('change', filterAndSort);
+    searchInput.addEventListener('input', filterAndSort);
+});
+</script>
+
+{% endblock %}

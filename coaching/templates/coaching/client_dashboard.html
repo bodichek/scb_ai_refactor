@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12">
+      <!-- Breadcrumb -->
+      <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a href="{% url 'coaching:my_clients' %}">Moji klienti</a></li>
+          <li class="breadcrumb-item active">{{ client.company_name }}</li>
+        </ol>
+      </nav>
+
+      <!-- Hlavička klienta -->
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2>📊 {{ client.company_name }}</h2>
+          <p class="text-muted">IČO: {{ client.ico|default:"Neznámé" }} | 📍 {{ client.city|default:"Město nezadáno" }}</p>
+        </div>
+        <div>
+          <a href="{% url 'coaching:client_documents' client.id %}" class="btn btn-outline-primary">
+            📄 Dokumenty
+          </a>
+          <a href="mailto:{{ client.user.email }}" class="btn btn-outline-info">
+            ✉️ Kontakt
+          </a>
+        </div>
+      </div>
+
+      <!-- Základní informace -->
+      <div class="row mb-4">
+        <div class="col-md-3">
+          <div class="card text-center">
+            <div class="card-body">
+              <h4 class="text-primary">{{ statements_count }}</h4>
+              <p class="text-muted">Nahraných výkazů</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card text-center">
+            <div class="card-body">
+              <h4 class="text-success">{{ surveys_completed }}</h4>
+              <p class="text-muted">Dokončených dotazníků</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card text-center">
+            <div class="card-body">
+              <h4 class="text-info">{{ documents_count }}</h4>
+              <p class="text-muted">Ostatních dokumentů</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card text-center">
+            <div class="card-body">
+              <h4 class="text-warning">{{ days_since_activity }}</h4>
+              <p class="text-muted">Dní od aktivity</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <!-- Levý sloupec - Finanční data -->
+        <div class="col-md-8">
+          <!-- Cash Flow analýza -->
+          <div class="card mb-4">
+            <div class="card-header">
+              <h5>💰 Cash Flow analýza</h5>
+            </div>
+            <div class="card-body">
+              {% if has_cashflow_data %}
+                <div id="cashflowChart" style="height: 300px;"></div>
+                
+                <div class="row mt-3">
+                  <div class="col-md-4">
+                    <div class="text-center">
+                      <h6 class="text-success">Příjmy</h6>
+                      <h4>{{ cashflow.total_income|floatformat:0 }} Kč</h4>
+                    </div>
+                  </div>
+                  <div class="col-md-4">
+                    <div class="text-center">
+                      <h6 class="text-danger">Výdaje</h6>
+                      <h4>{{ cashflow.total_expenses|floatformat:0 }} Kč</h4>
+                    </div>
+                  </div>
+                  <div class="col-md-4">
+                    <div class="text-center">
+                      <h6 class="{% if cashflow.net_cashflow >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        Čistý CF
+                      </h6>
+                      <h4>{{ cashflow.net_cashflow|floatformat:0 }} Kč</h4>
+                    </div>
+                  </div>
+                </div>
+              {% else %}
+                <div class="text-center py-4">
+                  <p class="text-muted">Pro tohoto klienta zatím nejsou k dispozici data cash flow</p>
+                  <small class="text-muted">Data se zobrazí po nahrání finančních výkazů</small>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Finanční výkazy -->
+          <div class="card mb-4">
+            <div class="card-header">
+              <h5>📊 Finanční výkazy</h5>
+            </div>
+            <div class="card-body">
+              {% if financial_statements %}
+                <div class="table-responsive">
+                  <table class="table table-sm">
+                    <thead>
+                      <tr>
+                        <th>Typ výkazu</th>
+                        <th>Období</th>
+                        <th>Nahráno</th>
+                        <th>Status</th>
+                        <th>Akce</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for statement in financial_statements %}
+                      <tr>
+                        <td>{{ statement.get_doc_type_display }}</td>
+                        <td>{{ statement.period|default:"-" }}</td>
+                        <td>{{ statement.uploaded_at|date:"d.m.Y H:i" }}</td>
+                        <td>
+                          {% if statement.analyzed %}
+                            <span class="badge bg-success">Analyzováno</span>
+                          {% else %}
+                            <span class="badge bg-warning">Čeká na analýzu</span>
+                          {% endif %}
+                        </td>
+                        <td>
+                          <a href="{{ statement.file.url }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                            📄 Zobrazit
+                          </a>
+                        </td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              {% else %}
+                <div class="text-center py-4">
+                  <p class="text-muted">Žádné finanční výkazy zatím nebyly nahrány</p>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Pravý sloupec - Další informace -->
+        <div class="col-md-4">
+          <!-- Informace o klientovi -->
+          <div class="card mb-4">
+            <div class="card-header">
+              <h6>ℹ️ Informace o klientovi</h6>
+            </div>
+            <div class="card-body">
+              <dl class="row">
+                <dt class="col-sm-5">Kontaktní osoba:</dt>
+                <dd class="col-sm-7">{{ client.contact_person|default:"-" }}</dd>
+                
+                <dt class="col-sm-5">Email:</dt>
+                <dd class="col-sm-7">
+                  <a href="mailto:{{ client.user.email }}">{{ client.user.email }}</a>
+                </dd>
+                
+                <dt class="col-sm-5">Telefon:</dt>
+                <dd class="col-sm-7">{{ client.phone|default:"-" }}</dd>
+                
+                <dt class="col-sm-5">Odvětví:</dt>
+                <dd class="col-sm-7">{{ client.industry|default:"-" }}</dd>
+                
+                <dt class="col-sm-5">Adresa:</dt>
+                <dd class="col-sm-7">
+                  {% if client.address %}
+                    {{ client.address }}<br>
+                    {{ client.postal_code }} {{ client.city }}
+                  {% else %}
+                    -
+                  {% endif %}
+                </dd>
+                
+                <dt class="col-sm-5">Registrace:</dt>
+                <dd class="col-sm-7">{{ client.user.date_joined|date:"d.m.Y" }}</dd>
+              </dl>
+            </div>
+          </div>
+
+          <!-- Dotazníky -->
+          <div class="card mb-4">
+            <div class="card-header">
+              <h6>📝 Dotazníky</h6>
+            </div>
+            <div class="card-body">
+              {% if surveys %}
+                {% for survey in surveys %}
+                <div class="border-bottom pb-2 mb-2">
+                  <strong>{{ survey.survey_name }}</strong><br>
+                  <small class="text-muted">Dokončen: {{ survey.submitted_at|date:"d.m.Y H:i" }}</small>
+                  {% if survey.ai_response %}
+                    <br><small class="text-success">✅ AI analýza dostupná</small>
+                  {% endif %}
+                </div>
+                {% endfor %}
+              {% else %}
+                <p class="text-muted">Žádné dokončené dotazníky</p>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Poznámky kouče -->
+          <div class="card">
+            <div class="card-header">
+              <h6>📝 Poznámky kouče</h6>
+            </div>
+            <div class="card-body">
+              <form method="post" action="{% url 'coaching:save_client_notes' client.id %}">
+                {% csrf_token %}
+                <textarea name="notes" class="form-control" rows="6" 
+                          placeholder="Zadejte své poznámky k tomuto klientovi...">{{ client_notes }}</textarea>
+                <button type="submit" class="btn btn-primary btn-sm mt-2">💾 Uložit poznámky</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Chart.js pro grafy -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+{% if has_cashflow_data %}
+// Cash Flow graf
+const ctx = document.getElementById('cashflowChart').getContext('2d');
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: {{ cashflow.months|safe }},
+        datasets: [{
+            label: 'Příjmy',
+            data: {{ cashflow.income_data|safe }},
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            tension: 0.1
+        }, {
+            label: 'Výdaje',
+            data: {{ cashflow.expense_data|safe }},
+            borderColor: 'rgb(255, 99, 132)',
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            tension: 0.1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return value.toLocaleString('cs-CZ') + ' Kč';
+                    }
+                }
+            }
+        }
+    }
+});
+{% endif %}
+</script>
+
+{% endblock %}

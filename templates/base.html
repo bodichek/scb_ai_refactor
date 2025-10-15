@@ -47,6 +47,13 @@
               <a class="nav-link" href="{% url 'exports:export_form' %}">📤 Exporty</a>
             </li>
 
+            <!-- Coaching (pouze pro kouče) -->
+            {% if user.userrole.role == 'coach' %}
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'coaching:my_clients' %}">🎯 Moji klienti</a>
+            </li>
+            {% endif %}
+
             <!-- Profil -->
             <li class="nav-item">
               <a class="nav-link" href="{% url 'accounts:profile' %}">👤 Profil</a>

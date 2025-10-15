@@ -45,3 +45,20 @@ class UserRole(models.Model):
 
     def __str__(self):
         return f"{self.user.username} ({self.role})"
+
+
+class CoachClientNotes(models.Model):
+    """Model pro poznámky kouče o klientovi"""
+    coach = models.ForeignKey(Coach, on_delete=models.CASCADE, related_name='client_notes')
+    client = models.ForeignKey(CompanyProfile, on_delete=models.CASCADE, related_name='coach_notes')
+    notes = models.TextField("Poznámky", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['coach', 'client']
+        verbose_name = "Poznámka kouče"
+        verbose_name_plural = "Poznámky kouče"
+
+    def __str__(self):
+        return f"Poznámky kouče {self.coach} o {self.client.company_name}"

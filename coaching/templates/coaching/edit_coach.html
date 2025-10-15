@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header">
+          <h5>⚙️ Upravit profil kouče</h5>
+        </div>
+        <div class="card-body">
+          <form method="post">
+            {% csrf_token %}
+            
+            <div class="row">
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="specialization" class="form-label">Specializace</label>
+                  <input type="text" class="form-control" id="specialization" name="specialization" 
+                         value="{{ coach.specialization|default:'' }}" 
+                         placeholder="Např. Finanční poradenství, Cash Flow management">
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="phone" class="form-label">Telefon</label>
+                  <input type="tel" class="form-control" id="phone" name="phone" 
+                         value="{{ coach.phone|default:'' }}" 
+                         placeholder="+420 123 456 789">
+                </div>
+              </div>
+            </div>
+            
+            <div class="row">
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="email" class="form-label">Kontaktní email</label>
+                  <input type="email" class="form-control" id="email" name="email" 
+                         value="{{ coach.email|default:'' }}" 
+                         placeholder="vas.email@example.com">
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="city" class="form-label">Město</label>
+                  <input type="text" class="form-control" id="city" name="city" 
+                         value="{{ coach.city|default:'' }}" 
+                         placeholder="Praha, Brno, Ostrava...">
+                </div>
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="bio" class="form-label">Bio / O mně</label>
+              <textarea class="form-control" id="bio" name="bio" rows="4" 
+                        placeholder="Krátký popis vaší odbornosti a zkušeností...">{{ coach.bio|default:'' }}</textarea>
+            </div>
+            
+            <div class="row">
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="linkedin" class="form-label">LinkedIn profil</label>
+                  <input type="url" class="form-control" id="linkedin" name="linkedin" 
+                         value="{{ coach.linkedin|default:'' }}" 
+                         placeholder="https://linkedin.com/in/vase-jmeno">
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="website" class="form-label">Webové stránky</label>
+                  <input type="url" class="form-control" id="website" name="website" 
+                         value="{{ coach.website|default:'' }}" 
+                         placeholder="https://vase-stranky.cz">
+                </div>
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="available" name="available" 
+                       {% if coach.available %}checked{% endif %}>
+                <label class="form-check-label" for="available">
+                  Dostupný pro nové klienty
+                </label>
+              </div>
+            </div>
+            
+            <div class="d-flex justify-content-between">
+              <a href="{% url 'coaching:my_clients' %}" class="btn btn-outline-secondary">
+                ← Zpět na dashboard
+              </a>
+              <button type="submit" class="btn btn-primary">
+                💾 Uložit změny
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+      
+      <!-- Informace o přiřazených klientech -->
+      <div class="card mt-4">
+        <div class="card-header">
+          <h6>📊 Informace o vašich klientech</h6>
+        </div>
+        <div class="card-body">
+          <div class="row text-center">
+            <div class="col-md-4">
+              <h4 class="text-primary">{{ coach.companyprofile_set.count }}</h4>
+              <p class="text-muted">Přiřazených klientů</p>
+            </div>
+            <div class="col-md-4">
+              <h4 class="text-success">
+                {% with active_count=coach.companyprofile_set.count %}
+                  {{ active_count }}
+                {% endwith %}
+              </h4>
+              <p class="text-muted">Aktivních klientů</p>
+            </div>
+            <div class="col-md-4">
+              <h4 class="text-info">
+                {{ coach.user.date_joined|date:"Y" }}
+              </h4>
+              <p class="text-muted">Rok začátku</p>
+            </div>
+          </div>
+          
+          {% if coach.companyprofile_set.exists %}
+            <div class="mt-3">
+              <h6>Vaši klienti:</h6>
+              <ul class="list-group list-group-flush">
+                {% for client in coach.companyprofile_set.all %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                  <div>
+                    <strong>{{ client.company_name }}</strong>
+                    <br><small class="text-muted">{{ client.city|default:"Město nezadáno" }}</small>
+                  </div>
+                  <a href="{% url 'coaching:client_dashboard' client.id %}" class="btn btn-sm btn-outline-primary">
+                    📊 Dashboard
+                  </a>
+                </li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
