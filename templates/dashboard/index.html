@@ -123,8 +123,19 @@
   <h3 class="mt-5">📈 Meziroční přehled</h3>
   <canvas id="allMetricsChart"></canvas>
  <!-- 💰 Přehled Cash Flow -->
-<h3 class="mt-5">💰 Výkaz Cash Flow ({{ selected_year }})</h3>
+<div class="d-flex justify-content-between align-items-center mt-5 mb-3">
+  <h3 class="mb-0">💰 Výkaz Cash Flow</h3>
+  <div class="d-flex align-items-center">
+    <label for="cashflow-year-select" class="form-label me-2 mb-0"><strong>Rok:</strong></label>
+    <select id="cashflow-year-select" class="form-select" style="width: auto;" onchange="loadCashflowForYear(this.value)">
+      {% for r in table_rows %}
+        <option value="{{ r.year }}" {% if r.year == selected_year %}selected{% endif %}>{{ r.year }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</div>
 
+<div id="cashflow-content">
 {% if cashflow %}
   <table class="table table-bordered align-middle mt-3">
     <thead class="table-dark text-center">
@@ -176,8 +187,7 @@
     ⚠️ Cash Flow zatím nebylo možné vypočítat – zkontrolujte, že máte nahrané výkazy pro vybraný rok.
   </div>
 {% endif %}
-
-</div>
+</div> <!-- konec cashflow-content -->
 
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -197,6 +207,28 @@ document.addEventListener("DOMContentLoaded", function() {
     return new bootstrap.Tooltip(tooltipTriggerEl);
   });
 });
+
+// ===== CASHFLOW FUNCTIONS =====
+async function loadCashflowForYear(year) {
+  try {
+    const response = await fetch(`/dashboard/api/cashflow/${year}/`);
+    if (response.ok) {
+      const html = await response.text();
+      document.getElementById('cashflow-content').innerHTML = html;
+      
+      // Znovu aktivujeme tooltips pro nový obsah
+      const tooltipTriggerList = document.querySelectorAll('#cashflow-content [data-bs-toggle="tooltip"]');
+      [...tooltipTriggerList].map(el => new bootstrap.Tooltip(el));
+    } else {
+      document.getElementById('cashflow-content').innerHTML = 
+        '<div class="alert alert-danger">⚠️ Nepodařilo se načíst cashflow data pro rok ' + year + '</div>';
+    }
+  } catch (error) {
+    console.error('Chyba při načítání cashflow:', error);
+    document.getElementById('cashflow-content').innerHTML = 
+      '<div class="alert alert-danger">⚠️ Chyba při načítání cashflow dat</div>';
+  }
+}
 
 // ===== DATA =====
 const rows = {{ rows|safe }};
