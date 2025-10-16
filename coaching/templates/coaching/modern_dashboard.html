@@ -195,14 +195,20 @@
         <!-- Cash Flow -->
         <div class="tab-pane fade" id="cashflow">
           <div class="card border-0 shadow-sm">
-            <div class="card-header bg-gradient bg-success text-white border-0">
-              <h6 class="mb-0"><i class="fas fa-coins me-2"></i>Měsíční Cash Flow</h6>
+            <div class="card-header bg-gradient bg-success text-white border-0 d-flex justify-content-between align-items-center">
+              <h6 class="mb-0"><i class="fas fa-coins me-2"></i>💰 Profit vs Cash Flow</h6>
+              <div class="d-flex align-items-center">
+                <label for="cashflow-year-select" class="form-label me-2 mb-0 text-white"><small>Rok:</small></label>
+                <select id="cashflow-year-select" class="form-select form-select-sm" style="width: auto; font-size: 0.875rem;">
+                  <option value="">Vyberte rok</option>
+                </select>
+              </div>
             </div>
-            <div class="card-body p-0">
+            <div class="card-body">
               <div id="cashflowContent">
                 <div class="text-center text-muted py-5">
                   <i class="fas fa-money-bill-wave fa-3x mb-3"></i>
-                  <p>Vyberte klienta pro zobrazení cash flow</p>
+                  <p>Vyberte klienta pro zobrazení cash flow analýzy</p>
                 </div>
               </div>
             </div>
@@ -574,40 +580,71 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function updateCashflowTab(data) {
         const content = document.getElementById('cashflowContent');
+        const yearSelect = document.getElementById('cashflow-year-select');
         
-        if (data.has_cashflow_data && data.cashflow.monthly_data) {
+        // Aktualizuj výběr roků
+        if (data.cashflow && data.cashflow.available_years) {
+            yearSelect.innerHTML = '<option value="">Vyberte rok</option>';
+            data.cashflow.available_years.forEach(year => {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                if (year === data.cashflow.current_year) {
+                    option.selected = true;
+                }
+                yearSelect.appendChild(option);
+            });
+        }
+        
+        if (data.has_cashflow_data && data.cashflow) {
+            // TABULKA PROFIT VS CASH FLOW (stejná jako má klient)
             let tableHtml = `
                 <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-success">
+                    <table class="table table-striped table-bordered align-middle text-center">
+                        <thead class="table-dark">
                             <tr>
-                                <th>Měsíc</th>
-                                <th class="text-end">Příjmy</th>
-                                <th class="text-end">Výdaje</th>
-                                <th class="text-end">Cash Flow</th>
-                                <th class="text-end">Kumulativní</th>
+                                <th>Položka</th>
+                                <th>Profit</th>
+                                <th>Cash Flow</th>
+                                <th>Rozdíl</th>
                             </tr>
                         </thead>
                         <tbody>
+                            <tr>
+                                <td><strong>Tržby</strong></td>
+                                <td>${Number(data.cashflow.revenue || 0).toLocaleString('cs-CZ')} Kč</td>
+                                <td>${Number(data.cashflow.gross_cash_profit || 0).toLocaleString('cs-CZ')} Kč</td>
+                                <td class="${(data.cashflow.variance.gross || 0) >= 0 ? 'text-success' : 'text-danger'}">
+                                    ${Number(data.cashflow.variance.gross || 0).toLocaleString('cs-CZ')} Kč
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Provozní zisk</strong></td>
+                                <td>${Number(data.cashflow.operating_cash_profit || 0).toLocaleString('cs-CZ')} Kč</td>
+                                <td>${Number(data.cashflow.operating_cash_flow || 0).toLocaleString('cs-CZ')} Kč</td>
+                                <td class="${(data.cashflow.variance.operating || 0) >= 0 ? 'text-success' : 'text-danger'}">
+                                    ${Number(data.cashflow.variance.operating || 0).toLocaleString('cs-CZ')} Kč
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Čistý zisk</strong></td>
+                                <td>${Number(data.cashflow.retained_profit || 0).toLocaleString('cs-CZ')} Kč</td>
+                                <td>${Number(data.cashflow.net_cash_flow || 0).toLocaleString('cs-CZ')} Kč</td>
+                                <td class="${(data.cashflow.variance.net || 0) >= 0 ? 'text-success' : 'text-danger'}">
+                                    ${Number(data.cashflow.variance.net || 0).toLocaleString('cs-CZ')} Kč
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <p class="text-muted small mt-3 mb-0">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Analýza porovnává účetní výsledky s reálným cash flow za rok ${data.cashflow.current_year || 'N/A'}.
+                    Rozdíly ukazují, kde se peníze "ztrácejí" nebo "objevují" vzhledem k zisku.
+                </p>
             `;
             
-            data.cashflow.monthly_data.forEach(month => {
-                tableHtml += `
-                    <tr>
-                        <td class="fw-medium">${month.month_name}</td>
-                        <td class="text-end text-success">${Number(month.revenue).toLocaleString()} Kč</td>
-                        <td class="text-end text-danger">${Number(month.expenses).toLocaleString()} Kč</td>
-                        <td class="text-end ${month.cashflow >= 0 ? 'text-success' : 'text-danger'} fw-medium">
-                            ${Number(month.cashflow).toLocaleString()} Kč
-                        </td>
-                        <td class="text-end ${month.cumulative >= 0 ? 'text-success' : 'text-danger'} fw-bold">
-                            ${Number(month.cumulative).toLocaleString()} Kč
-                        </td>
-                    </tr>
-                `;
-            });
-            
-            tableHtml += '</tbody></table></div>';
             content.innerHTML = tableHtml;
         } else {
             content.innerHTML = `
@@ -647,17 +684,31 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div class="accordion-body">
                 `;
                 
+                // Zobrazení otázek a odpovědí
                 survey.responses.forEach(response => {
                     accordionHtml += `
                         <div class="mb-4 pb-3 border-bottom">
                             <div class="d-flex justify-content-between align-items-start mb-2">
-                                <h6 class="mb-1 text-primary">${response.question.text}</h6>
+                                <h6 class="mb-1 text-primary">${response.question}</h6>
                                 ${response.score ? `<span class="badge bg-primary">${response.score}/10</span>` : ''}
                             </div>
-                            <p class="text-muted mb-0">${response.answer_text}</p>
+                            <p class="text-muted mb-0">${response.answer_text || 'Bez odpovědi'}</p>
                         </div>
                     `;
                 });
+                
+                // Přidání AI shrnutí (pokud existuje)
+                if (survey.submission.ai_response) {
+                    accordionHtml += `
+                        <div class="alert alert-light border-start border-5 border-primary">
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="fas fa-robot text-primary me-2"></i>
+                                <h6 class="mb-0 text-primary">AI Shrnutí a doporučení</h6>
+                            </div>
+                            <div class="text-muted" style="white-space: pre-line;">${survey.submission.ai_response}</div>
+                        </div>
+                    `;
+                }
                 
                 accordionHtml += `
                             </div>
@@ -756,32 +807,42 @@ document.addEventListener('DOMContentLoaded', function() {
             documentsHtml += `
                 <div class="mb-4">
                     <h6 class="text-primary mb-3"><i class="fas fa-chart-bar me-2"></i>Finanční výkazy (${data.financial_statements.length})</h6>
-                    <div class="row g-3">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th><i class="fas fa-file me-1"></i>Dokument</th>
+                                    <th>Typ</th>
+                                    <th>Datum nahrání</th>
+                                    <th>Popis</th>
+                                    <th class="text-center">Akce</th>
+                                </tr>
+                            </thead>
+                            <tbody>
             `;
             
             data.financial_statements.forEach(doc => {
                 documentsHtml += `
-                    <div class="col-md-6">
-                        <div class="document-item card h-100 border">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <h6 class="card-title mb-1 text-primary">${doc.get_doc_type_display}</h6>
-                                    <small class="text-muted">${new Date(doc.uploaded_at).toLocaleDateString('cs-CZ')}</small>
-                                </div>
-                                <p class="card-text text-muted small mb-2">${doc.description || 'Bez popisu'}</p>
-                                <div class="d-flex align-items-center justify-content-between">
-                                    <small class="text-muted"><i class="fas fa-file me-1"></i>${doc.filename}</small>
-                                    <button class="btn btn-sm btn-outline-primary" onclick="viewDocument('${doc.id}')">
-                                        <i class="fas fa-eye me-1"></i>Zobrazit
-                                    </button>
-                                </div>
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-file-pdf text-danger me-2"></i>
+                                <span class="fw-medium">${doc.filename}</span>
                             </div>
-                        </div>
-                    </div>
+                        </td>
+                        <td><span class="badge bg-primary">${doc.get_doc_type_display || doc.doc_type}</span></td>
+                        <td><small class="text-muted">${new Date(doc.uploaded_at).toLocaleDateString('cs-CZ')}</small></td>
+                        <td><small class="text-muted">${doc.description || 'Bez popisu'}</small></td>
+                        <td class="text-center">
+                            <button class="btn btn-sm btn-outline-primary" onclick="viewDocument('${doc.id}', '${doc.file_url}')">
+                                <i class="fas fa-eye me-1"></i>Zobrazit
+                            </button>
+                        </td>
+                    </tr>
                 `;
             });
             
-            documentsHtml += '</div></div>';
+            documentsHtml += '</tbody></table></div></div>';
         }
         
         // Ostatní dokumenty
@@ -789,32 +850,42 @@ document.addEventListener('DOMContentLoaded', function() {
             documentsHtml += `
                 <div class="mb-4">
                     <h6 class="text-secondary mb-3"><i class="fas fa-folder me-2"></i>Ostatní dokumenty (${data.other_documents.length})</h6>
-                    <div class="row g-3">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th><i class="fas fa-file me-1"></i>Dokument</th>
+                                    <th>Typ</th>
+                                    <th>Datum nahrání</th>
+                                    <th>Popis</th>
+                                    <th class="text-center">Akce</th>
+                                </tr>
+                            </thead>
+                            <tbody>
             `;
             
             data.other_documents.forEach(doc => {
                 documentsHtml += `
-                    <div class="col-md-6">
-                        <div class="document-item card h-100 border">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <h6 class="card-title mb-1 text-secondary">${doc.get_doc_type_display || 'Dokument'}</h6>
-                                    <small class="text-muted">${new Date(doc.uploaded_at).toLocaleDateString('cs-CZ')}</small>
-                                </div>
-                                <p class="card-text text-muted small mb-2">${doc.description || 'Bez popisu'}</p>
-                                <div class="d-flex align-items-center justify-content-between">
-                                    <small class="text-muted"><i class="fas fa-file me-1"></i>${doc.filename}</small>
-                                    <button class="btn btn-sm btn-outline-secondary" onclick="viewDocument('${doc.id}')">
-                                        <i class="fas fa-eye me-1"></i>Zobrazit
-                                    </button>
-                                </div>
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-file-alt text-secondary me-2"></i>
+                                <span class="fw-medium">${doc.filename}</span>
                             </div>
-                        </div>
-                    </div>
+                        </td>
+                        <td><span class="badge bg-secondary">${doc.get_doc_type_display || doc.doc_type || 'Dokument'}</span></td>
+                        <td><small class="text-muted">${new Date(doc.uploaded_at).toLocaleDateString('cs-CZ')}</small></td>
+                        <td><small class="text-muted">${doc.description || 'Bez popisu'}</small></td>
+                        <td class="text-center">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="viewDocument('${doc.id}', '${doc.file_url}')">
+                                <i class="fas fa-eye me-1"></i>Zobrazit
+                            </button>
+                        </td>
+                    </tr>
                 `;
             });
             
-            documentsHtml += '</div></div>';
+            documentsHtml += '</tbody></table></div></div>';
         }
         
         if (!documentsHtml) {
@@ -1015,11 +1086,32 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('clientActivity').textContent = 'Chyba';
     }
     
-    // Document viewer function
-    window.viewDocument = function(documentId) {
-        // Here you would implement document viewing functionality
-        // For now, just show an alert
-        alert('Zobrazení dokumentu ID: ' + documentId + '\n\nTato funkcionalita bude implementována.');
+    // Document viewer function - otevře PDF v novém okně
+    window.viewDocument = function(documentId, documentUrl) {
+        // Pokud URL není předaná, vytvoříme fallback URL
+        if (!documentUrl) {
+            console.warn('Document URL not provided, using fallback');
+            documentUrl = `/media/documents/${documentId}/`;
+        }
+        
+        // Pokusíme se otevřít v novém okně
+        try {
+            const newWindow = window.open(documentUrl, '_blank', 'width=1000,height=800,scrollbars=yes,resizable=yes');
+            if (!newWindow) {
+                // Pokud se nepodařilo otevřít v novém okně (blokováno popup), zkusíme přímý odkaz
+                window.location.href = documentUrl;
+            }
+        } catch (error) {
+            console.error('Error opening document:', error);
+            // Fallback - stáhne soubor
+            const link = document.createElement('a');
+            link.href = documentUrl;
+            link.download = '';
+            link.target = '_blank';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
     };
 });
 </script>

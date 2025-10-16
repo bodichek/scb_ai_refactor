@@ -301,13 +301,22 @@ def client_dashboard(request, client_id):
                 'has_cashflow_data': has_cashflow_data,
             }
             
-            # Přidáme cashflow data pouze pokud existují
+            # Přidáme cashflow data pouze pokud existují - SPRÁVNÁ STRUKTURA PRO TABULKU
             if has_cashflow_data and cashflow_data:
                 json_data['cashflow'] = {
-                    'monthly_data': cashflow_data.get('monthly_data', []),
-                    'total_revenue': cashflow_data.get('total_revenue', 0),
-                    'total_expenses': cashflow_data.get('total_expenses', 0),
-                    'net_cashflow': cashflow_data.get('net_cashflow', 0)
+                    'revenue': cashflow_data.get('revenue', 0),
+                    'gross_cash_profit': cashflow_data.get('gross_cash_profit', 0),
+                    'operating_cash_profit': cashflow_data.get('operating_cash_profit', 0),
+                    'operating_cash_flow': cashflow_data.get('operating_cash_flow', 0),
+                    'retained_profit': cashflow_data.get('retained_profit', 0),
+                    'net_cash_flow': cashflow_data.get('net_cash_flow', 0),
+                    'variance': {
+                        'gross': cashflow_data.get('variance', {}).get('gross', 0),
+                        'operating': cashflow_data.get('variance', {}).get('operating', 0),
+                        'net': cashflow_data.get('variance', {}).get('net', 0)
+                    },
+                    'available_years': cashflow_years,
+                    'current_year': current_year if 'current_year' in locals() else cashflow_years[0] if cashflow_years else None
                 }
             else:
                 json_data['cashflow'] = None
@@ -326,7 +335,8 @@ def client_dashboard(request, client_id):
                 try:
                     survey_data = {
                         'submission': {
-                            'created_at': detail['submission'].created_at.isoformat()
+                            'created_at': detail['submission'].created_at.isoformat(),
+                            'ai_response': detail['submission'].ai_response or ''
                         },
                         'response_count': detail['response_count'],
                         'avg_score': float(detail['avg_score']),
@@ -379,7 +389,8 @@ def client_dashboard(request, client_id):
                         'get_doc_type_display': str(doc.get_doc_type_display() if hasattr(doc, 'get_doc_type_display') else 'Finanční výkaz'),
                         'description': str(doc.description or ''),
                         'filename': str(doc.filename or ''),
-                        'uploaded_at': doc.uploaded_at.isoformat()
+                        'uploaded_at': doc.uploaded_at.isoformat(),
+                        'file_url': doc.file.url if doc.file else ''
                     })
                 except:
                     continue
@@ -392,7 +403,8 @@ def client_dashboard(request, client_id):
                         'get_doc_type_display': str(doc.get_doc_type_display() if hasattr(doc, 'get_doc_type_display') else 'Dokument'),
                         'description': str(doc.description or ''),
                         'filename': str(doc.filename or ''),
-                        'uploaded_at': doc.uploaded_at.isoformat()
+                        'uploaded_at': doc.uploaded_at.isoformat(),
+                        'file_url': doc.file.url if doc.file else ''
                     })
                 except:
                     continue
