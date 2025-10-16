@@ -1,12 +1,38 @@
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.contrib.auth import login, logout
+from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
 from django.shortcuts import render, redirect
 from django.db import IntegrityError
 
 from coaching.models import Coach
 from .models import CompanyProfile, UserRole
+
+
+def login_view(request):
+    """Vlastní login view s přesměrováním podle role uživatele"""
+    if request.method == "POST":
+        username = request.POST.get("username")
+        password = request.POST.get("password")
+        
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            login(request, user)
+            
+            # Zkontroluj, jestli je uživatel kouč
+            try:
+                user_role = user.userrole.role
+                if user_role == 'coach':
+                    return redirect('coaching:my_clients')
+                else:
+                    return redirect('dashboard:index')
+            except:
+                # Pokud userrole neexistuje, přesměruj na dashboard
+                return redirect('dashboard:index')
+        else:
+            messages.error(request, 'Neplatné přihlašovací údaje.')
+    
+    return render(request, 'accounts/login.html')
 
 
 @login_required
