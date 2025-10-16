@@ -1,10 +1,25 @@
 from django.contrib import admin
 from django.urls import path
+from django.contrib.auth.models import User
 from .models import Coach, UserCoachAssignment
 from accounts.models import UserRole, CompanyProfile
 from django.template.response import TemplateResponse
 from coaching.models import Coach
 from ingest.models import FinancialStatement
+
+
+class UserCoachAssignmentInline(admin.TabularInline):
+    model = UserCoachAssignment
+    extra = 1
+    fields = ('client', 'notes', 'assigned_at')
+    readonly_fields = ('assigned_at',)
+    
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "client":
+            # Zobrazit pouze uživatele, kteří NEJSOU coach
+            coach_users = UserRole.objects.filter(role='coach').values_list('user_id', flat=True)
+            kwargs["queryset"] = User.objects.exclude(id__in=coach_users)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
 @admin.register(Coach)
@@ -16,9 +31,16 @@ class CoachAdmin(admin.ModelAdmin):
         "email",
         "city",
         "available",
+        "clients_count",
     )
     list_filter = ("available", "city", "specialization")
     search_fields = ("user__username", "email", "phone", "specialization")
+    inlines = [UserCoachAssignmentInline]
+    
+    def clients_count(self, obj):
+        """Počet přiřazených klientů"""
+        return UserCoachAssignment.objects.filter(coach=obj).count()
+    clients_count.short_description = "Počet klientů"
     
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
@@ -31,11 +53,28 @@ class UserCoachAssignmentAdmin(admin.ModelAdmin):
     list_display = (
         "coach",
         "client",
+        "client_role",
         "assigned_at",
     )
-    search_fields = ("coach__user__username", "client__username")
-    list_filter = ("assigned_at",)
+    search_fields = ("coach__user__username", "client__username", "client__email")
+    list_filter = ("assigned_at", "coach")
     ordering = ("-assigned_at",)
+    
+    def client_role(self, obj):
+        """Zobrazí roli klienta"""
+        try:
+            return obj.client.userrole.get_role_display()
+        except:
+            return "Neznámá"
+    client_role.short_description = "Role klienta"
+    
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "client":
+            # Zobrazit pouze uživatele, kteří NEJSOU coach
+            from accounts.models import UserRole
+            coach_users = UserRole.objects.filter(role='coach').values_list('user_id', flat=True)
+            kwargs["queryset"] = User.objects.exclude(id__in=coach_users)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 class CustomAdminSite(admin.AdminSite):
     site_header = "FinApp Administration"

@@ -1,0 +1,346 @@
+<!-- AJAX template pro client dashboard content -->
+<div class="row">
+  <!-- Základní info klienta -->
+  <div class="col-12 mb-3">
+    <div class="card border-primary">
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-8">
+            <h5 class="card-title">🏢 {{ client.company_name }}</h5>
+            <p class="card-text">
+              <strong>Kontakt:</strong> {{ client.user.first_name }} {{ client.user.last_name }}<br>
+              <strong>Email:</strong> {{ client.user.email }}<br>
+              <strong>Město:</strong> {{ client.city|default:"Neuvedeno" }}<br>
+              <strong>Obor:</strong> {{ client.business_field|default:"Neuvedeno" }}
+            </p>
+          </div>
+          <div class="col-md-4 text-end">
+            <div class="badge {% if days_since_activity <= 7 %}bg-success{% elif days_since_activity <= 30 %}bg-warning{% else %}bg-danger{% endif %} fs-6">
+              {% if days_since_activity <= 7 %}
+                🟢 Aktivní
+              {% elif days_since_activity <= 30 %}
+                🟡 Méně aktivní
+              {% else %}
+                🔴 Neaktivní
+              {% endif %}
+            </div>
+            <p class="text-muted mt-2">
+              {% if days_since_activity < 999 %}
+                Poslední aktivita: před {{ days_since_activity }} dny
+              {% else %}
+                Žádná aktivita
+              {% endif %}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Statistiky -->
+<div class="row mb-3">
+  <div class="col-md-3">
+    <div class="card text-center bg-light">
+      <div class="card-body">
+        <h4 class="text-primary">{{ statements_count }}</h4>
+        <small>Finančních výkazů</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center bg-light">
+      <div class="card-body">
+        <h4 class="text-info">{{ documents_count }}</h4>
+        <small>Ostatních dokumentů</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center bg-light">
+      <div class="card-body">
+        <h4 class="text-success">{{ surveys_completed }}</h4>
+        <small>Dotazníků vyplněno</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center bg-light">
+      <div class="card-body">
+        <h4 class="text-warning">{{ suropen_answers|length }}</h4>
+        <small>SUROPEN odpovědí</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tabs pro různé sekce -->
+<ul class="nav nav-tabs" id="clientTabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab">
+      📊 Přehled
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="cashflow-tab" data-bs-toggle="tab" data-bs-target="#cashflow" type="button" role="tab">
+      💰 Cash Flow
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="surveys-tab" data-bs-toggle="tab" data-bs-target="#surveys" type="button" role="tab">
+      📝 Dotazníky
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="suropen-tab" data-bs-toggle="tab" data-bs-target="#suropen" type="button" role="tab">
+      🔍 SUROPEN
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="documents-tab" data-bs-toggle="tab" data-bs-target="#documents" type="button" role="tab">
+      📁 Dokumenty
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content" id="clientTabsContent">
+  <!-- Přehled tab -->
+  <div class="tab-pane fade show active" id="overview" role="tabpanel">
+    <div class="mt-3">
+      {% if chart_data %}
+        <div class="row">
+          <div class="col-md-6">
+            <div class="card">
+              <div class="card-header">📈 Vývoj příjmů</div>
+              <div class="card-body">
+                <canvas id="revenueChart" width="400" height="300"></canvas>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card">
+              <div class="card-header">📉 Vývoj nákladů</div>
+              <div class="card-body">
+                <canvas id="expensesChart" width="400" height="300"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <div class="alert alert-info">
+          <i class="fas fa-info-circle"></i> Žádná finanční data pro zobrazení grafů.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Cash Flow tab -->
+  <div class="tab-pane fade" id="cashflow" role="tabpanel">
+    <div class="mt-3">
+      {% if has_cashflow_data %}
+        <div class="table-responsive">
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th>Měsíc</th>
+                <th>Příjmy</th>
+                <th>Výdaje</th>
+                <th>Cash Flow</th>
+                <th>Kumulativní</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for month_data in cashflow.monthly_data %}
+                <tr>
+                  <td>{{ month_data.month_name }}</td>
+                  <td class="text-success">{{ month_data.revenue|floatformat:0 }} Kč</td>
+                  <td class="text-danger">{{ month_data.expenses|floatformat:0 }} Kč</td>
+                  <td class="{% if month_data.cashflow >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ month_data.cashflow|floatformat:0 }} Kč
+                  </td>
+                  <td class="{% if month_data.cumulative >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ month_data.cumulative|floatformat:0 }} Kč
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="alert alert-warning">
+          <i class="fas fa-exclamation-triangle"></i> Žádná cashflow data k dispozici.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Dotazníky tab -->
+  <div class="tab-pane fade" id="surveys" role="tabpanel">
+    <div class="mt-3">
+      {% if survey_details %}
+        {% for survey_detail in survey_details %}
+          <div class="card mb-3">
+            <div class="card-header">
+              <h6>📝 Dotazník z {{ survey_detail.submission.created_at|date:"d.m.Y H:i" }}</h6>
+              <small class="text-muted">{{ survey_detail.response_count }} odpovědí</small>
+            </div>
+            <div class="card-body">
+              {% for response in survey_detail.responses %}
+                <div class="mb-2">
+                  <strong>{{ response.question.text }}</strong><br>
+                  <span class="text-muted">{{ response.answer_text }}</span>
+                  {% if response.score %}
+                    <span class="badge bg-primary ms-2">{{ response.score }}/10</span>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="alert alert-info">
+          <i class="fas fa-info-circle"></i> Klient zatím nevyplnil žádné dotazníky.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- SUROPEN tab -->
+  <div class="tab-pane fade" id="suropen" role="tabpanel">
+    <div class="mt-3">
+      {% if suropen_answers %}
+        {% for batch in suropen_answers %}
+          <div class="card mb-3">
+            <div class="card-header">
+              <h6>🔍 SUROPEN analýza z {{ batch.created_at|date:"d.m.Y H:i" }}</h6>
+            </div>
+            <div class="card-body">
+              <h6>Odpovědi klienta:</h6>
+              {% for answer in batch.answers %}
+                <div class="mb-2">
+                  <strong>{{ answer.question }}</strong><br>
+                  <span class="text-muted">{{ answer.answer }}</span>
+                </div>
+              {% endfor %}
+              
+              {% if batch.ai_response %}
+                <hr>
+                <h6>AI Analýza:</h6>
+                <div class="alert alert-light">{{ batch.ai_response }}</div>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="alert alert-info">
+          <i class="fas fa-info-circle"></i> Klient zatím neprovedl žádnou SUROPEN analýzu.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Dokumenty tab -->
+  <div class="tab-pane fade" id="documents" role="tabpanel">
+    <div class="mt-3">
+      {% if financial_statements %}
+        <h6>🧾 Finanční výkazy ({{ financial_statements|length }}):</h6>
+        <div class="list-group mb-4">
+          {% for statement in financial_statements %}
+            <div class="list-group-item">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">{{ statement.get_doc_type_display }}</h6>
+                <small>{{ statement.uploaded_at|date:"d.m.Y" }}</small>
+              </div>
+              <p class="mb-1">{{ statement.description|default:"Bez popisu" }}</p>
+              <small class="text-muted">{{ statement.filename }}</small>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="alert alert-warning">
+          <i class="fas fa-exclamation-triangle"></i> Klient zatím nenahrál žádné finanční výkazy.
+        </div>
+      {% endif %}
+      
+      {% if other_documents %}
+        <h6 class="mt-4">📄 Ostatní dokumenty ({{ other_documents|length }}):</h6>
+        <div class="list-group">
+          {% for doc in other_documents %}
+            <div class="list-group-item">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">{{ doc.get_doc_type_display|default:"Dokument" }}</h6>
+                <small>{{ doc.uploaded_at|date:"d.m.Y" }}</small>
+              </div>
+              <p class="mb-1">{{ doc.description|default:"Bez popisu" }}</p>
+              <small class="text-muted">{{ doc.filename }}</small>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Chart.js scripts pro grafy -->
+{% if chart_data %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Revenue Chart
+const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+new Chart(revenueCtx, {
+    type: 'line',
+    data: {
+        labels: {{ chart_data.labels|safe }},
+        datasets: [{
+            label: 'Příjmy',
+            data: {{ chart_data.revenue|safe }},
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            tension: 0.1
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return value.toLocaleString() + ' Kč';
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Expenses Chart
+const expensesCtx = document.getElementById('expensesChart').getContext('2d');
+new Chart(expensesCtx, {
+    type: 'line',
+    data: {
+        labels: {{ chart_data.labels|safe }},
+        datasets: [{
+            label: 'Náklady',
+            data: {{ chart_data.expenses|safe }},
+            borderColor: 'rgb(255, 99, 132)',
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            tension: 0.1
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return value.toLocaleString() + ' Kč';
+                    }
+                }
+            }
+        }
+    }
+});
+</script>
+{% endif %}

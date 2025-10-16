@@ -1,0 +1,1 @@
+# Prázdný __init__.py soubor pro vytvoření Python balíčku

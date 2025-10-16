@@ -234,6 +234,205 @@
           </div>
         </div>
       </div>
+      
+      <!-- Nová sekce s grafy, detailnými dotazníky a suropen -->
+      <div class="row mt-4">
+        <!-- Chart.js grafy -->
+        <div class="col-12">
+          <div class="card mb-4">
+            <div class="card-header">
+              <h5>📊 Finanční grafy</h5>
+            </div>
+            <div class="card-body">
+              {% if chart_data %}
+                <div class="row">
+                  <div class="col-md-6">
+                    <canvas id="profitChart" width="400" height="200"></canvas>
+                  </div>
+                  <div class="col-md-6">
+                    <canvas id="revenueChart" width="400" height="200"></canvas>
+                  </div>
+                </div>
+              {% else %}
+                <div class="text-center py-4">
+                  <p class="text-muted">Nejsou dostupná data pro grafy</p>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Cash Flow tabulka jako má klient -->
+      {% if has_cashflow_data and cashflow_years %}
+      <div class="row mt-4">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header d-flex justify-content-between">
+              <h5>💰 Cash Flow výkaz (jako má klient)</h5>
+              <form method="get" class="d-flex">
+                <select name="year" class="form-select form-select-sm me-2" onchange="this.form.submit()">
+                  {% for year in cashflow_years %}
+                    <option value="{{ year }}" {% if year == request.GET.year|default:cashflow_years.0 %}selected{% endif %}>{{ year }}</option>
+                  {% endfor %}
+                </select>
+              </form>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-striped">
+                  <thead class="table-dark">
+                    <tr>
+                      <th>Položka</th>
+                      <th>Profit (Kč)</th>
+                      <th>Cash Flow (Kč)</th>
+                      <th>Variance (Kč)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>Hrubá marže</strong></td>
+                      <td>{{ cashflow.gross_margin|floatformat:0 }}</td>
+                      <td>{{ cashflow.gross_cash_profit|floatformat:0 }}</td>
+                      <td class="{% if cashflow.variance.gross > 0 %}text-success{% else %}text-danger{% endif %}">{{ cashflow.variance.gross|floatformat:0 }}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Provozní zisk</strong></td>
+                      <td>{{ cashflow.operating_cash_profit|floatformat:0 }}</td>
+                      <td>{{ cashflow.operating_cash_flow|floatformat:0 }}</td>
+                      <td class="{% if cashflow.variance.operating > 0 %}text-success{% else %}text-danger{% endif %}">{{ cashflow.variance.operating|floatformat:0 }}</td>
+                    </tr>
+                    <tr class="table-info">
+                      <td><strong>Čistý zisk/CF</strong></td>
+                      <td><strong>{{ cashflow.net_profit|floatformat:0 }}</strong></td>
+                      <td><strong>{{ cashflow.net_cash_flow|floatformat:0 }}</strong></td>
+                      <td class="{% if cashflow.variance.net > 0 %}text-success{% else %}text-danger{% endif %}"><strong>{{ cashflow.variance.net|floatformat:0 }}</strong></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- Detailní dotazníky -->
+      {% if survey_details %}
+      <div class="row mt-4">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <h5>📝 Detailní odpovědi na dotazníky</h5>
+            </div>
+            <div class="card-body">
+              {% for survey_detail in survey_details %}
+                <div class="card mb-3">
+                  <div class="card-header d-flex justify-content-between">
+                    <h6>📝 Dotazník #{{ survey_detail.submission.batch_id|slice:":8" }}</h6>
+                    <div>
+                      <small class="text-muted">{{ survey_detail.submission.created_at|date:"d.m.Y H:i" }}</small>
+                      <span class="badge bg-info ms-2">{{ survey_detail.response_count }} odpovědí</span>
+                      <span class="badge bg-success ms-1">Ø {{ survey_detail.avg_score|floatformat:1 }}/10</span>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    {% if survey_detail.responses %}
+                      <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                          <thead>
+                            <tr>
+                              <th>Otázka</th>
+                              <th width="100">Skóre</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {% for response in survey_detail.responses %}
+                            <tr>
+                              <td>{{ response.question }}</td>
+                              <td>
+                                <span class="badge bg-{% if response.score >= 8 %}success{% elif response.score >= 5 %}warning{% else %}danger{% endif %}">
+                                  {{ response.score }}/10
+                                </span>
+                              </td>
+                            </tr>
+                            {% endfor %}
+                          </tbody>
+                        </table>
+                      </div>
+                    {% endif %}
+                    
+                    {% if survey_detail.submission.ai_response %}
+                      <hr>
+                      <h6>🤖 AI shrnutí</h6>
+                      <div class="alert alert-info">
+                        {{ survey_detail.submission.ai_response|truncatewords:50 }}
+                      </div>
+                    {% endif %}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- Suropen odpovědi -->
+      {% if suropen_answers %}
+      <div class="row mt-4">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <h5>🏢 Suropen odpovědi klienta</h5>
+            </div>
+            <div class="card-body">
+              {% for batch in suropen_answers %}
+                <div class="card mb-3">
+                  <div class="card-header d-flex justify-content-between">
+                    <h6>🏢 Batch #{{ batch.created_at|date:"d.m.Y" }}</h6>
+                    <small class="text-muted">{{ batch.created_at|date:"d.m.Y H:i" }}</small>
+                  </div>
+                  <div class="card-body">
+                    {% regroup batch.answers by section as sections %}
+                    {% for section in sections %}
+                      <h6>📋 {{ section.grouper }}</h6>
+                      <div class="table-responsive mb-3">
+                        <table class="table table-sm table-striped">
+                          <thead>
+                            <tr>
+                              <th>Otázka</th>
+                              <th>Odpověď</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {% for answer in section.list %}
+                            <tr>
+                              <td><strong>{{ answer.question }}</strong></td>
+                              <td>{{ answer.answer|truncatewords:20 }}</td>
+                            </tr>
+                            {% endfor %}
+                          </tbody>
+                        </table>
+                      </div>
+                    {% endfor %}
+                    
+                    {% if batch.ai_response %}
+                      <hr>
+                      <h6>🤖 AI analýza</h6>
+                      <div class="alert alert-light">
+                        {{ batch.ai_response|truncatewords:50 }}
+                      </div>
+                    {% endif %}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      
     </div>
   </div>
 </div>
@@ -242,41 +441,134 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 {% if has_cashflow_data %}
-// Cash Flow graf
-const ctx = document.getElementById('cashflowChart').getContext('2d');
-new Chart(ctx, {
-    type: 'line',
-    data: {
-        labels: {{ cashflow.months|safe }},
-        datasets: [{
-            label: 'Příjmy',
-            data: {{ cashflow.income_data|safe }},
-            borderColor: 'rgb(75, 192, 192)',
-            backgroundColor: 'rgba(75, 192, 192, 0.2)',
-            tension: 0.1
-        }, {
-            label: 'Výdaje',
-            data: {{ cashflow.expense_data|safe }},
-            borderColor: 'rgb(255, 99, 132)',
-            backgroundColor: 'rgba(255, 99, 132, 0.2)',
-            tension: 0.1
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-            y: {
-                beginAtZero: true,
-                ticks: {
-                    callback: function(value) {
-                        return value.toLocaleString('cs-CZ') + ' Kč';
+// Starý Cash Flow graf
+const ctx = document.getElementById('cashflowChart');
+if (ctx) {
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Leden', 'Únor', 'Březen', 'Duben', 'Květen', 'Červen'],
+            datasets: [{
+                label: 'Příjmy',
+                data: [100000, 120000, 110000, 130000, 125000, 135000],
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                tension: 0.1
+            }, {
+                label: 'Výdaje',
+                data: [80000, 95000, 85000, 105000, 100000, 110000],
+                borderColor: 'rgb(255, 99, 132)',
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString('cs-CZ') + ' Kč';
+                        }
                     }
                 }
             }
         }
-    }
-});
+    });
+}
+{% endif %}
+
+{% if chart_data %}
+// Nové Chart.js grafy s reálnými daty
+const chartData = {{ chart_data|safe }};
+
+// Profit Story graf
+const profitCtx = document.getElementById('profitChart');
+if (profitCtx) {
+    new Chart(profitCtx, {
+        type: 'bar',
+        data: {
+            labels: chartData.map(d => d.year),
+            datasets: [{
+                label: 'Čistý zisk',
+                data: chartData.map(d => d.net_profit),
+                backgroundColor: chartData.map(d => d.net_profit >= 0 ? 'rgba(40, 167, 69, 0.8)' : 'rgba(220, 53, 69, 0.8)'),
+                borderColor: chartData.map(d => d.net_profit >= 0 ? 'rgba(40, 167, 69, 1)' : 'rgba(220, 53, 69, 1)'),
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Profit Story - Čistý zisk podle let'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString('cs-CZ') + ' Kč';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Revenue vs COGS graf
+const revenueCtx = document.getElementById('revenueChart');
+if (revenueCtx) {
+    new Chart(revenueCtx, {
+        type: 'line',
+        data: {
+            labels: chartData.map(d => d.year),
+            datasets: [{
+                label: 'Tržby',
+                data: chartData.map(d => d.revenue),
+                borderColor: 'rgb(54, 162, 235)',
+                backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                tension: 0.1
+            }, {
+                label: 'Náklady prodeje',
+                data: chartData.map(d => d.cogs),
+                borderColor: 'rgb(255, 99, 132)',
+                backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                tension: 0.1
+            }, {
+                label: 'Režijní náklady',
+                data: chartData.map(d => d.overheads),
+                borderColor: 'rgb(255, 205, 86)',
+                backgroundColor: 'rgba(255, 205, 86, 0.1)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Vývoj tržeb a nákladů'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString('cs-CZ') + ' Kč';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
 {% endif %}
 </script>
 

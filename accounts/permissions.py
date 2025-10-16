@@ -3,8 +3,9 @@ from django.shortcuts import redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import Http404
+from django.contrib.auth.models import User
 from accounts.models import UserRole, CompanyProfile
-from coaching.models import Coach
+from coaching.models import Coach, UserCoachAssignment
 
 
 def get_user_role(user):
@@ -51,31 +52,34 @@ def company_required(view_func):
 
 
 def get_coach_clients(coach_user):
-    """Získá všechny klienty daného kouče"""
+    """Získá všechny klienty daného kouče přes UserCoachAssignment"""
     try:
         coach = Coach.objects.get(user=coach_user)
-        return CompanyProfile.objects.filter(assigned_coach=coach)
+        assignments = UserCoachAssignment.objects.filter(coach=coach).values_list('client_id', flat=True)
+        return User.objects.filter(id__in=assignments)
     except Coach.DoesNotExist:
-        return CompanyProfile.objects.none()
+        return User.objects.none()
 
 
 def can_coach_access_client(coach_user, client_user_or_profile):
-    """Kontrola, zda může coach přistupovat k datům klienta"""
+    """Kontrola, zda může coach přistupovat k datům klienta přes UserCoachAssignment"""
     if not is_coach(coach_user):
         return False
     
     try:
+        coach = Coach.objects.get(user=coach_user)
+        
         # Accept both User objects and CompanyProfile objects
         if hasattr(client_user_or_profile, 'user'):
             # It's a CompanyProfile
-            client_profile = client_user_or_profile
+            client_user = client_user_or_profile.user
         else:
             # It's a User object
-            client_profile = CompanyProfile.objects.get(user=client_user_or_profile)
+            client_user = client_user_or_profile
         
-        coach = Coach.objects.get(user=coach_user)
-        return client_profile.assigned_coach == coach
-    except (CompanyProfile.DoesNotExist, Coach.DoesNotExist):
+        # Zkontroluj přes UserCoachAssignment
+        return UserCoachAssignment.objects.filter(coach=coach, client=client_user).exists()
+    except Coach.DoesNotExist:
         return False
 
 
@@ -128,7 +132,6 @@ def get_accessible_user(request_user, target_user_id=None):
         
         # Zkontroluj, zda je target_user klientem tohoto kouče
         try:
-            from django.contrib.auth.models import User
             target_user = User.objects.get(id=target_user_id)
             if can_coach_access_client(request_user, target_user):
                 return target_user

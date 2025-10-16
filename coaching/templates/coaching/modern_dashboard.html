@@ -1,0 +1,1030 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Coach Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row justify-content-center">
+    <div class="col-12 col-xl-10">
+      
+      <!-- Header s výběrem klienta -->
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-md-8">
+              <h1 class="h3 mb-0 text-dark fw-bold">
+                <i class="fas fa-users-cog text-primary me-2"></i>
+                Coach Dashboard
+              </h1>
+              <p class="text-muted mb-0 mt-1">Správa a monitoring klientů</p>
+            </div>
+            <div class="col-md-4">
+              <div class="input-group">
+                <span class="input-group-text bg-light border-end-0">
+                  <i class="fas fa-search text-muted"></i>
+                </span>
+                <select id="clientSelector" class="form-select border-start-0 bg-light">
+                  <option value="">Vyberte klienta...</option>
+                  {% for client in clients %}
+                    <option value="{{ client.id }}" 
+                            data-company="{{ client.company_name }}"
+                            data-user="{{ client.user.first_name }} {{ client.user.last_name }}"
+                            data-email="{{ client.user.email }}">
+                      {{ client.company_name }} - {{ client.user.first_name }} {{ client.user.last_name }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Klientské info (skryté na začátku) -->
+      <div id="clientInfoSection" class="card border-0 shadow-sm mb-4" style="display: none;">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-md-6">
+              <div class="d-flex align-items-center">
+                <div class="avatar-lg bg-primary bg-gradient rounded-circle d-flex align-items-center justify-content-center me-3">
+                  <i class="fas fa-building text-white fs-4"></i>
+                </div>
+                <div>
+                  <h4 id="clientCompanyName" class="mb-1 fw-bold">-</h4>
+                  <p id="clientContactInfo" class="text-muted mb-0">-</p>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6 text-md-end">
+              <div class="row g-3">
+                <div class="col-6 col-sm-3">
+                  <div class="text-center">
+                    <div id="clientStatsDocuments" class="h5 mb-0 text-primary fw-bold">-</div>
+                    <small class="text-muted">Dokumenty</small>
+                  </div>
+                </div>
+                <div class="col-6 col-sm-3">
+                  <div class="text-center">
+                    <div id="clientStatsSurveys" class="h5 mb-0 text-success fw-bold">-</div>
+                    <small class="text-muted">Dotazníky</small>
+                  </div>
+                </div>
+                <div class="col-6 col-sm-3">
+                  <div class="text-center">
+                    <div id="clientStatsSuropen" class="h5 mb-0 text-info fw-bold">-</div>
+                    <small class="text-muted">SUROPEN</small>
+                  </div>
+                </div>
+                <div class="col-6 col-sm-3">
+                  <div class="text-center">
+                    <div id="clientActivity" class="badge bg-secondary">-</div>
+                    <small class="text-muted d-block">Status</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigační záložky (skryté na začátku) -->
+      <div id="tabNavigation" class="card border-0 shadow-sm mb-4" style="display: none;">
+        <div class="card-body p-0">
+          <nav class="nav nav-pills nav-fill">
+            <button class="nav-link active rounded-0 border-0 py-3" id="overview-tab" data-bs-toggle="pill" data-bs-target="#overview" type="button">
+              <i class="fas fa-chart-line me-2"></i>📊 Přehled
+            </button>
+            <button class="nav-link rounded-0 border-0 py-3" id="cashflow-tab" data-bs-toggle="pill" data-bs-target="#cashflow" type="button">
+              <i class="fas fa-money-bill-wave me-2"></i>💰 Cash Flow
+            </button>
+            <button class="nav-link rounded-0 border-0 py-3" id="surveys-tab" data-bs-toggle="pill" data-bs-target="#surveys" type="button">
+              <i class="fas fa-poll me-2"></i>📝 Dotazníky
+            </button>
+            <button class="nav-link rounded-0 border-0 py-3" id="suropen-tab" data-bs-toggle="pill" data-bs-target="#suropen" type="button">
+              <i class="fas fa-search me-2"></i>🔍 SUROPEN
+            </button>
+            <button class="nav-link rounded-0 border-0 py-3" id="documents-tab" data-bs-toggle="pill" data-bs-target="#documents" type="button">
+              <i class="fas fa-folder me-2"></i>📁 Dokumenty
+            </button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- Obsah záložek (skrytý na začátku) -->
+      <div id="tabContent" class="tab-content" style="display: none;">
+        
+        <!-- Přehled -->
+        <div class="tab-pane fade show active" id="overview">
+          <!-- První řada grafů -->
+          <div class="row g-4 mb-4">
+            <div class="col-md-6">
+              <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-gradient bg-primary text-white border-0">
+                  <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Profit Story</h6>
+                </div>
+                <div class="card-body">
+                  <canvas id="profitStoryChart" height="300"></canvas>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-gradient bg-success text-white border-0">
+                  <h6 class="mb-0"><i class="fas fa-percentage me-2"></i>Trend ziskovosti</h6>
+                </div>
+                <div class="card-body">
+                  <canvas id="profitabilityTrendsChart" height="300"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Druhá řada grafů -->
+          <div class="row g-4 mb-4">
+            <div class="col-md-6">
+              <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-gradient bg-warning text-white border-0">
+                  <h6 class="mb-0"><i class="fas fa-chart-line me-2"></i>Růst tržeb vs. COGS</h6>
+                </div>
+                <div class="card-body">
+                  <canvas id="revCogsGrowthChart" height="300"></canvas>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-gradient bg-info text-white border-0">
+                  <h6 class="mb-0"><i class="fas fa-chart-area me-2"></i>Růst tržeb vs. provozní náklady</h6>
+                </div>
+                <div class="card-body">
+                  <canvas id="revOverheadsGrowthChart" height="300"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Třetí řada - velký graf -->
+          <div class="row g-4 mb-4">
+            <div class="col-12">
+              <div class="card border-0 shadow-sm">
+                <div class="card-header bg-gradient bg-dark text-white border-0">
+                  <h6 class="mb-0"><i class="fas fa-chart-mixed me-2"></i>Meziroční přehled všech metrik</h6>
+                </div>
+                <div class="card-body">
+                  <canvas id="allMetricsChart" height="400"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Finanční přehled -->
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-light border-0">
+              <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Finanční přehled</h6>
+            </div>
+            <div class="card-body" id="financialOverview">
+              <div class="text-center text-muted py-4">
+                <i class="fas fa-chart-pie fa-3x mb-3"></i>
+                <p>Vyberte klienta pro zobrazení finančního přehledu</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cash Flow -->
+        <div class="tab-pane fade" id="cashflow">
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-gradient bg-success text-white border-0">
+              <h6 class="mb-0"><i class="fas fa-coins me-2"></i>Měsíční Cash Flow</h6>
+            </div>
+            <div class="card-body p-0">
+              <div id="cashflowContent">
+                <div class="text-center text-muted py-5">
+                  <i class="fas fa-money-bill-wave fa-3x mb-3"></i>
+                  <p>Vyberte klienta pro zobrazení cash flow</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dotazníky -->
+        <div class="tab-pane fade" id="surveys">
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-gradient bg-info text-white border-0">
+              <h6 class="mb-0"><i class="fas fa-clipboard-question me-2"></i>Vyplněné dotazníky</h6>
+            </div>
+            <div class="card-body">
+              <div id="surveysContent">
+                <div class="text-center text-muted py-5">
+                  <i class="fas fa-poll fa-3x mb-3"></i>
+                  <p>Vyberte klienta pro zobrazení dotazníků</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUROPEN -->
+        <div class="tab-pane fade" id="suropen">
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-gradient bg-warning text-white border-0">
+              <h6 class="mb-0"><i class="fas fa-magnifying-glass-chart me-2"></i>SUROPEN Analýzy</h6>
+            </div>
+            <div class="card-body">
+              <div id="suropenContent">
+                <div class="text-center text-muted py-5">
+                  <i class="fas fa-search fa-3x mb-3"></i>
+                  <p>Vyberte klienta pro zobrazení SUROPEN analýz</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dokumenty -->
+        <div class="tab-pane fade" id="documents">
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-gradient bg-secondary text-white border-0">
+              <h6 class="mb-0"><i class="fas fa-file-alt me-2"></i>Nahrané dokumenty</h6>
+            </div>
+            <div class="card-body">
+              <div id="documentsContent">
+                <div class="text-center text-muted py-5">
+                  <i class="fas fa-folder-open fa-3x mb-3"></i>
+                  <p>Vyberte klienta pro zobrazení dokumentů</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Pokud žádní klienti -->
+      {% if not clients %}
+        <div class="card border-0 shadow-sm">
+          <div class="card-body text-center py-5">
+            <i class="fas fa-users-slash fa-4x text-muted mb-4"></i>
+            <h4 class="text-muted">Žádní přiřazení klienti</h4>
+            <p class="text-muted">Nemáte přiřazené žádné klienty pro coaching.</p>
+          </div>
+        </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+
+<!-- Moderní CSS styling -->
+<style>
+/* Moderní minimalistické styly */
+.avatar-lg {
+  width: 60px;
+  height: 60px;
+}
+
+.nav-pills .nav-link {
+  background: transparent;
+  color: #6c757d;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.nav-pills .nav-link:hover {
+  background: rgba(13, 110, 253, 0.1);
+  color: #0d6efd;
+}
+
+.nav-pills .nav-link.active {
+  background: linear-gradient(135deg, #0d6efd, #6610f2);
+  color: white;
+  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+}
+
+.card {
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+.form-select, .form-control {
+  border: 1px solid #e9ecef;
+  transition: all 0.3s ease;
+}
+
+.form-select:focus, .form-control:focus {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+.bg-gradient {
+  background: linear-gradient(135deg, var(--bs-primary), var(--bs-primary-dark, #0056b3));
+}
+
+.bg-gradient.bg-danger {
+  background: linear-gradient(135deg, #dc3545, #b02a37);
+}
+
+.bg-gradient.bg-success {
+  background: linear-gradient(135deg, #198754, #146c43);
+}
+
+.bg-gradient.bg-info {
+  background: linear-gradient(135deg, #0dcaf0, #0aa2c0);
+}
+
+.bg-gradient.bg-warning {
+  background: linear-gradient(135deg, #ffc107, #d39e00);
+}
+
+.bg-gradient.bg-secondary {
+  background: linear-gradient(135deg, #6c757d, #565e64);
+}
+
+/* Loading spinner */
+.spinner-border-sm {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Accordion customization */
+.accordion-button:not(.collapsed) {
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  color: #0d6efd;
+}
+
+.accordion-button:focus {
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* Table responsiveness */
+.table-responsive {
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+/* Document preview styles */
+.document-item {
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.document-item:hover {
+  background: rgba(13, 110, 253, 0.05);
+  border-color: #0d6efd !important;
+}
+
+/* Charts container */
+canvas {
+  max-height: 300px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .nav-pills .nav-link {
+    font-size: 0.875rem;
+    padding: 0.75rem 0.5rem;
+  }
+  
+  .avatar-lg {
+    width: 50px;
+    height: 50px;
+  }
+}
+</style>
+
+<!-- JavaScript functionality -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const clientSelector = document.getElementById('clientSelector');
+    const clientInfoSection = document.getElementById('clientInfoSection');
+    const tabNavigation = document.getElementById('tabNavigation');
+    const tabContent = document.getElementById('tabContent');
+    
+    // Client selection handler
+    clientSelector.addEventListener('change', function() {
+        const clientId = this.value;
+        console.log('Client selected:', clientId);
+        
+        if (!clientId) {
+            // Hide all sections if no client selected
+            clientInfoSection.style.display = 'none';
+            tabNavigation.style.display = 'none';
+            tabContent.style.display = 'none';
+            return;
+        }
+        
+        // Show loading state
+        showLoadingState();
+        
+        // Load client data
+        loadClientData(clientId);
+    });
+    
+    function showLoadingState() {
+        clientInfoSection.style.display = 'block';
+        tabNavigation.style.display = 'block';
+        tabContent.style.display = 'block';
+        
+        // Show loading in client info
+        document.getElementById('clientCompanyName').innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Načítám...';
+        document.getElementById('clientContactInfo').textContent = 'Načítám informace o klientovi...';
+        
+        // Show loading in stats
+        ['Documents', 'Surveys', 'Suropen'].forEach(stat => {
+            document.getElementById('clientStats' + stat).innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        });
+        document.getElementById('clientActivity').textContent = 'Načítám...';
+    }
+    
+    function loadClientData(clientId) {
+        fetch(`/coaching/client/${clientId}/`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            console.log('Response status:', response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Received data:', data);
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            updateClientInfo(data);
+            updateTabContents(data);
+        })
+        .catch(error => {
+            console.error('Error loading client data:', error);
+            showErrorState(error.message);
+        });
+    }
+    
+    function updateClientInfo(data) {
+        // Update client basic info
+        document.getElementById('clientCompanyName').textContent = data.client.company_name;
+        document.getElementById('clientContactInfo').innerHTML = 
+            `<i class="fas fa-user me-1"></i>${data.client.user.first_name} ${data.client.user.last_name}<br>
+             <i class="fas fa-envelope me-1"></i>${data.client.user.email}`;
+        
+        // Update stats
+        document.getElementById('clientStatsDocuments').textContent = data.statements_count + data.documents_count;
+        document.getElementById('clientStatsSurveys').textContent = data.surveys_completed;
+        document.getElementById('clientStatsSuropen').textContent = data.suropen_answers.length;
+        
+        // Update activity status
+        const activityBadge = document.getElementById('clientActivity');
+        if (data.days_since_activity <= 7) {
+            activityBadge.className = 'badge bg-success';
+            activityBadge.textContent = 'Aktivní';
+        } else if (data.days_since_activity <= 30) {
+            activityBadge.className = 'badge bg-warning';
+            activityBadge.textContent = 'Méně aktivní';
+        } else {
+            activityBadge.className = 'badge bg-danger';
+            activityBadge.textContent = 'Neaktivní';
+        }
+    }
+    
+    function updateTabContents(data) {
+        updateOverviewTab(data);
+        updateCashflowTab(data);
+        updateSurveysTab(data);
+        updateSuropenTab(data);
+        updateDocumentsTab(data);
+    }
+    
+    function updateOverviewTab(data) {
+        // Update charts if data available
+        if (data.chart_data && data.chart_data.length > 0) {
+            createCharts(data);
+        }
+        
+        // Update financial overview s daty z nejnovějšího roku
+        const overview = document.getElementById('financialOverview');
+        if (data.chart_data && data.chart_data.length > 0) {
+            const latestYear = data.chart_data[data.chart_data.length - 1];
+            overview.innerHTML = `
+                <div class="row g-3">
+                    <div class="col-md-3 text-center">
+                        <div class="p-3 bg-primary bg-gradient rounded text-white">
+                            <h4 class="mb-1">${Number(latestYear.revenue).toLocaleString()} Kč</h4>
+                            <small>Tržby ${latestYear.year}</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <div class="p-3 bg-success bg-gradient rounded text-white">
+                            <h4 class="mb-1">${Number(latestYear.gross_margin).toLocaleString()} Kč</h4>
+                            <small>Hrubá marže</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <div class="p-3 bg-info bg-gradient rounded text-white">
+                            <h4 class="mb-1">${Number(latestYear.ebit).toLocaleString()} Kč</h4>
+                            <small>EBIT</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <div class="p-3 ${latestYear.net_profit >= 0 ? 'bg-success' : 'bg-danger'} bg-gradient rounded text-white">
+                            <h4 class="mb-1">${Number(latestYear.net_profit).toLocaleString()} Kč</h4>
+                            <small>Čistý zisk</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row g-3 mt-3">
+                    <div class="col-md-4 text-center">
+                        <div class="p-2 bg-light rounded">
+                            <h6 class="mb-1">${latestYear.profitability.gm_pct.toFixed(1)}%</h6>
+                            <small class="text-muted">Hrubá marže</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <div class="p-2 bg-light rounded">
+                            <h6 class="mb-1">${latestYear.profitability.op_pct.toFixed(1)}%</h6>
+                            <small class="text-muted">Provozní marže</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <div class="p-2 bg-light rounded">
+                            <h6 class="mb-1">${latestYear.profitability.np_pct.toFixed(1)}%</h6>
+                            <small class="text-muted">Čistá marže</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            overview.innerHTML = `
+                <div class="alert alert-info mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Klient zatím nenahrál finanční data pro zobrazení přehledu.
+                </div>
+            `;
+        }
+    }
+    
+    function updateCashflowTab(data) {
+        const content = document.getElementById('cashflowContent');
+        
+        if (data.has_cashflow_data && data.cashflow.monthly_data) {
+            let tableHtml = `
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-success">
+                            <tr>
+                                <th>Měsíc</th>
+                                <th class="text-end">Příjmy</th>
+                                <th class="text-end">Výdaje</th>
+                                <th class="text-end">Cash Flow</th>
+                                <th class="text-end">Kumulativní</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            data.cashflow.monthly_data.forEach(month => {
+                tableHtml += `
+                    <tr>
+                        <td class="fw-medium">${month.month_name}</td>
+                        <td class="text-end text-success">${Number(month.revenue).toLocaleString()} Kč</td>
+                        <td class="text-end text-danger">${Number(month.expenses).toLocaleString()} Kč</td>
+                        <td class="text-end ${month.cashflow >= 0 ? 'text-success' : 'text-danger'} fw-medium">
+                            ${Number(month.cashflow).toLocaleString()} Kč
+                        </td>
+                        <td class="text-end ${month.cumulative >= 0 ? 'text-success' : 'text-danger'} fw-bold">
+                            ${Number(month.cumulative).toLocaleString()} Kč
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            tableHtml += '</tbody></table></div>';
+            content.innerHTML = tableHtml;
+        } else {
+            content.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+                    <h5 class="text-muted">Žádná cash flow data</h5>
+                    <p class="text-muted">Klient zatím nenahrál finanční data.</p>
+                </div>
+            `;
+        }
+    }
+    
+    function updateSurveysTab(data) {
+        const content = document.getElementById('surveysContent');
+        
+        if (data.survey_details && data.survey_details.length > 0) {
+            let accordionHtml = '<div class="accordion" id="surveysAccordion">';
+            
+            data.survey_details.forEach((survey, index) => {
+                const collapseId = `survey-${index}`;
+                accordionHtml += `
+                    <div class="accordion-item border-0 shadow-sm mb-3">
+                        <h6 class="accordion-header">
+                            <button class="accordion-button ${index === 0 ? '' : 'collapsed'}" type="button" 
+                                    data-bs-toggle="collapse" data-bs-target="#${collapseId}">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-poll me-3"></i>
+                                    <div>
+                                        <div class="fw-bold">Dotazník z ${new Date(survey.submission.created_at).toLocaleDateString('cs-CZ')}</div>
+                                        <small class="text-muted">${survey.response_count} odpovědí • Průměrné hodnocení: ${Math.round(survey.avg_score * 10) / 10}/10</small>
+                                    </div>
+                                </div>
+                            </button>
+                        </h6>
+                        <div id="${collapseId}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" 
+                             data-bs-parent="#surveysAccordion">
+                            <div class="accordion-body">
+                `;
+                
+                survey.responses.forEach(response => {
+                    accordionHtml += `
+                        <div class="mb-4 pb-3 border-bottom">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h6 class="mb-1 text-primary">${response.question.text}</h6>
+                                ${response.score ? `<span class="badge bg-primary">${response.score}/10</span>` : ''}
+                            </div>
+                            <p class="text-muted mb-0">${response.answer_text}</p>
+                        </div>
+                    `;
+                });
+                
+                accordionHtml += `
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            accordionHtml += '</div>';
+            content.innerHTML = accordionHtml;
+        } else {
+            content.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="fas fa-clipboard-question fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">Žádné vyplněné dotazníky</h5>
+                    <p class="text-muted">Klient zatím nevyplnil žádné dotazníky.</p>
+                </div>
+            `;
+        }
+    }
+    
+    function updateSuropenTab(data) {
+        const content = document.getElementById('suropenContent');
+        
+        if (data.suropen_answers && data.suropen_answers.length > 0) {
+            let accordionHtml = '<div class="accordion" id="suropenAccordion">';
+            
+            data.suropen_answers.forEach((batch, index) => {
+                const collapseId = `suropen-${index}`;
+                accordionHtml += `
+                    <div class="accordion-item border-0 shadow-sm mb-3">
+                        <h6 class="accordion-header">
+                            <button class="accordion-button ${index === 0 ? '' : 'collapsed'}" type="button" 
+                                    data-bs-toggle="collapse" data-bs-target="#${collapseId}">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-magnifying-glass-chart me-3"></i>
+                                    <div>
+                                        <div class="fw-bold">SUROPEN analýza z ${new Date(batch.created_at).toLocaleDateString('cs-CZ')}</div>
+                                        <small class="text-muted">${batch.answers.length} odpovědí</small>
+                                    </div>
+                                </div>
+                            </button>
+                        </h6>
+                        <div id="${collapseId}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" 
+                             data-bs-parent="#suropenAccordion">
+                            <div class="accordion-body">
+                                <h6 class="text-primary mb-3">Odpovědi klienta:</h6>
+                `;
+                
+                batch.answers.forEach(answer => {
+                    accordionHtml += `
+                        <div class="mb-3 p-3 bg-light rounded">
+                            <div class="fw-medium text-dark mb-1">${answer.question}</div>
+                            <div class="text-muted">${answer.answer}</div>
+                        </div>
+                    `;
+                });
+                
+                if (batch.ai_response) {
+                    accordionHtml += `
+                        <hr class="my-4">
+                        <h6 class="text-warning mb-3"><i class="fas fa-robot me-2"></i>AI Analýza:</h6>
+                        <div class="p-3 bg-warning bg-opacity-10 rounded border border-warning">
+                            ${batch.ai_response}
+                        </div>
+                    `;
+                }
+                
+                accordionHtml += `
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            accordionHtml += '</div>';
+            content.innerHTML = accordionHtml;
+        } else {
+            content.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">Žádné SUROPEN analýzy</h5>
+                    <p class="text-muted">Klient zatím neprovedl žádnou SUROPEN analýzu.</p>
+                </div>
+            `;
+        }
+    }
+    
+    function updateDocumentsTab(data) {
+        const content = document.getElementById('documentsContent');
+        
+        let documentsHtml = '';
+        
+        // Finanční výkazy
+        if (data.financial_statements && data.financial_statements.length > 0) {
+            documentsHtml += `
+                <div class="mb-4">
+                    <h6 class="text-primary mb-3"><i class="fas fa-chart-bar me-2"></i>Finanční výkazy (${data.financial_statements.length})</h6>
+                    <div class="row g-3">
+            `;
+            
+            data.financial_statements.forEach(doc => {
+                documentsHtml += `
+                    <div class="col-md-6">
+                        <div class="document-item card h-100 border">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title mb-1 text-primary">${doc.get_doc_type_display}</h6>
+                                    <small class="text-muted">${new Date(doc.uploaded_at).toLocaleDateString('cs-CZ')}</small>
+                                </div>
+                                <p class="card-text text-muted small mb-2">${doc.description || 'Bez popisu'}</p>
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <small class="text-muted"><i class="fas fa-file me-1"></i>${doc.filename}</small>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="viewDocument('${doc.id}')">
+                                        <i class="fas fa-eye me-1"></i>Zobrazit
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            documentsHtml += '</div></div>';
+        }
+        
+        // Ostatní dokumenty
+        if (data.other_documents && data.other_documents.length > 0) {
+            documentsHtml += `
+                <div class="mb-4">
+                    <h6 class="text-secondary mb-3"><i class="fas fa-folder me-2"></i>Ostatní dokumenty (${data.other_documents.length})</h6>
+                    <div class="row g-3">
+            `;
+            
+            data.other_documents.forEach(doc => {
+                documentsHtml += `
+                    <div class="col-md-6">
+                        <div class="document-item card h-100 border">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title mb-1 text-secondary">${doc.get_doc_type_display || 'Dokument'}</h6>
+                                    <small class="text-muted">${new Date(doc.uploaded_at).toLocaleDateString('cs-CZ')}</small>
+                                </div>
+                                <p class="card-text text-muted small mb-2">${doc.description || 'Bez popisu'}</p>
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <small class="text-muted"><i class="fas fa-file me-1"></i>${doc.filename}</small>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="viewDocument('${doc.id}')">
+                                        <i class="fas fa-eye me-1"></i>Zobrazit
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            documentsHtml += '</div></div>';
+        }
+        
+        if (!documentsHtml) {
+            documentsHtml = `
+                <div class="text-center py-5">
+                    <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">Žádné dokumenty</h5>
+                    <p class="text-muted">Klient zatím nenahrál žádné dokumenty.</p>
+                </div>
+            `;
+        }
+        
+        content.innerHTML = documentsHtml;
+    }
+    
+    function createCharts(data) {
+        if (!data.chart_data || data.chart_data.length === 0) {
+            console.log('No chart data available');
+            return;
+        }
+        
+        const dataRows = data.chart_data;
+        const labels = dataRows.map(r => r.year);
+        
+        // 1. PROFIT STORY CHART (stejný jako má klient)
+        const profitStoryCtx = document.getElementById('profitStoryChart').getContext('2d');
+        const categories = ["Tržby", "COGS", "Hrubá marže", "Provozní náklady", "EBIT", "Čistý zisk"];
+        const datasets = dataRows.map((row, idx) => ({
+            label: row.year,
+            data: [row.revenue, row.cogs, row.gross_margin, row.overheads, row.ebit, row.net_profit],
+            backgroundColor: `hsl(${(idx * 70) % 360},70%,50%)`
+        }));
+        
+        new Chart(profitStoryCtx, {
+            type: "bar",
+            data: { labels: categories, datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: "Váš příběh zisku (Profit Story)",
+                        font: { size: 16, weight: 'bold' }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (item) => `${item.dataset.label}: ${item.formattedValue.toLocaleString('cs-CZ')} Kč`
+                        }
+                    },
+                    legend: { position: "top" }
+                },
+                scales: {
+                    y: {
+                        title: { display: true, text: "Hodnota (Kč)" },
+                        ticks: { callback: (v) => v.toLocaleString('cs-CZ') }
+                    }
+                }
+            }
+        });
+
+        // 2. PROFITABILITY TRENDS CHART (Trend ziskovosti)
+        const profitabilityTrendsCtx = document.getElementById('profitabilityTrendsChart').getContext('2d');
+        const datasetsTrends = dataRows.map((row, idx) => ({
+            label: row.year,
+            data: [row.profitability.gm_pct, row.profitability.op_pct, row.profitability.np_pct],
+            backgroundColor: `hsl(${(idx * 70) % 360},70%,50%)`
+        }));
+        
+        new Chart(profitabilityTrendsCtx, {
+            type: "bar",
+            data: { labels: ["Hrubá marže %", "Provozní marže %", "Čistá marže %"], datasets: datasetsTrends },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: "Trend ziskovosti",
+                        font: { size: 16, weight: 'bold' }
+                    },
+                    tooltip: { callbacks: { label: (item) => `${item.dataset.label}: ${item.formattedValue}%` } }
+                },
+                scales: { y: { ticks: { callback: (v) => v + "%" } } }
+            }
+        });
+
+        // 3. REVENUE VS COGS GROWTH CHART (Růst tržeb vs. COGS)
+        const revCogsGrowthCtx = document.getElementById('revCogsGrowthChart').getContext('2d');
+        const revGrowth = dataRows.map(row => row.growth.revenue);
+        const cogsGrowth = dataRows.map(row => row.growth.cogs);
+        
+        new Chart(revCogsGrowthCtx, {
+            type: "bar",
+            data: {
+                labels: dataRows.map(row => row.year),
+                datasets: [
+                    { label: "Růst tržeb (%)", data: revGrowth, backgroundColor: "rgba(0,123,255,0.7)" },
+                    { label: "Růst nákladů na prodané zboží (%)", data: cogsGrowth, backgroundColor: "rgba(255,99,132,0.7)" }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { 
+                        display: true, 
+                        text: "Růst tržeb vs. růst nákladů na prodané zboží", 
+                        font: { size: 16, weight: 'bold' } 
+                    },
+                    tooltip: { callbacks: { label: (item) => `${item.dataset.label}: ${item.formattedValue}%` } }
+                },
+                scales: { y: { ticks: { callback: (v) => v + "%" } } }
+            }
+        });
+
+        // 4. REVENUE VS OVERHEADS GROWTH CHART (Růst tržeb vs. provozní náklady)
+        const revOverheadsGrowthCtx = document.getElementById('revOverheadsGrowthChart').getContext('2d');
+        const overheadsGrowth = dataRows.map(row => row.growth.overheads);
+        
+        new Chart(revOverheadsGrowthCtx, {
+            type: "bar",
+            data: {
+                labels: dataRows.map(row => row.year),
+                datasets: [
+                    { label: "Růst tržeb (%)", data: revGrowth, backgroundColor: "rgba(0,123,255,0.7)" },
+                    { label: "Růst provozních nákladů (%)", data: overheadsGrowth, backgroundColor: "rgba(255,206,86,0.7)" }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { 
+                        display: true, 
+                        text: "Růst tržeb vs. růst provozních nákladů", 
+                        font: { size: 16, weight: 'bold' } 
+                    },
+                    tooltip: { callbacks: { label: (item) => `${item.dataset.label}: ${item.formattedValue}%` } }
+                },
+                scales: { y: { ticks: { callback: (v) => v + "%" } } }
+            }
+        });
+
+        // 5. ALL METRICS CHART (Meziroční přehled všech metrik)
+        const allMetricsCtx = document.getElementById('allMetricsChart').getContext('2d');
+        
+        new Chart(allMetricsCtx, {
+            type: "line",
+            data: {
+                labels: dataRows.map(row => row.year),
+                datasets: [
+                    { label: "Tržby", data: dataRows.map(r => r.revenue), borderColor: "blue", tension: 0.3, fill: false },
+                    { label: "COGS (náklady na prodané zboží)", data: dataRows.map(r => r.cogs), borderColor: "red", tension: 0.3, fill: false },
+                    { label: "Hrubá marže", data: dataRows.map(r => r.gross_margin), borderColor: "green", tension: 0.3, fill: false },
+                    { label: "Provozní náklady", data: dataRows.map(r => r.overheads), borderColor: "orange", tension: 0.3, fill: false },
+                    { label: "EBIT", data: dataRows.map(r => r.ebit), borderColor: "purple", tension: 0.3, fill: false },
+                    { label: "Čistý zisk", data: dataRows.map(r => r.net_profit), borderColor: "brown", tension: 0.3, fill: false }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { 
+                        display: true, 
+                        text: "Meziroční vývoj hlavních metrik", 
+                        font: { size: 16, weight: 'bold' } 
+                    },
+                    tooltip: { 
+                        callbacks: { 
+                            label: (item) => `${item.dataset.label}: ${item.formattedValue.toLocaleString('cs-CZ')} Kč` 
+                        } 
+                    },
+                    legend: { position: "top" }
+                },
+                scales: {
+                    y: { 
+                        ticks: { 
+                            callback: (v) => v.toLocaleString('cs-CZ') + " Kč" 
+                        } 
+                    }
+                }
+            }
+        });
+    }
+    
+    function showErrorState(errorMessage) {
+        document.getElementById('clientCompanyName').textContent = 'Chyba při načítání';
+        document.getElementById('clientContactInfo').innerHTML = 
+            `<i class="fas fa-exclamation-triangle text-danger me-1"></i>${errorMessage || 'Nepodařilo se načíst informace o klientovi'}`;
+        
+        // Reset stats to error state
+        ['Documents', 'Surveys', 'Suropen'].forEach(stat => {
+            document.getElementById('clientStats' + stat).innerHTML = '<i class="fas fa-times text-danger"></i>';
+        });
+        document.getElementById('clientActivity').className = 'badge bg-danger';
+        document.getElementById('clientActivity').textContent = 'Chyba';
+    }
+    
+    // Document viewer function
+    window.viewDocument = function(documentId) {
+        // Here you would implement document viewing functionality
+        // For now, just show an alert
+        alert('Zobrazení dokumentu ID: ' + documentId + '\n\nTato funkcionalita bude implementována.');
+    };
+});
+</script>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+{% endblock %}
