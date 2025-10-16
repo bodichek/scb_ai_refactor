@@ -20,21 +20,25 @@
               <p class="text-muted mb-0 mt-1">Správa a monitoring klientů</p>
             </div>
             <div class="col-md-4">
-              <div class="input-group">
-                <span class="input-group-text bg-light border-end-0">
-                  <i class="fas fa-search text-muted"></i>
-                </span>
-                <select id="clientSelector" class="form-select border-start-0 bg-light">
-                  <option value="">Vyberte klienta...</option>
-                  {% for client in clients %}
-                    <option value="{{ client.id }}" 
-                            data-company="{{ client.company_name }}"
-                            data-user="{{ client.user.first_name }} {{ client.user.last_name }}"
-                            data-email="{{ client.user.email }}">
-                      {{ client.company_name }} - {{ client.user.first_name }} {{ client.user.last_name }}
-                    </option>
-                  {% endfor %}
-                </select>
+              <div class="position-relative">
+                <div class="input-group">
+                  <span class="input-group-text bg-light border-end-0">
+                    <i class="fas fa-search text-muted"></i>
+                  </span>
+                  <input type="text" 
+                         id="clientSearchInput" 
+                         class="form-control border-start-0 bg-light" 
+                         placeholder="Vyhledejte klienta podle názvu firmy nebo jména..."
+                         autocomplete="off">
+                  <span class="input-group-text bg-light border-start-0" style="cursor: pointer;" id="dropdownIndicator">
+                    <i class="fas fa-chevron-down text-muted"></i>
+                  </span>
+                </div>
+                
+                <!-- Dropdown s výsledky vyhledávání -->
+                <div id="searchResults" class="position-absolute w-100 bg-white border rounded shadow-sm mt-1" style="display: none; z-index: 1000; max-height: 300px; overflow-y: auto;">
+                  <!-- Výsledky se načtou dynamicky -->
+                </div>
               </div>
             </div>
           </div>
@@ -407,14 +411,174 @@ canvas {
 <!-- JavaScript functionality -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const clientSelector = document.getElementById('clientSelector');
+    const clientSearchInput = document.getElementById('clientSearchInput');
+    const searchResults = document.getElementById('searchResults');
+    const dropdownIndicator = document.getElementById('dropdownIndicator');
     const clientInfoSection = document.getElementById('clientInfoSection');
     const tabNavigation = document.getElementById('tabNavigation');
     const tabContent = document.getElementById('tabContent');
     
-    // Client selection handler
-    clientSelector.addEventListener('change', function() {
-        const clientId = this.value;
+    // Dropdown indicator click handler
+    dropdownIndicator.addEventListener('click', function() {
+        clientSearchInput.focus();
+        if (searchResults.style.display === 'none' || !searchResults.style.display) {
+            showSearchResults(allClients);
+        } else {
+            searchResults.style.display = 'none';
+        }
+    });
+    
+    // Všichni klienti pro vyhledávání
+    const allClients = [
+        {% for client in clients %}
+        {
+            id: {{ client.id }},
+            company_name: "{{ client.company_name|escapejs }}",
+            user_name: "{{ client.user.first_name|escapejs }} {{ client.user.last_name|escapejs }}",
+            email: "{{ client.user.email|escapejs }}"
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+    
+    let selectedIndex = -1;
+    
+    // Focus handler - zobrazí všechny klienty při focusu
+    clientSearchInput.addEventListener('focus', function() {
+        const query = this.value.toLowerCase().trim();
+        
+        if (query === '') {
+            // Zobrazit všechny klienty pokud je input prázdný
+            showSearchResults(allClients);
+        } else {
+            // Filtrovat podle současného textu
+            const filteredClients = allClients.filter(client => 
+                client.company_name.toLowerCase().includes(query) ||
+                client.user_name.toLowerCase().includes(query) ||
+                client.email.toLowerCase().includes(query)
+            );
+            showSearchResults(filteredClients);
+        }
+    });
+    
+    // Input handler - filtrování při psaní
+    clientSearchInput.addEventListener('input', function() {
+        const query = this.value.toLowerCase().trim();
+        selectedIndex = -1; // Reset výběru při psaní
+        
+        if (query === '') {
+            // Zobrazit všechny klienty pokud je input prázdný
+            showSearchResults(allClients);
+            return;
+        }
+        
+        // Filtrovat klienty podle názvu firmy nebo jména
+        const filteredClients = allClients.filter(client => 
+            client.company_name.toLowerCase().includes(query) ||
+            client.user_name.toLowerCase().includes(query) ||
+            client.email.toLowerCase().includes(query)
+        );
+        
+        showSearchResults(filteredClients);
+    });
+    
+    // Keyboard navigation
+    clientSearchInput.addEventListener('keydown', function(e) {
+        const results = searchResults.querySelectorAll('.client-result');
+        
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            selectedIndex = Math.min(selectedIndex + 1, results.length - 1);
+            updateSelection(results);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            selectedIndex = Math.max(selectedIndex - 1, -1);
+            updateSelection(results);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (selectedIndex >= 0 && results[selectedIndex]) {
+                results[selectedIndex].click();
+            }
+        } else if (e.key === 'Escape') {
+            searchResults.style.display = 'none';
+            selectedIndex = -1;
+        }
+    });
+    
+    function updateSelection(results) {
+        results.forEach((result, index) => {
+            if (index === selectedIndex) {
+                result.style.backgroundColor = '#007bff';
+                result.style.color = 'white';
+                result.scrollIntoView({ block: 'nearest' });
+            } else {
+                result.style.backgroundColor = '';
+                result.style.color = '';
+            }
+        });
+    }
+    
+    // Skrýt výsledky při kliknutí mimo
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#clientSearchInput') && !e.target.closest('#searchResults')) {
+            searchResults.style.display = 'none';
+        }
+    });
+    
+    function showSearchResults(clients) {
+        if (clients.length === 0) {
+            searchResults.innerHTML = '<div class="p-3 text-muted">Nenalezeni žádní klienti</div>';
+        } else {
+            searchResults.innerHTML = clients.map(client => `
+                <div class="p-3 border-bottom client-result" style="cursor: pointer;" data-client-id="${client.id}">
+                    <div class="fw-bold">${client.company_name}</div>
+                    <div class="text-muted small">${client.user_name} - ${client.email}</div>
+                </div>
+            `).join('');
+            
+            // Přidat event listenery pro výsledky
+            searchResults.querySelectorAll('.client-result').forEach((result, index) => {
+                result.addEventListener('click', function() {
+                    const clientId = this.dataset.clientId;
+                    const client = clients.find(c => c.id == clientId);
+                    
+                    // Nastavit hodnotu do inputu
+                    clientSearchInput.value = `${client.company_name} - ${client.user_name}`;
+                    
+                    // Skrýt výsledky
+                    searchResults.style.display = 'none';
+                    selectedIndex = -1;
+                    
+                    // Načíst data klienta
+                    selectClient(clientId);
+                });
+                
+                // Hover efekt (pokud není vybrán klávesnicí)
+                result.addEventListener('mouseenter', function() {
+                    if (index !== selectedIndex) {
+                        this.style.backgroundColor = '#f8f9fa';
+                    }
+                });
+                result.addEventListener('mouseleave', function() {
+                    if (index !== selectedIndex) {
+                        this.style.backgroundColor = '';
+                        this.style.color = '';
+                    }
+                });
+                
+                // Nastavit selected index při hover
+                result.addEventListener('mousemove', function() {
+                    if (selectedIndex !== index) {
+                        selectedIndex = index;
+                        updateSelection(searchResults.querySelectorAll('.client-result'));
+                    }
+                });
+            });
+        }
+        
+        searchResults.style.display = 'block';
+    }
+    
+    function selectClient(clientId) {
         console.log('Client selected:', clientId);
         
         if (!clientId) {
@@ -430,7 +594,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Load client data
         loadClientData(clientId);
-    });
+    }
     
     function showLoadingState() {
         clientInfoSection.style.display = 'block';
