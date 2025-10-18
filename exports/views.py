@@ -411,3 +411,10 @@ def export_pdf(request):
     buffer.seek(0)
     filename = f"Report_{timezone.localtime().strftime('%Y%m%d_%H%M')}.pdf"
     return FileResponse(buffer, as_attachment=True, filename=filename)
+
+@login_required
+def export_config_api(request):
+    """Vraci data pro React export stranku."""
+    statements = FinancialStatement.objects.filter(owner=request.user).order_by("year")
+    years = [s.year for s in statements]
+    return JsonResponse({"years": years})

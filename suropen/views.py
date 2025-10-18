@@ -1,24 +1,28 @@
+import json
+from uuid import UUID, uuid4
+from datetime import timedelta
+
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect
 from django.db import transaction
+from django.db.models import Count, Max
+from django.http import JsonResponse, HttpResponseBadRequest
+from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
-from datetime import timedelta
-from django.db.models import Count, Max
+from django.views.decorators.http import require_http_methods
+
+from openai import OpenAI
+
 from .models import OpenAnswer
 
-# OpenAI client
-from openai import OpenAI
-client = OpenAI()  # používá env OPENAI_API_KEY
+client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
-
-# 🔹 Otázky napevno (sekce → otázky)
 QUESTIONS = [
     {
         "section": "VÍCE ČASU",
         "items": [
-            "Jak často a v jaké podobě se věnuji strategickému přemýšlení o směrování firmy?",
+            "Jak často a v jaké podobě se věnuji strategickému přemýšlení o směřování firmy?",
             "Co mi nejvíce bere čas a energii?",
             "V jaké roli se cítím nejvíce produktivní a užitečný/á?",
         ],
@@ -34,30 +38,38 @@ QUESTIONS = [
         "section": "MÉNĚ STRACHU",
         "items": [
             "Čeho se nejvíce obávám nebo mi brání v rozhodování?",
-            "Kdyby všechny obavy a pochybnosti zmizely, co bych podniknul ve svém podnikání?",
+            "Kdyby všechny obavy a pochybnosti zmizely, co bych podniknul/a ve svém podnikání?",
             "Co mi nejvíce brání v mém podnikání?",
         ],
     },
 ]
 
+COOLDOWN_SECONDS = 10
 
-# 🔹 Pomocné funkce
+
+class NoAnswerProvided(Exception):
+    pass
+
+
+class DuplicateSubmissionError(Exception):
+    pass
+
+
 def _build_ai_prompt(user_inputs):
-    """Vytvoří prompt pro OpenAI z otevřených odpovědí."""
     system = (
         "Jsi byznysový kouč. Stručně, konkrétně a akčně shrň odpovědi zakladatele firmy, "
-        "identifikuj 3–5 hlavních zjištění a navrhni 5 krátkých, proveditelných doporučení. "
+        "identifikuj tři až pět hlavních zjištění a navrhni pět krátkých, proveditelných doporučení. "
         "Používej češtinu, buď věcný, bez floskulí."
     )
 
     lines = []
-    for i, r in enumerate(user_inputs, 1):
-        lines.append(f"{i}) [{r['section']}] {r['question']}\n→ Odpověď: {r['answer']}")
+    for idx, row in enumerate(user_inputs, start=1):
+        lines.append(f"{idx}) [{row['section']}] {row['question']}\n→ Odpověď: {row['answer']}")
 
     user_text = (
         "Níže jsou moje otevřené odpovědi v kategoriích ČAS/PENÍZE/STRACH.\n\n"
         + "\n\n".join(lines)
-        + "\n\nProsím: 1) krátké shrnutí, 2) klíčové překážky, 3) 5 konkrétních kroků na 14 dní."
+        + "\n\nProsím: 1) krátké shrnutí, 2) klíčové poznatky, 3) 5 konkrétních kroků na 14 dní."
     )
 
     return [
@@ -67,7 +79,6 @@ def _build_ai_prompt(user_inputs):
 
 
 def _ask_openai(messages, model=None):
-    """Zavolá OpenAI API a vrátí textovou odpověď."""
     model = model or getattr(settings, "OPENAI_MODEL", "gpt-4o-mini")
     try:
         resp = client.chat.completions.create(
@@ -77,84 +88,133 @@ def _ask_openai(messages, model=None):
             max_tokens=900,
         )
         return resp.choices[0].message.content.strip()
-    except Exception as e:
+    except Exception as exc:  # pragma: no cover - OpenAI fallback
         return (
-            "⚠️ Nepodařilo se získat odpověď od AI. "
+            "Nepodařilo se získat odpověď od AI. "
             "Zkontroluj nastavení OPENAI_API_KEY/OPENAI_MODEL.\n"
-            f"Detail: {type(e).__name__}: {e}"
+            f"Detail: {type(exc).__name__}: {exc}"
         )
 
 
-# 🔹 Hlavní view
+def _create_submission(user, answers):
+    cleaned = []
+    for item in answers:
+        section = item.get("section", "").strip()
+        question = item.get("question", "").strip()
+        answer = (item.get("answer") or "").strip()
+        cleaned.append({"section": section, "question": question, "answer": answer})
+
+    if not any(entry["answer"] for entry in cleaned):
+        raise NoAnswerProvided("Vyplňte alespoň jednu odpověď.")
+
+    last = OpenAnswer.objects.filter(user=user).order_by("-created_at").first()
+    if last and (timezone.now() - last.created_at) < timedelta(seconds=COOLDOWN_SECONDS):
+        raise DuplicateSubmissionError("Formulář byl odeslán příliš rychle po sobě.")
+
+    ai_text = _ask_openai(_build_ai_prompt(cleaned))
+    batch_id = uuid4()
+
+    with transaction.atomic():
+        for entry in cleaned:
+            OpenAnswer.objects.create(
+                user=user,
+                batch_id=batch_id,
+                section=entry["section"],
+                question=entry["question"],
+                answer=entry["answer"],
+                ai_response=ai_text,
+            )
+
+    return batch_id, ai_text
+
+
+def _get_summaries(user):
+    batches = (
+        OpenAnswer.objects.filter(user=user)
+        .values("batch_id")
+        .annotate(count=Count("id"), created_at=Max("created_at"))
+        .order_by("-created_at")
+    )
+    summaries = []
+    for batch in batches:
+        answers = (
+            OpenAnswer.objects.filter(user=user, batch_id=batch["batch_id"])
+            .order_by("created_at")
+        )
+        first = answers.first()
+        summaries.append({
+            "batch_id": str(batch["batch_id"]),
+            "created_at": batch["created_at"].isoformat() if batch["created_at"] else None,
+            "answer_count": batch["count"],
+            "ai_response": getattr(first, "ai_response", None),
+        })
+    return summaries
+
+
+def _get_batch_detail(user, batch_id):
+    try:
+        batch_uuid = UUID(str(batch_id))
+    except (TypeError, ValueError):
+        return None
+
+    answers = list(
+        OpenAnswer.objects.filter(user=user, batch_id=batch_uuid).order_by("created_at")
+    )
+    if not answers:
+        return None
+    first = answers[0]
+    return {
+        "batch_id": str(batch_uuid),
+        "created_at": first.created_at.isoformat() if first.created_at else None,
+        "ai_response": first.ai_response,
+        "answers": [
+            {"section": a.section, "question": a.question, "answer": a.answer}
+            for a in answers
+        ],
+    }
+
+
 @login_required
 def form(request):
     if request.method == "POST":
-        collected = []
+        answers = []
         for s_idx, block in enumerate(QUESTIONS):
             for q_idx, question in enumerate(block["items"]):
                 key = f"q-{s_idx}-{q_idx}"
-                ans = (request.POST.get(key) or "").strip()
-                collected.append({
+                answer = (request.POST.get(key) or "").strip()
+                answers.append({
                     "section": block["section"],
                     "question": question,
-                    "answer": ans,
+                    "answer": answer,
                 })
-
-        # ✅ validace: musí být aspoň jedna odpověď
-        if not any(item["answer"] for item in collected):
+        try:
+            _create_submission(request.user, answers)
+        except NoAnswerProvided:
             submissions = (
                 OpenAnswer.objects.filter(user=request.user)
                 .values("batch_id")
-                .annotate(
-                    count=Count("id"),
-                    created_at=Max("created_at"),  # vezme nejnovější čas z batch
-                )
+                .annotate(count=Count("id"), created_at=Max("created_at"))
                 .order_by("-created_at")
             )
             return render(request, "suropen/form.html", {
                 "questions": QUESTIONS,
-                "error": "Vyplň prosím alespoň jednu odpověď.",
                 "submissions": submissions,
+                "error": "Vyplň prosím alespoň jednu odpověď.",
+                "just_submitted": False,
+                "duplicate": False,
             })
-
-        # ✅ ochrana proti opakovanému odeslání do 10 s
-        last = OpenAnswer.objects.filter(user=request.user).order_by("-created_at").first()
-        if last and (timezone.now() - last.created_at) < timedelta(seconds=10):
-            print("⚠️ Ignoruji duplicitní odeslání")
+        except DuplicateSubmissionError:
             return redirect(reverse("suropen:form") + "?duplicate=1")
 
-        # ✅ AI + uložení
-        messages = _build_ai_prompt(collected)
-        ai_text = _ask_openai(messages)
-
-        from uuid import uuid4
-        batch_id = uuid4()
-        with transaction.atomic():
-            for item in collected:
-                OpenAnswer.objects.create(
-                    user=request.user,
-                    batch_id=batch_id,
-                    section=item["section"],
-                    question=item["question"],
-                    answer=item["answer"],
-                    ai_response=ai_text,
-                )
-
-        # ✅ redirect (PRG)
         return redirect(reverse("suropen:form") + "?submitted=1")
 
-    # 🔹 GET – načteme historii (souhrn batchů)
     submissions = (
         OpenAnswer.objects.filter(user=request.user)
         .values("batch_id")
-        .annotate(
-            count=Count("id"),
-            created_at=Max("created_at"),
-        )
+        .annotate(count=Count("id"), created_at=Max("created_at"))
         .order_by("-created_at")
     )
 
-    ai_text = None
     just_submitted = request.GET.get("submitted") == "1"
     duplicate = request.GET.get("duplicate") == "1"
 
@@ -163,33 +223,72 @@ def form(request):
         "submissions": submissions,
         "just_submitted": just_submitted,
         "duplicate": duplicate,
-        "ai_text": ai_text,
+        "ai_text": None,
     })
 
 
 @login_required
 def history(request):
-    """Přehled vlastních odeslání seskupený dle batch_id."""
-    batches = (
-        OpenAnswer.objects
-        .filter(user=request.user)
-        .values("batch_id")
-        .annotate(created_at=Max("created_at"))
-        .order_by("-created_at")
-    )
-
+    summaries = _get_summaries(request.user)
     data = []
-    for b in batches:
-        items = list(
-            OpenAnswer.objects.filter(user=request.user, batch_id=b["batch_id"])
-            .order_by("created_at")
-            .values("section", "question", "answer", "ai_response")
-        )
-        data.append({
-            "batch_id": b["batch_id"],
-            "created_at": b["created_at"],
-            "items": items,
-            "ai_response": items[0]["ai_response"] if items else None,
+    for summary in summaries:
+        detail = _get_batch_detail(request.user, summary["batch_id"])
+        if detail:
+            data.append(detail)
+    return render(request, "suropen/history.html", {"batches": data})
+
+
+# ---- API endpoints ----
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def form_api(request):
+    if request.method == "GET":
+        return JsonResponse({
+            "questions": QUESTIONS,
+            "submissions": _get_summaries(request.user),
+            "cooldown_seconds": COOLDOWN_SECONDS,
         })
 
-    return render(request, "suropen/history.html", {"batches": data})
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except json.JSONDecodeError:
+        return HttpResponseBadRequest("Invalid JSON body.")
+
+    answers = payload.get("answers")
+    if not isinstance(answers, list):
+        return HttpResponseBadRequest("Pole answers musí být seznam.")
+
+    try:
+        batch_id, _ = _create_submission(request.user, answers)
+    except NoAnswerProvided as exc:
+        return HttpResponseBadRequest(str(exc))
+    except DuplicateSubmissionError as exc:
+        return JsonResponse({"success": False, "error": str(exc)}, status=429)
+
+    detail = _get_batch_detail(request.user, batch_id)
+    summary = _get_summaries(request.user)[0] if detail else None
+
+    return JsonResponse({
+        "success": True,
+        "submission": summary,
+        "detail": detail,
+    }, status=201)
+
+
+@login_required
+def history_api(request):
+    batches = []
+    for summary in _get_summaries(request.user):
+        detail = _get_batch_detail(request.user, summary["batch_id"])
+        if detail:
+            batches.append(detail)
+    return JsonResponse({"batches": batches})
+
+
+@login_required
+def batch_detail_api(request, batch_id):
+    detail = _get_batch_detail(request.user, batch_id)
+    if not detail:
+        return JsonResponse({"error": "Nenalezeno."}, status=404)
+    return JsonResponse({"batch": detail})

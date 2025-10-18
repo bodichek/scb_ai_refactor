@@ -3,7 +3,12 @@ from django.contrib.auth.models import User
 from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
 from django.shortcuts import render, redirect
+from django.urls import reverse
 from django.db import IntegrityError
+from django.http import JsonResponse, HttpResponseBadRequest
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
+import json
 
 from coaching.models import Coach
 from .models import CompanyProfile, UserRole
@@ -33,6 +38,41 @@ def login_view(request):
             messages.error(request, 'Neplatné přihlašovací údaje.')
     
     return render(request, 'accounts/login.html')
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def login_api(request):
+    """JSON login endpoint pro SPA frontend."""
+    try:
+        if request.headers.get("Content-Type", "").startswith("application/json"):
+            payload = json.loads((request.body or b"{}").decode("utf-8"))
+        else:
+            payload = request.POST
+    except json.JSONDecodeError:
+        return HttpResponseBadRequest("Invalid JSON body.")
+
+    username = (payload.get("username") or "").strip()
+    password = payload.get("password") or ""
+
+    if not username or not password:
+        return JsonResponse({"success": False, "error": "Vyplňte e-mail i heslo."}, status=400)
+
+    user = authenticate(request, username=username, password=password)
+    if user is None:
+        return JsonResponse({"success": False, "error": "Neplatné přihlašovací údaje."}, status=400)
+
+    login(request, user)
+
+    redirect_url = reverse("dashboard:index")
+    try:
+        user_role = user.userrole.role
+        if user_role == "coach":
+            redirect_url = reverse("coaching:my_clients")
+    except Exception:
+        pass
+
+    return JsonResponse({"success": True, "redirect": redirect_url})
 
 
 @login_required

@@ -8,7 +8,7 @@ from django.utils import timezone
 from datetime import datetime, timedelta
 from accounts.models import CompanyProfile, Coach, CoachClientNotes
 from accounts.permissions import coach_required, can_coach_access_client
-from ingest.models import Document
+from ingest.models import Document, FinancialStatement
 from survey.models import SurveySubmission
 from dashboard.cashflow import calculate_cashflow
 from .models import Coach
@@ -285,6 +285,7 @@ def client_dashboard(request, client_id):
         try:
             # Připravíme data pro JSON response s lepším error handlingem
             json_data = {
+                'success': True,
                 'client': {
                     'id': client.id,
                     'company_name': client.company_name or '',
@@ -299,6 +300,7 @@ def client_dashboard(request, client_id):
                 'surveys_completed': surveys_completed,
                 'days_since_activity': days_since_activity,
                 'has_cashflow_data': has_cashflow_data,
+                'client_notes': client_notes,
             }
             
             # Přidáme cashflow data pouze pokud existují - SPRÁVNÁ STRUKTURA PRO TABULKU
@@ -490,3 +492,242 @@ def edit_coach(request):
         return redirect("coaching:my_clients")
 
     return render(request, "coaching/edit_coach.html", {"coach": coach})
+
+
+# === SPA/JSON endpoints and updated notes view ===
+@login_required
+@coach_required
+def save_client_notes(request, client_id):  # override with JSON support
+    """Uložení poznámek kouče pro klienta (HTML form i JSON)."""
+    is_json = request.headers.get('Content-Type', '').startswith('application/json') or \
+              request.headers.get('Accept', '').startswith('application/json')
+    if request.method != 'POST':
+        if is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'Invalid method'}, status=405)
+        return redirect('coaching:client_dashboard', client_id=client_id)
+
+    client = get_object_or_404(CompanyProfile, id=client_id)
+    if not can_coach_access_client(request.user, client):
+        if is_json:
+            return JsonResponse({'success': False, 'error': 'Forbidden'}, status=403)
+        messages.error(request, 'Nemáte oprávnění k úpravě poznámek tohoto klienta.')
+        return redirect('coaching:my_clients')
+
+    try:
+        coach = Coach.objects.get(user=request.user)
+        if request.headers.get('Content-Type', '').startswith('application/json'):
+            import json
+            try:
+                payload = json.loads((request.body or b'').decode('utf-8') or '{}')
+            except Exception:
+                return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+            notes_text = str(payload.get('notes', '')).strip()
+        else:
+            notes_text = str(request.POST.get('notes', '')).strip()
+
+        notes_obj, created = CoachClientNotes.objects.get_or_create(
+            coach=coach,
+            client=client,
+            defaults={'notes': notes_text}
+        )
+        if not created:
+            notes_obj.notes = notes_text
+            notes_obj.save()
+
+        if is_json:
+            return JsonResponse({'success': True})
+        messages.success(request, 'Poznámky byly úspěšně uloženy.')
+        return redirect('coaching:client_dashboard', client_id=client_id)
+
+    except Coach.DoesNotExist:
+        if is_json:
+            return JsonResponse({'success': False, 'error': 'Profil kouče nenalezen.'}, status=400)
+        messages.error(request, 'Váš profil kouče nebyl nalezen.')
+        return redirect('coaching:client_dashboard', client_id=client_id)
+
+
+@login_required
+@coach_required
+def client_data(request, client_id):
+    client = get_object_or_404(CompanyProfile, id=client_id)
+    if not can_coach_access_client(request.user, client):
+        return JsonResponse({'success': False, 'error': 'Forbidden'}, status=403)
+    latest_doc = Document.objects.filter(owner=client.user).order_by('-uploaded_at').first()
+    statements_count = Document.objects.filter(owner=client.user).count()
+    return JsonResponse({
+        'success': True,
+        'client': {
+            'id': client.id,
+            'name': client.company_name,
+            'user_id': client.user.id,
+        },
+        'stats': {
+            'statements_count': statements_count,
+            'last_activity': latest_doc.uploaded_at.isoformat() if latest_doc else None,
+        }
+    })
+
+
+@login_required
+@coach_required
+def documents_data(request, client_id):
+    client = get_object_or_404(CompanyProfile, id=client_id)
+    if not can_coach_access_client(request.user, client):
+        return JsonResponse({'success': False, 'error': 'Forbidden'}, status=403)
+    docs = Document.objects.filter(owner=client.user).order_by('-uploaded_at')[:25]
+    return JsonResponse({
+        'success': True,
+        'documents': [
+            {
+                'id': d.id,
+                'name': getattr(d.file, 'name', ''),
+                'type': d.doc_type,
+                'year': d.year,
+                'uploaded_at': d.uploaded_at.isoformat() if getattr(d, 'uploaded_at', None) else None,
+            } for d in docs
+        ]
+    })
+
+
+@login_required
+@coach_required
+def cashflow_data(request, client_id):
+    client = get_object_or_404(CompanyProfile, id=client_id)
+    if not can_coach_access_client(request.user, client):
+        return JsonResponse({'success': False, 'error': 'Forbidden'}, status=403)
+    years = list(FinancialStatement.objects.filter(owner=client.user).values_list('year', flat=True).order_by('-year'))
+    if not years:
+        return JsonResponse({'success': True, 'available': False})
+    year = years[0]
+    cf = calculate_cashflow(client.user, year) or {}
+    return JsonResponse({'success': True, 'available': True, 'year': year, 'cashflow': cf})
+
+
+@login_required
+@coach_required
+def charts_data(request, client_id):
+    client = get_object_or_404(CompanyProfile, id=client_id)
+    if not can_coach_access_client(request.user, client):
+        return JsonResponse({'success': False, 'error': 'Forbidden'}, status=403)
+    rows = []
+    for fs in FinancialStatement.objects.filter(owner=client.user).order_by('year'):
+        d = fs.data or {}
+        revenue = float(d.get('Revenue', 0))
+        cogs = float(d.get('COGS', 0))
+        overheads = float(d.get('Overheads', 0))
+        depreciation = float(d.get('Depreciation', 0))
+        ebit = float(d.get('EBIT', revenue - cogs - overheads - depreciation))
+        rows.append({'year': fs.year, 'revenue': revenue, 'cogs': cogs, 'ebit': ebit})
+    return JsonResponse({'success': True, 'series': rows})
+
+
+@login_required
+@coach_required
+def surveys_data(request, client_id):
+    client = get_object_or_404(CompanyProfile, id=client_id)
+    if not can_coach_access_client(request.user, client):
+        return JsonResponse({'success': False, 'error': 'Forbidden'}, status=403)
+    submissions = SurveySubmission.objects.filter(user=client.user).order_by('-created_at')
+    return JsonResponse({'success': True, 'count': submissions.count(), 'latest': submissions.first().created_at.isoformat() if submissions.first() else None})
+
+
+@login_required
+@coach_required
+def suropen_data(request, client_id):
+    client = get_object_or_404(CompanyProfile, id=client_id)
+    if not can_coach_access_client(request.user, client):
+        return JsonResponse({'success': False, 'error': 'Forbidden'}, status=403)
+    try:
+        from suropen.models import OpenAnswer
+        count = OpenAnswer.objects.filter(user=client.user).count()
+    except Exception:
+        count = 0
+    return JsonResponse({'success': True, 'count': count})
+
+
+# ---- SPA endpoints for coach dashboard ----
+
+def _serialize_client_summary(profile, statements_count, last_activity):
+    now = timezone.now()
+    days_since = (now - last_activity).days if last_activity else None
+    return {
+        'id': profile.id,
+        'company_name': profile.company_name or '',
+        'user': {
+            'id': profile.user.id,
+            'first_name': profile.user.first_name or '',
+            'last_name': profile.user.last_name or '',
+            'email': profile.user.email or '',
+        },
+        'statements_count': statements_count,
+        'last_activity': last_activity.isoformat() if last_activity else None,
+        'days_since_activity': days_since,
+    }
+
+
+@login_required
+@coach_required
+def my_clients_api(request):
+    coach = get_object_or_404(Coach, user=request.user)
+    search_query = (request.GET.get('search') or '').strip()
+
+    clients_qs = CompanyProfile.objects.filter(assigned_coach=coach).select_related('user')
+    if search_query:
+        clients_qs = clients_qs.filter(
+            Q(company_name__icontains=search_query)
+            | Q(user__first_name__icontains=search_query)
+            | Q(user__last_name__icontains=search_query)
+            | Q(user__email__icontains=search_query)
+        )
+
+    clients_payload = []
+    owners = []
+    for profile in clients_qs:
+        owners.append(profile.user)
+        statements_count = Document.objects.filter(
+            owner=profile.user,
+            doc_type__in=['income', 'balance', 'rozvaha', 'vysledovka', 'cashflow'],
+        ).count()
+        last_document = Document.objects.filter(owner=profile.user).order_by('-uploaded_at').first()
+        last_activity = last_document.uploaded_at if last_document else None
+        clients_payload.append(_serialize_client_summary(profile, statements_count, last_activity))
+
+    now = timezone.now()
+    active_clients = sum(
+        1 for item in clients_payload if item['days_since_activity'] is not None and item['days_since_activity'] <= 30
+    )
+    statements_total = sum(item['statements_count'] for item in clients_payload)
+    recent_uploads = Document.objects.filter(
+        owner__in=owners,
+        uploaded_at__gte=now - timedelta(days=30),
+    ).count()
+
+    recent_docs = (
+        Document.objects.filter(
+            owner__in=owners,
+            uploaded_at__gte=now - timedelta(days=7),
+        )
+        .select_related('owner', 'owner__companyprofile')
+        .order_by('-uploaded_at')[:5]
+    )
+    recent_activities = [
+        {
+            'date': doc.uploaded_at.isoformat(),
+            'client_name': getattr(doc.owner.companyprofile, 'company_name', ''),
+            'description': f"Nahrál dokument: {doc.get_doc_type_display()}" if hasattr(doc, 'get_doc_type_display') else '',
+        }
+        for doc in recent_docs
+    ]
+
+    return JsonResponse({
+        'success': True,
+        'search_query': search_query,
+        'stats': {
+            'clients_count': len(clients_payload),
+            'active_clients': active_clients,
+            'statements_total': statements_total,
+            'recent_uploads': recent_uploads,
+        },
+        'clients': clients_payload,
+        'recent_activities': recent_activities,
+    })

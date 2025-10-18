@@ -1,4 +1,4 @@
-import os
+﻿import os
 import io
 import json
 import base64
@@ -22,7 +22,7 @@ def index(request):
     for s in statements:
         d = s.data or {}
 
-        # Základní výpočty
+        # ZÃ¡kladnÃ­ vÃ½poÄty
         revenue = d.get("Revenue", 0)
         cogs = d.get("COGS", 0)
         gross_margin = revenue - cogs
@@ -31,7 +31,7 @@ def index(request):
         ebit = d.get("EBIT", gross_margin - overheads - depreciation)
         net_profit = d.get("NetProfit", 0)
 
-        # Cashflow (jen základní bloky)
+        # Cashflow (jen zÃ¡kladnÃ­ bloky)
         cash_from_customers = d.get("CashFromCustomers", revenue)
         cash_to_suppliers = d.get("CashToSuppliers", cogs)
         gross_cash_profit = cash_from_customers - cash_to_suppliers
@@ -57,7 +57,7 @@ def index(request):
             "ebit": ebit,
             "net_profit": net_profit,
 
-            # Profitability % (poměrové ukazatele)
+            # Profitability % (pomÄ›rovÃ© ukazatele)
             "profitability": {
                 "gm_pct": (gross_margin / revenue * 100) if revenue else 0,
                 "op_pct": (ebit / revenue * 100) if revenue else 0,
@@ -78,14 +78,14 @@ def index(request):
             "other_assets": other_assets,
             "net_cf": net_cf,
 
-            "growth": {}  # doplníme níže
+            "growth": {}  # doplnÃ­me nÃ­Å¾e
         })
 
-    # Seřadit a připravit roky
+    # SeÅ™adit a pÅ™ipravit roky
     rows = sorted(rows, key=lambda r: r["year"])
     years = [r["year"] for r in rows]
 
-    # Meziroční růsty
+    # MeziroÄnÃ­ rÅ¯sty
     for i, r in enumerate(rows):
         if i == 0:
             r["growth"] = {"revenue": 0, "cogs": 0, "overheads": 0}
@@ -97,20 +97,20 @@ def index(request):
                 "overheads": ((r["overheads"] - prev["overheads"]) / prev["overheads"] * 100) if prev["overheads"] else 0,
             }
 
-    # 💰 Výpočet Cash Flow pro poslední rok (přidáno z původního kódu)
+    # ðŸ’° VÃ½poÄet Cash Flow pro poslednÃ­ rok (pÅ™idÃ¡no z pÅ¯vodnÃ­ho kÃ³du)
     cf = None
     selected_year = years[-1] if years else None
     if selected_year:
         try:
             cf = calculate_cashflow(request.user, selected_year)
         except Exception as e:
-            print(f"⚠️ Chyba výpočtu cashflow: {e}")
+            print(f"âš ï¸ Chyba vÃ½poÄtu cashflow: {e}")
 
     return render(request, "dashboard/index.html", {
         "rows": json.dumps(rows),
         "years": json.dumps(years),
         "table_rows": rows,
-        "cashflow": cf,  # ✅ přidáno
+        "cashflow": cf,  # âœ… pÅ™idÃ¡no
         "selected_year": selected_year,
     })
 
@@ -125,11 +125,11 @@ def cashflow_view(request, year):
 
 @login_required
 def api_cashflow(request, year):
-    """API endpoint pro načítání Profit vs Cash Flow tabulky pro specifický rok"""
+    """API endpoint pro naÄÃ­tÃ¡nÃ­ Profit vs Cash Flow tabulky pro specifickÃ½ rok"""
     cf = calculate_cashflow(request.user, year)
     
     if cf:
-        # Vypočítáme variance (rozdíly)
+        # VypoÄÃ­tÃ¡me variance (rozdÃ­ly)
         revenue_variance = cf["gross_cash_profit"] - cf["gross_margin"]
         operating_variance = cf["operating_cash_flow"] - cf["operating_cash_profit"] 
         net_variance = cf["net_cash_flow"] - cf["retained_profit"]
@@ -142,135 +142,135 @@ def api_cashflow(request, year):
             else:
                 return '<span class="text-muted">-</span>'
         
-        # Renderujeme Profit vs Cash Flow tabulku v češtině podle daňového řádu ČR
+        # Renderujeme Profit vs Cash Flow tabulku v ÄeÅ¡tinÄ› podle daÅˆovÃ©ho Å™Ã¡du ÄŒR
         cashflow_html = f'''
         <table class="table table-bordered align-middle mt-3">
           <thead class="table-dark text-center">
             <tr>
-              <th width="35%">Zisk (účetní)</th>
-              <th width="35%">Peněžní tok (hotovost)</th>
-              <th width="30%">Rozdíl</th>
+              <th width="35%">Zisk (ÃºÄetnÃ­)</th>
+              <th width="35%">PenÄ›Å¾nÃ­ tok (hotovost)</th>
+              <th width="30%">RozdÃ­l</th>
             </tr>
           </thead>
           <tbody>
-            <!-- Tržby -->
+            <!-- TrÅ¾by -->
             <tr>
-              <td><strong>Tržby za prodej zboží a služeb</strong> 
-                <span data-bs-toggle="tooltip" title="Účetní tržby dle § 23 zákona o účetnictví - zahrnují všechny faktury vystavené v daném období">❓</span>
-                <br><span class="text-primary">{cf["revenue"]:,.0f} Kč</span></td>
-              <td><strong>Příjmy od zákazníků</strong>
-                <span data-bs-toggle="tooltip" title="Skutečně přijaté peněžní prostředky od zákazníků - liší se od tržeb kvůli pohledávkám">❓</span>
-                <br><span class="text-primary">{cf["revenue"] * 0.93:,.0f} Kč</span></td>
+              <td><strong>TrÅ¾by za prodej zboÅ¾Ã­ a sluÅ¾eb</strong> 
+                <span data-bs-toggle="tooltip" title="ÃšÄetnÃ­ trÅ¾by dle Â§ 23 zÃ¡kona o ÃºÄetnictvÃ­ - zahrnujÃ­ vÅ¡echny faktury vystavenÃ© v danÃ©m obdobÃ­">â“</span>
+                <br><span class="text-primary">{cf["revenue"]:,.0f} KÄ</span></td>
+              <td><strong>PÅ™Ã­jmy od zÃ¡kaznÃ­kÅ¯</strong>
+                <span data-bs-toggle="tooltip" title="SkuteÄnÄ› pÅ™ijatÃ© penÄ›Å¾nÃ­ prostÅ™edky od zÃ¡kaznÃ­kÅ¯ - liÅ¡Ã­ se od trÅ¾eb kvÅ¯li pohledÃ¡vkÃ¡m">â“</span>
+                <br><span class="text-primary">{cf["revenue"] * 0.93:,.0f} KÄ</span></td>
               <td class="text-center">{format_variance((cf["revenue"] * 0.93) - cf["revenue"])}</td>
             </tr>
             
-            <!-- Náklady na prodané zboží -->
+            <!-- NÃ¡klady na prodanÃ© zboÅ¾Ã­ -->
             <tr>
-              <td><strong>Náklady na prodané zboží</strong>
-                <span data-bs-toggle="tooltip" title="Účetní náklady na zboží podle § 25 zákona o účetnictví - zaúčtované náklady za prodané zboží">❓</span>
-                <br><span class="text-danger">{cf["cogs"]:,.0f} Kč</span></td>
-              <td><strong>Výdaje dodavatelům</strong>
-                <span data-bs-toggle="tooltip" title="Skutečně zaplacené částky dodavatelům - liší se od nákladů kvůli závazkům a zásob">❓</span>
-                <br><span class="text-danger">{cf["cogs"] * 0.98:,.0f} Kč</span></td>
+              <td><strong>NÃ¡klady na prodanÃ© zboÅ¾Ã­</strong>
+                <span data-bs-toggle="tooltip" title="ÃšÄetnÃ­ nÃ¡klady na zboÅ¾Ã­ podle Â§ 25 zÃ¡kona o ÃºÄetnictvÃ­ - zaÃºÄtovanÃ© nÃ¡klady za prodanÃ© zboÅ¾Ã­">â“</span>
+                <br><span class="text-danger">{cf["cogs"]:,.0f} KÄ</span></td>
+              <td><strong>VÃ½daje dodavatelÅ¯m</strong>
+                <span data-bs-toggle="tooltip" title="SkuteÄnÄ› zaplacenÃ© ÄÃ¡stky dodavatelÅ¯m - liÅ¡Ã­ se od nÃ¡kladÅ¯ kvÅ¯li zÃ¡vazkÅ¯m a zÃ¡sob">â“</span>
+                <br><span class="text-danger">{cf["cogs"] * 0.98:,.0f} KÄ</span></td>
               <td class="text-center">{format_variance((cf["cogs"] * 0.98) - cf["cogs"])}</td>
             </tr>
             
-            <!-- Hrubá marže -->
+            <!-- HrubÃ¡ marÅ¾e -->
             <tr class="table-light">
-              <td><strong>Hrubá marže</strong>
-                <span data-bs-toggle="tooltip" title="Hrubý zisk = Tržby - Náklady na prodané zboží. Základní ukazatel ziskovosti obchodní činnosti">❓</span>
-                <br><span class="fw-bold text-success">{cf["gross_margin"]:,.0f} Kč</span></td>
-              <td><strong>Hrubý peněžní tok</strong>
-                <span data-bs-toggle="tooltip" title="Skutečná hotovost z obchodní činnosti = Příjmy od zákazníků - Výdaje dodavatelům">❓</span>
-                <br><span class="fw-bold text-success">{cf["gross_cash_profit"]:,.0f} Kč</span></td>
+              <td><strong>HrubÃ¡ marÅ¾e</strong>
+                <span data-bs-toggle="tooltip" title="HrubÃ½ zisk = TrÅ¾by - NÃ¡klady na prodanÃ© zboÅ¾Ã­. ZÃ¡kladnÃ­ ukazatel ziskovosti obchodnÃ­ Äinnosti">â“</span>
+                <br><span class="fw-bold text-success">{cf["gross_margin"]:,.0f} KÄ</span></td>
+              <td><strong>HrubÃ½ penÄ›Å¾nÃ­ tok</strong>
+                <span data-bs-toggle="tooltip" title="SkuteÄnÃ¡ hotovost z obchodnÃ­ Äinnosti = PÅ™Ã­jmy od zÃ¡kaznÃ­kÅ¯ - VÃ½daje dodavatelÅ¯m">â“</span>
+                <br><span class="fw-bold text-success">{cf["gross_cash_profit"]:,.0f} KÄ</span></td>
               <td class="text-center fw-bold">{format_variance(cf["gross_cash_profit"] - cf["gross_margin"])}</td>
             </tr>
             
-            <!-- Provozní náklady -->
+            <!-- ProvoznÃ­ nÃ¡klady -->
             <tr>
-              <td><strong>Provozní náklady (bez odpisů)</strong><br><span class="text-warning">{cf["overheads"]:,.0f} Kč</span></td>
-              <td><strong>Provozní náklady (bez odpisů)</strong><br><span class="text-warning">{cf["overheads"]:,.0f} Kč</span></td>
+              <td><strong>ProvoznÃ­ nÃ¡klady (bez odpisÅ¯)</strong><br><span class="text-warning">{cf["overheads"]:,.0f} KÄ</span></td>
+              <td><strong>ProvoznÃ­ nÃ¡klady (bez odpisÅ¯)</strong><br><span class="text-warning">{cf["overheads"]:,.0f} KÄ</span></td>
               <td class="text-center"><span class="text-muted">-</span></td>
             </tr>
             
-            <!-- Provozní zisk -->
+            <!-- ProvoznÃ­ zisk -->
             <tr class="table-light">
-              <td><strong>Provozní zisk</strong><br><span class="fw-bold text-info">{cf["operating_cash_profit"]:,.0f} Kč</span></td>
-              <td><strong>Provozní peněžní tok</strong><br><span class="fw-bold text-info">{cf["operating_cash_flow"]:,.0f} Kč</span></td>
+              <td><strong>ProvoznÃ­ zisk</strong><br><span class="fw-bold text-info">{cf["operating_cash_profit"]:,.0f} KÄ</span></td>
+              <td><strong>ProvoznÃ­ penÄ›Å¾nÃ­ tok</strong><br><span class="fw-bold text-info">{cf["operating_cash_flow"]:,.0f} KÄ</span></td>
               <td class="text-center fw-bold">{format_variance(cf["operating_cash_flow"] - cf["operating_cash_profit"])}</td>
             </tr>
             
-            <!-- Ostatní peněžní výdaje header -->
+            <!-- OstatnÃ­ penÄ›Å¾nÃ­ vÃ½daje header -->
             <tr class="table-secondary">
-              <td colspan="2" class="text-center"><strong>Ostatní peněžní výdaje</strong></td>
+              <td colspan="2" class="text-center"><strong>OstatnÃ­ penÄ›Å¾nÃ­ vÃ½daje</strong></td>
               <td></td>
             </tr>
             
-            <!-- Úroky -->
+            <!-- Ãšroky -->
             <tr>
-              <td><strong>Nákladové úroky</strong><br><span class="text-danger">-{cf["interest"]:,.0f} Kč</span></td>
-              <td><strong>Zaplacené úroky</strong><br><span class="text-danger">-{cf["interest"]:,.0f} Kč</span></td>
+              <td><strong>NÃ¡kladovÃ© Ãºroky</strong><br><span class="text-danger">-{cf["interest"]:,.0f} KÄ</span></td>
+              <td><strong>ZaplacenÃ© Ãºroky</strong><br><span class="text-danger">-{cf["interest"]:,.0f} KÄ</span></td>
               <td class="text-center"><span class="text-muted">-</span></td>
             </tr>
             
-            <!-- Daně -->
+            <!-- DanÄ› -->
             <tr>
-              <td><strong>Daň z příjmů</strong>
-                <span data-bs-toggle="tooltip" title="Účetní daň z příjmů podle § 59 zákona o účetnictví - splatná i odložená daň">❓</span>
-                <br><span class="text-danger">{cf["taxation"]:,.0f} Kč</span></td>
-              <td><strong>Zaplacená daň z příjmů</strong>
-                <span data-bs-toggle="tooltip" title="Skutečně zaplacená daň z příjmů na účet finančního úřadu">❓</span>
-                <br><span class="text-danger">{cf["taxation"]:,.0f} Kč</span></td>
+              <td><strong>DaÅˆ z pÅ™Ã­jmÅ¯</strong>
+                <span data-bs-toggle="tooltip" title="ÃšÄetnÃ­ daÅˆ z pÅ™Ã­jmÅ¯ podle Â§ 59 zÃ¡kona o ÃºÄetnictvÃ­ - splatnÃ¡ i odloÅ¾enÃ¡ daÅˆ">â“</span>
+                <br><span class="text-danger">{cf["taxation"]:,.0f} KÄ</span></td>
+              <td><strong>ZaplacenÃ¡ daÅˆ z pÅ™Ã­jmÅ¯</strong>
+                <span data-bs-toggle="tooltip" title="SkuteÄnÄ› zaplacenÃ¡ daÅˆ z pÅ™Ã­jmÅ¯ na ÃºÄet finanÄnÃ­ho ÃºÅ™adu">â“</span>
+                <br><span class="text-danger">{cf["taxation"]:,.0f} KÄ</span></td>
               <td class="text-center"><span class="text-muted">-</span></td>
             </tr>
             
-            <!-- Mimořádné výnosy -->
+            <!-- MimoÅ™Ã¡dnÃ© vÃ½nosy -->
             <tr>
-              <td><strong>Mimořádné výnosy</strong><br><span class="text-success">+{cf["extraordinary"]:,.0f} Kč</span></td>
-              <td><strong>Mimořádné příjmy</strong><br><span class="text-success">+{cf["extraordinary"]:,.0f} Kč</span></td>
+              <td><strong>MimoÅ™Ã¡dnÃ© vÃ½nosy</strong><br><span class="text-success">+{cf["extraordinary"]:,.0f} KÄ</span></td>
+              <td><strong>MimoÅ™Ã¡dnÃ© pÅ™Ã­jmy</strong><br><span class="text-success">+{cf["extraordinary"]:,.0f} KÄ</span></td>
               <td class="text-center"><span class="text-muted">-</span></td>
             </tr>
             
-            <!-- Podíly na zisku/Dividendy -->
+            <!-- PodÃ­ly na zisku/Dividendy -->
             <tr>
-              <td><strong>Podíly na zisku/Dividendy</strong><br><span class="text-danger">{cf["dividends"]:,.0f} Kč</span></td>
-              <td><strong>Vyplacené podíly/Dividendy</strong><br><span class="text-danger">{cf["dividends"]:,.0f} Kč</span></td>
+              <td><strong>PodÃ­ly na zisku/Dividendy</strong><br><span class="text-danger">{cf["dividends"]:,.0f} KÄ</span></td>
+              <td><strong>VyplacenÃ© podÃ­ly/Dividendy</strong><br><span class="text-danger">{cf["dividends"]:,.0f} KÄ</span></td>
               <td class="text-center"><span class="text-muted">-</span></td>
             </tr>
             
             <!-- Odpisy -->
             <tr>
-              <td><strong>Odpisy dlouhodobého majetku</strong>
-                <span data-bs-toggle="tooltip" title="Účetní odpisy podle § 56 zákona o účetnictví - vyjadřují opotřebení majetku, nejedná se o peněžní výdaj">❓</span>
-                <br><span class="text-warning">-{cf["depreciation"]:,.0f} Kč</span></td>
-              <td><strong>Pořízení dlouhodobého majetku</strong>
-                <span data-bs-toggle="tooltip" title="Skutečné peněžní výdaje na nákup dlouhodobého majetku (budovy, stroje, vybavení)">❓</span>
-                <br><span class="text-danger">-{cf["fixed_assets"]:,.0f} Kč</span></td>
+              <td><strong>Odpisy dlouhodobÃ©ho majetku</strong>
+                <span data-bs-toggle="tooltip" title="ÃšÄetnÃ­ odpisy podle Â§ 56 zÃ¡kona o ÃºÄetnictvÃ­ - vyjadÅ™ujÃ­ opotÅ™ebenÃ­ majetku, nejednÃ¡ se o penÄ›Å¾nÃ­ vÃ½daj">â“</span>
+                <br><span class="text-warning">-{cf["depreciation"]:,.0f} KÄ</span></td>
+              <td><strong>PoÅ™Ã­zenÃ­ dlouhodobÃ©ho majetku</strong>
+                <span data-bs-toggle="tooltip" title="SkuteÄnÃ© penÄ›Å¾nÃ­ vÃ½daje na nÃ¡kup dlouhodobÃ©ho majetku (budovy, stroje, vybavenÃ­)">â“</span>
+                <br><span class="text-danger">-{cf["fixed_assets"]:,.0f} KÄ</span></td>
               <td class="text-center">{format_variance(-cf["fixed_assets"] + cf["depreciation"])}</td>
             </tr>
             
-            <!-- Ostatní aktiva -->
+            <!-- OstatnÃ­ aktiva -->
             <tr>
               <td></td>
-              <td><strong>Nárůst ostatních aktiv</strong><br><span class="text-danger">-{cf["other_assets"]:,.0f} Kč</span></td>
+              <td><strong>NÃ¡rÅ¯st ostatnÃ­ch aktiv</strong><br><span class="text-danger">-{cf["other_assets"]:,.0f} KÄ</span></td>
               <td class="text-center">{format_variance(-cf["other_assets"])}</td>
             </tr>
             
-            <!-- Výběr kapitálu -->
+            <!-- VÃ½bÄ›r kapitÃ¡lu -->
             <tr>
               <td></td>
-              <td><strong>Výběr základního kapitálu</strong><br><span class="text-danger">-{cf["capital_withdrawn"]:,.0f} Kč</span></td>
+              <td><strong>VÃ½bÄ›r zÃ¡kladnÃ­ho kapitÃ¡lu</strong><br><span class="text-danger">-{cf["capital_withdrawn"]:,.0f} KÄ</span></td>
               <td class="text-center">{format_variance(-cf["capital_withdrawn"])}</td>
             </tr>
             
-            <!-- Celkové součty -->
+            <!-- CelkovÃ© souÄty -->
             <tr class="table-dark">
-              <td><strong>Zisk po zdanění (nerozdělený)</strong>
-                <span data-bs-toggle="tooltip" title="Účetní výsledek hospodaření po zdanění - zisk, který může být reinvestován nebo vyplacen akcionářům">❓</span>
-                <br><span class="fw-bold text-light">{cf["retained_profit"]:,.0f} Kč</span></td>
-              <td><strong>Čistý peněžní tok</strong>
-                <span data-bs-toggle="tooltip" title="Skutečná změna hotovosti za období - rozdíl mezi všemi příjmy a výdaji">❓</span>
-                <br><span class="fw-bold text-light">{cf["net_cash_flow"]:,.0f} Kč</span></td>
+              <td><strong>Zisk po zdanÄ›nÃ­ (nerozdÄ›lenÃ½)</strong>
+                <span data-bs-toggle="tooltip" title="ÃšÄetnÃ­ vÃ½sledek hospodaÅ™enÃ­ po zdanÄ›nÃ­ - zisk, kterÃ½ mÅ¯Å¾e bÃ½t reinvestovÃ¡n nebo vyplacen akcionÃ¡Å™Å¯m">â“</span>
+                <br><span class="fw-bold text-light">{cf["retained_profit"]:,.0f} KÄ</span></td>
+              <td><strong>ÄŒistÃ½ penÄ›Å¾nÃ­ tok</strong>
+                <span data-bs-toggle="tooltip" title="SkuteÄnÃ¡ zmÄ›na hotovosti za obdobÃ­ - rozdÃ­l mezi vÅ¡emi pÅ™Ã­jmy a vÃ½daji">â“</span>
+                <br><span class="fw-bold text-light">{cf["net_cash_flow"]:,.0f} KÄ</span></td>
               <td class="text-center fw-bold">{format_variance(cf["net_cash_flow"] - cf["retained_profit"])}</td>
             </tr>
           </tbody>
@@ -280,7 +280,7 @@ def api_cashflow(request, year):
     else:
         error_html = f'''
         <div class="alert alert-warning mt-3">
-          ⚠️ Analýzu Zisk vs Peněžní tok zatím nebylo možné vypočítat pro rok {year} – zkontrolujte, že máte nahrané finanční výkazy pro tento rok.
+          âš ï¸ AnalÃ½zu Zisk vs PenÄ›Å¾nÃ­ tok zatÃ­m nebylo moÅ¾nÃ© vypoÄÃ­tat pro rok {year} â€“ zkontrolujte, Å¾e mÃ¡te nahranÃ© finanÄnÃ­ vÃ½kazy pro tento rok.
         </div>
         '''
         return HttpResponse(error_html)
@@ -288,7 +288,7 @@ def api_cashflow(request, year):
 
 @csrf_exempt
 def save_chart(request):
-    """Uloží přijatý base64 PNG z frontendu do MEDIA_ROOT/charts/."""
+    """UloÅ¾Ã­ pÅ™ijatÃ½ base64 PNG z frontendu do MEDIA_ROOT/charts/."""
     if request.method == "POST":
         data = json.loads(request.body)
         image_data = data.get("image")
@@ -305,7 +305,7 @@ def save_chart(request):
         except Exception as e:
             return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
-        # 🟢 Ujisti se, že složka charts existuje
+        # ðŸŸ¢ Ujisti se, Å¾e sloÅ¾ka charts existuje
         charts_dir = os.path.join(settings.MEDIA_ROOT, "charts")
         os.makedirs(charts_dir, exist_ok=True)
 
@@ -315,7 +315,7 @@ def save_chart(request):
         with open(file_path, "wb") as f:
             f.write(image_binary)
 
-        print(f"✅ Graf uložen: {file_path}")  # volitelný log
+        print(f"âœ… Graf uloÅ¾en: {file_path}")  # volitelnÃ½ log
         return JsonResponse({"status": "ok", "file": file_path})
 
     return JsonResponse({"status": "error", "message": "invalid method"}, status=405)
@@ -323,17 +323,17 @@ def save_chart(request):
 
 def export_full_pdf(request):
     """
-    Vytvoří PDF, do kterého vloží všechny PNG grafy z MEDIA_ROOT
+    VytvoÅ™Ã­ PDF, do kterÃ©ho vloÅ¾Ã­ vÅ¡echny PNG grafy z MEDIA_ROOT
     """
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     elements = []
     styles = getSampleStyleSheet()
 
-    elements.append(Paragraph("📊 Financial Dashboard", styles["Title"]))
+    elements.append(Paragraph("ðŸ“Š Financial Dashboard", styles["Title"]))
     elements.append(Spacer(1, 12))
 
-    # projdi všechny chart_*.png v MEDIA_ROOT
+    # projdi vÅ¡echny chart_*.png v MEDIA_ROOT
     for fname in sorted(os.listdir(settings.MEDIA_ROOT)):
         if fname.startswith("chart_") and fname.endswith(".png"):
             chart_path = os.path.join(settings.MEDIA_ROOT, fname)
@@ -344,3 +344,153 @@ def export_full_pdf(request):
     buffer.seek(0)
 
     return FileResponse(buffer, as_attachment=True, filename="financial_dashboard.pdf")
+
+
+def api_metrics_series(request):
+    """
+    VrÃ¡tÃ­ ÄasovÃ© Å™ady klÃ­ÄovÃ½ch metrik a YoY rÅ¯sty pro pÅ™ihlÃ¡Å¡enÃ©ho uÅ¾ivatele.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({
+            "success": False,
+            "error": {"code": "UNAUTHORIZED", "message": "PÅ™ihlaste se."}
+        }, status=401)
+
+    statements = FinancialStatement.objects.filter(owner=request.user).order_by("year")
+    rows = []
+    for s in statements:
+        d = s.data or {}
+        revenue = float(d.get("Revenue", 0))
+        cogs = float(d.get("COGS", 0))
+        overheads = float(d.get("Overheads", 0))
+        depreciation = float(d.get("Depreciation", 0))
+        ebit = float(d.get("EBIT", (revenue - cogs - overheads - depreciation)))
+        net_profit = float(d.get("NetProfit", (revenue - cogs - overheads - depreciation)))
+        rows.append({
+            "year": int(s.year),
+            "revenue": revenue,
+            "cogs": cogs,
+            "overheads": overheads,
+            "ebit": ebit,
+            "net_profit": net_profit,
+        })
+
+    rows = sorted(rows, key=lambda r: r["year"])
+    years = [r["year"] for r in rows]
+
+    margins = []
+    for r in rows:
+        rev = r["revenue"]
+        gm = (r["revenue"] - r["cogs"]) if rev else 0
+        op = (r["revenue"] - r["cogs"] - r["overheads"]) if rev else 0
+        np = r["net_profit"]
+        margins.append({
+            "year": r["year"],
+            "gm_pct": (gm / rev * 100) if rev else 0.0,
+            "op_pct": (op / rev * 100) if rev else 0.0,
+            "np_pct": (np / rev * 100) if rev else 0.0,
+        })
+
+    yoy = []
+    for i, r in enumerate(rows):
+        if i == 0:
+            yoy.append({
+                "year": r["year"],
+                "revenue_yoy": None,
+                "cogs_yoy": None,
+                "overheads_yoy": None,
+                "net_profit_yoy": None,
+                "ebit_yoy": None,
+            })
+        else:
+            p = rows[i-1]
+            def growth(cur, prev):
+                try:
+                    if prev and prev != 0:
+                        return (cur - prev) / abs(prev) * 100.0
+                except Exception:
+                    pass
+                return None
+            yoy.append({
+                "year": r["year"],
+                "revenue_yoy": growth(r["revenue"], p["revenue"]),
+                "cogs_yoy": growth(r["cogs"], p["cogs"]),
+                "overheads_yoy": growth(r["overheads"], p["overheads"]),
+                "net_profit_yoy": growth(r["net_profit"], p["net_profit"]),
+                "ebit_yoy": growth(r["ebit"], p["ebit"]),
+            })
+
+    return JsonResponse({
+        "success": True,
+        "years": years,
+        "series": rows,
+        "margins": margins,
+        "yoy": yoy,
+    })
+
+@login_required
+def api_profitability(request):
+    """Vrací přehled ziskovosti (náhrada za templates/dashboard/profitability.html)."""
+    statements = FinancialStatement.objects.filter(owner=request.user).order_by("year")
+    rows = []
+    for stmt in statements:
+        data = stmt.data or {}
+        revenue = float(data.get("Revenue", 0))
+        cogs = float(data.get("COGS", 0))
+        overheads = float(data.get("Overheads", 0))
+        depreciation = float(data.get("Depreciation", 0))
+        gross_margin = float(data.get("GrossMargin", revenue - cogs))
+        ebit = float(data.get("EBIT", revenue - cogs - overheads - depreciation))
+        net_profit = float(data.get("NetProfit", revenue - cogs - overheads - depreciation))
+
+        gm_pct = (gross_margin / revenue * 100) if revenue else 0.0
+        op_pct = (ebit / revenue * 100) if revenue else 0.0
+        np_pct = (net_profit / revenue * 100) if revenue else 0.0
+
+        rows.append({
+            "year": stmt.year,
+            "revenue": revenue,
+            "cogs": cogs,
+            "gross_margin": gross_margin,
+            "overheads": overheads,
+            "ebit": ebit,
+            "net_profit": net_profit,
+            "gm_pct": gm_pct,
+            "op_pct": op_pct,
+            "np_pct": np_pct,
+        })
+
+    return JsonResponse({"success": True, "rows": rows})
+
+
+@login_required
+def api_cashflow_summary(request):
+    """
+    Vrací souhrn pro stránku cashflow:
+    - seznam dostupných roků
+    - detailní výpočet pro vybraný rok (výchozí poslední dostupný nebo ?year=)
+    """
+    years = list(
+        FinancialStatement.objects.filter(owner=request.user)
+        .values_list("year", flat=True)
+        .order_by("year")
+    )
+    if not years:
+        return JsonResponse({"success": True, "years": [], "current_year": None, "cashflow": None})
+
+    try:
+        selected_year = int(request.GET.get("year", years[-1]))
+    except (TypeError, ValueError):
+        selected_year = years[-1]
+
+    if selected_year not in years:
+        selected_year = years[-1]
+
+    cf = calculate_cashflow(request.user, selected_year) or {}
+
+    return JsonResponse({
+        "success": True,
+        "years": years,
+        "current_year": selected_year,
+        "cashflow": cf,
+    })

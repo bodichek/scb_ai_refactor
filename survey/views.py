@@ -2,9 +2,12 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Avg
+from django.http import JsonResponse, HttpResponseBadRequest
+from django.views.decorators.http import require_http_methods
 from .models import Response, SurveySubmission
 from openai import OpenAI
 from django.conf import settings
+import json
 
 # ✅ OpenAI klient
 client = OpenAI(api_key=getattr(settings, "OPENAI_API_KEY", None))
@@ -345,3 +348,121 @@ def survey_detail(request, batch_id):
         "chart_labels": chart_labels,
         "chart_data": chart_data,
     })
+
+
+# ---- API endpoints for SPA frontend ----
+
+def _serialize_submission(submission: SurveySubmission, include_items: bool = False):
+    avg_score = submission.responses.aggregate(avg=Avg("score"))["avg"]
+    data = {
+        "batch_id": str(submission.batch_id),
+        "created_at": submission.created_at.isoformat(),
+        "ai_response": submission.ai_response,
+        "avg_score": round(avg_score, 1) if avg_score is not None else None,
+    }
+    if include_items:
+        items = []
+        for r in submission.responses.all():
+            label_text = None
+            for q in QUESTIONS:
+                if q["question"] == r.question:
+                    for score_range, text in q["labels"].items():
+                        low, high = map(int, score_range.split("-"))
+                        if low <= r.score <= high:
+                            label_text = text
+                            break
+                    break
+            items.append({
+                "question": r.question,
+                "score": r.score,
+                "label": label_text,
+            })
+        data["items"] = items
+    return data
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def questionnaire_api(request):
+    """
+    GET: Vrací otázky a seznam odeslaných dotazníků.
+    POST: Uloží nové odpovědi, vygeneruje AI shrnutí a vrátí batch_id.
+    """
+    if request.method == "GET":
+        submissions = [
+            _serialize_submission(s)
+            for s in SurveySubmission.objects.filter(user=request.user).order_by("-created_at")
+        ]
+        return JsonResponse({
+            "questions": QUESTIONS,
+            "submissions": submissions,
+        })
+
+    # POST
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except json.JSONDecodeError:
+        return HttpResponseBadRequest("Invalid JSON body.")
+
+    answers = payload.get("answers")
+    if not isinstance(answers, list) or len(answers) != len(QUESTIONS):
+        return HttpResponseBadRequest("Odpovědi nejsou ve správném formátu.")
+
+    with transaction.atomic():
+        submission = SurveySubmission.objects.create(user=request.user)
+        for idx, question in enumerate(QUESTIONS):
+            value = answers[idx]
+            try:
+                score = int(value)
+            except (TypeError, ValueError):
+                score = 0
+            Response.objects.create(
+                user=request.user,
+                submission=submission,
+                question=question["question"],
+                score=score,
+            )
+
+    generate_ai_summary(submission)
+
+    return JsonResponse({
+        "success": True,
+        "submission": _serialize_submission(submission),
+    }, status=201)
+
+
+@login_required
+def latest_submission_api(request):
+    """Vrací poslední odeslaný dotazník."""
+    submission = SurveySubmission.objects.filter(user=request.user).order_by("-created_at").first()
+    if not submission:
+        return JsonResponse({"submission": None})
+    return JsonResponse({"submission": _serialize_submission(submission, include_items=True)})
+
+
+@login_required
+def submissions_api(request):
+    """Vrací seznam odeslaných dotazníků."""
+    submissions = [
+        _serialize_submission(s)
+        for s in SurveySubmission.objects.filter(user=request.user).order_by("-created_at")
+    ]
+    return JsonResponse({"submissions": submissions})
+
+
+@login_required
+def submission_detail_api(request, batch_id):
+    submission = get_object_or_404(SurveySubmission, user=request.user, batch_id=batch_id)
+    data = _serialize_submission(submission, include_items=True)
+
+    history = SurveySubmission.objects.filter(user=request.user).order_by("created_at").prefetch_related("responses")
+    chart = []
+    for s in history:
+        count = s.responses.count() or 1
+        avg = sum(r.score for r in s.responses.all()) / count
+        chart.append({
+            "label": s.created_at.strftime("%d.%m.%Y"),
+            "value": round(avg, 2),
+        })
+
+    return JsonResponse({"submission": data, "history": chart})
