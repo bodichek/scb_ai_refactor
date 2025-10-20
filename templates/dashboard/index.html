@@ -1,659 +1,712 @@
 {% extends "base.html" %}
+
+{% block extra_head %}
+  <script>
+    tailwind.config = {
+      corePlugins: {
+        preflight: false,
+      },
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script>
+    const rows = JSON.parse('{{ rows|escapejs }}');
+    const years = JSON.parse('{{ years|escapejs }}');
+    const chartSeries = JSON.parse('{{ chart_series|escapejs }}');
+    const scoreHistoryData = JSON.parse('{{ score_history|default:"[]"|escapejs }}');
+
+    let profitStoryChart, profitabilityTrendsChart, revCogsGrowthChart, revOverheadsGrowthChart, allMetricsChart;
+
+    function getSelectedYears() {
+      const selected = Array.from(document.querySelectorAll('.year-filter:checked')).map((cb) => parseInt(cb.value, 10));
+      if (!selected.length) {
+        return years.slice();
+      }
+      return selected;
+    }
+
+    function filterRowsByYears(selectedYears) {
+      return rows.filter((row) => selectedYears.includes(row.year));
+    }
+
+    function destroyIfExists(chart) {
+      if (chart && typeof chart.destroy === 'function') {
+        chart.destroy();
+      }
+    }
+
+    function renderCharts() {
+      const selectedYears = getSelectedYears();
+      const dataRows = filterRowsByYears(selectedYears);
+      const labels = dataRows.map((row) => row.year);
+
+      // Profit Story
+      destroyIfExists(profitStoryChart);
+      profitStoryChart = new Chart(document.getElementById('profitStoryChart'), {
+        type: 'bar',
+        data: {
+          labels: ['Tržby', 'Náklady na prodané zboží', 'Hrubá marže', 'Provozní náklady', 'EBIT', 'Čistý zisk'],
+          datasets: dataRows.map((row, idx) => ({
+            label: row.year,
+            data: [row.revenue, row.cogs, row.gross_margin, row.overheads, row.ebit, row.net_profit],
+            backgroundColor: `hsl(${(idx * 70) % 360}, 70%, 54%)`,
+            borderRadius: 12,
+            maxBarThickness: 40,
+          })),
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (item) => `${item.label}: ${Number(item.parsed.y).toLocaleString('cs-CZ')} Kč`,
+              },
+            },
+            legend: { position: 'top', labels: { usePointStyle: true } },
+          },
+          scales: {
+            y: {
+              ticks: {
+                callback: (value) => Number(value).toLocaleString('cs-CZ'),
+              },
+            },
+          },
+        },
+      });
+      window.profitStoryChart = profitStoryChart;
+
+      // Profitability Trends
+      destroyIfExists(profitabilityTrendsChart);
+      profitabilityTrendsChart = new Chart(document.getElementById('profitabilityTrendsChart'), {
+        type: 'bar',
+        data: {
+          labels: ['Hrubá marže %', 'Provozní marže %', 'Čistá marže %'],
+          datasets: dataRows.map((row, idx) => ({
+            label: row.year,
+            data: [row.profitability.gm_pct, row.profitability.op_pct, row.profitability.np_pct],
+            backgroundColor: `hsl(${(idx * 70) % 360}, 70%, 54%)`,
+            borderRadius: 12,
+            maxBarThickness: 40,
+          })),
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: { display: false },
+            tooltip: { callbacks: { label: (item) => `${item.label}: ${item.formattedValue}%` } },
+            legend: { position: 'top', labels: { usePointStyle: true } },
+          },
+          scales: {
+            y: { ticks: { callback: (value) => `${value}%` } },
+          },
+        },
+      });
+      window.profitabilityTrendsChart = profitabilityTrendsChart;
+
+      // Revenue vs COGS growth
+      const revGrowth = dataRows.map((row) => row.growth.revenue);
+      const cogsGrowth = dataRows.map((row) => row.growth.cogs);
+      destroyIfExists(revCogsGrowthChart);
+      revCogsGrowthChart = new Chart(document.getElementById('revCogsGrowthChart'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Růst tržeb (%)', data: revGrowth, backgroundColor: 'rgba(59,130,246,0.75)', borderRadius: 10, maxBarThickness: 42 },
+            { label: 'Růst nákladů na prodané zboží (%)', data: cogsGrowth, backgroundColor: 'rgba(248,113,113,0.75)', borderRadius: 10, maxBarThickness: 42 },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: { display: false },
+            tooltip: { callbacks: { label: (item) => `${item.dataset.label}: ${item.formattedValue}%` } },
+            legend: { position: 'top', labels: { usePointStyle: true } },
+          },
+          scales: { y: { ticks: { callback: (value) => `${value}%` } } },
+        },
+      });
+      window.revCogsGrowthChart = revCogsGrowthChart;
+
+      // Revenue vs overheads growth
+      const overheadGrowth = dataRows.map((row) => row.growth.overheads);
+      destroyIfExists(revOverheadsGrowthChart);
+      revOverheadsGrowthChart = new Chart(document.getElementById('revOverheadsGrowthChart'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Růst tržeb (%)', data: revGrowth, backgroundColor: 'rgba(14,116,144,0.75)', borderRadius: 10, maxBarThickness: 42 },
+            { label: 'Růst provozních nákladů (%)', data: overheadGrowth, backgroundColor: 'rgba(250,204,21,0.75)', borderRadius: 10, maxBarThickness: 42 },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: { display: false },
+            tooltip: { callbacks: { label: (item) => `${item.dataset.label}: ${item.formattedValue}%` } },
+            legend: { position: 'top', labels: { usePointStyle: true } },
+          },
+          scales: { y: { ticks: { callback: (value) => `${value}%` } } },
+        },
+      });
+      window.revOverheadsGrowthChart = revOverheadsGrowthChart;
+
+      // All metrics chart
+      destroyIfExists(allMetricsChart);
+      allMetricsChart = new Chart(document.getElementById('allMetricsChart'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Tržby', data: dataRows.map((r) => r.revenue), borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
+            { label: 'COGS', data: dataRows.map((r) => r.cogs), borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
+            { label: 'Hrubá marže', data: dataRows.map((r) => r.gross_margin), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
+            { label: 'Provozní náklady', data: dataRows.map((r) => r.overheads), borderColor: '#facc15', backgroundColor: 'rgba(250,204,21,0.18)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
+            { label: 'EBIT', data: dataRows.map((r) => r.ebit), borderColor: '#a855f7', backgroundColor: 'rgba(168,85,247,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
+            { label: 'Čistý zisk', data: dataRows.map((r) => r.net_profit), borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: { display: false },
+            tooltip: { callbacks: { label: (item) => `${item.dataset.label}: ${Number(item.parsed.y).toLocaleString('cs-CZ')} Kč` } },
+            legend: { position: 'top', labels: { usePointStyle: true } },
+          },
+          scales: {
+            y: {
+              ticks: {
+                callback: (value) => Number(value).toLocaleString('cs-CZ') + ' Kč',
+              },
+            },
+          },
+        },
+      });
+      window.allMetricsChart = allMetricsChart;
+    }
+
+    function renderSparkline() {
+      const spark = document.getElementById('scoreSparkline');
+      if (!spark || !scoreHistoryData.length) return;
+      const sparkChart = new Chart(spark, {
+        type: 'line',
+        data: {
+          labels: scoreHistoryData.map((item) => item.label),
+          datasets: [{
+            data: scoreHistoryData.map((item) => item.value),
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99,102,241,0.18)',
+            tension: 0.4,
+            borderWidth: 2,
+            fill: true,
+            pointRadius: 2,
+          }],
+        },
+        options: {
+          plugins: { legend: { display: false }, tooltip: { enabled: false } },
+          scales: { x: { display: false }, y: { display: false } },
+          maintainAspectRatio: false,
+        },
+      });
+      window.scoreSparklineChart = sparkChart;
+    }
+
+    function renderMetricTrendChart() {
+      const ctx = document.getElementById('metricsTrendChart');
+      if (!ctx || !chartSeries.labels || !chartSeries.labels.length) return;
+      window.metricsTrendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: chartSeries.labels,
+          datasets: [
+            {
+              label: 'Tržby',
+              data: chartSeries.revenue,
+              borderColor: '#0a58f5',
+              backgroundColor: 'rgba(10, 88, 245, 0.15)',
+              tension: 0.35,
+              borderWidth: 3,
+              fill: true,
+              pointRadius: 3,
+            },
+            {
+              label: 'Čistý zisk',
+              data: chartSeries.net_profit,
+              borderColor: '#22c55e',
+              backgroundColor: 'rgba(34, 197, 94, 0.15)',
+              tension: 0.35,
+              borderWidth: 3,
+              fill: true,
+              pointRadius: 3,
+            },
+            {
+              label: 'EBIT',
+              data: chartSeries.ebit,
+              borderColor: '#f97316',
+              backgroundColor: 'rgba(249, 115, 22, 0.15)',
+              tension: 0.35,
+              borderWidth: 3,
+              fill: true,
+              pointRadius: 3,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', labels: { usePointStyle: true } },
+            tooltip: {
+              callbacks: {
+                label: (context) => `${context.dataset.label}: ${Number(context.parsed.y || 0).toLocaleString('cs-CZ')} Kč`,
+              },
+            },
+          },
+          scales: {
+            y: { ticks: { callback: (value) => Number(value).toLocaleString('cs-CZ') + ' Kč' } },
+          },
+        },
+      });
+    }
+
+    function getCookie(name) {
+      const cookies = document.cookie ? document.cookie.split(';') : [];
+      for (let i = 0; i < cookies.length; i += 1) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === `${name}=`) {
+          return decodeURIComponent(cookie.substring(name.length + 1));
+        }
+      }
+      return null;
+    }
+
+    async function saveChartAsImage(chart, chartId) {
+      if (!chart || typeof chart.toBase64Image !== 'function') {
+        return;
+      }
+      const dataUrl = chart.toBase64Image('image/png', 1);
+      if (!dataUrl || dataUrl.length < 100) {
+        return;
+      }
+      try {
+        const response = await fetch('{% url "dashboard:save_chart" %}', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+          },
+          body: JSON.stringify({ image: dataUrl, chart_id: chartId }),
+        });
+        const payload = await response.json();
+        if (payload.status !== 'ok') {
+          console.warn('Nepodařilo se uložit graf:', chartId, payload);
+        }
+      } catch (error) {
+        console.error('Chyba při ukládání grafu', chartId, error);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+
+    async function saveAllCharts() {
+      const charts = [
+        { chart: window.profitStoryChart, id: 'profit_story' },
+        { chart: window.profitabilityTrendsChart, id: 'profitability_trends' },
+        { chart: window.revCogsGrowthChart, id: 'rev_cogs_growth' },
+        { chart: window.revOverheadsGrowthChart, id: 'rev_overheads_growth' },
+        { chart: window.allMetricsChart, id: 'all_metrics' },
+        { chart: window.metricsTrendChart, id: 'metrics_trend' },
+      ];
+      for (const cfg of charts) {
+        await saveChartAsImage(cfg.chart, cfg.id);
+      }
+    }
+
+    async function loadCashflowForYear(year) {
+      const container = document.getElementById('cashflow-content');
+      if (!container || !year) {
+        return;
+      }
+      container.innerHTML = '<div class="py-6 text-sm text-slate-500 text-center">Načítáme peněžní tok…</div>';
+      try {
+        const response = await fetch(`/dashboard/api/cashflow/${year}/`);
+        if (!response.ok) {
+          throw new Error('response not ok');
+        }
+        const html = await response.text();
+        container.innerHTML = html;
+        if (window.bootstrap) {
+          const tooltips = [].slice.call(container.querySelectorAll('[data-bs-toggle="tooltip"]'));
+          tooltips.map((el) => new bootstrap.Tooltip(el));
+        }
+      } catch (error) {
+        console.error('Chyba při načítání cashflow', error);
+        container.innerHTML = '<div class="py-6 text-sm text-rose-600 text-center">Nepodařilo se načíst cashflow data. Zkus to prosím znovu.</div>';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      renderCharts();
+      renderSparkline();
+      renderMetricTrendChart();
+
+      document.querySelectorAll('.year-filter').forEach((cb) => {
+        cb.addEventListener('change', renderCharts);
+      });
+
+      if (window.bootstrap) {
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map((tooltipTriggerEl) => new bootstrap.Tooltip(tooltipTriggerEl));
+      }
+
+      const contactForm = document.getElementById('coachContactForm');
+      if (contactForm) {
+        const messageInput = document.getElementById('coachMessage');
+        const statusEl = document.getElementById('coachContactStatus');
+        const setContactStatus = (text, tone = 'info') => {
+          statusEl.textContent = text;
+          statusEl.classList.remove('text-slate-500', 'text-emerald-600', 'text-rose-600', 'text-amber-600');
+          if (tone === 'success') {
+            statusEl.classList.add('text-emerald-600');
+          } else if (tone === 'error') {
+            statusEl.classList.add('text-rose-600');
+          } else if (tone === 'warning') {
+            statusEl.classList.add('text-amber-600');
+          } else {
+            statusEl.classList.add('text-slate-500');
+          }
+        };
+        contactForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const message = (messageInput?.value || '').trim();
+          if (!message) {
+            setContactStatus('Napiš stručně, s čím potřebuješ pomoct.', 'warning');
+            return;
+          }
+          setContactStatus('Posílám dotaz koučovi…', 'info');
+          try {
+            const response = await fetch('{% url "dashboard:ask_coach" %}', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+              },
+              body: JSON.stringify({ message }),
+            });
+            const data = await response.json();
+            if (!data.success) {
+              throw new Error(data.error || 'Chyba při odeslání');
+            }
+            setContactStatus(data.reply || 'Zpráva byla odeslána.', 'success');
+            messageInput.value = '';
+          } catch (error) {
+            setContactStatus('Nepodařilo se odeslat dotaz. Zkus to prosím znovu.', 'error');
+            console.error(error);
+          }
+        });
+      }
+
+      const exportBtn = document.getElementById('chart-export-trigger');
+      const exportStatus = document.getElementById('chart-export-status');
+      const setStatus = (text, tone = 'info') => {
+        if (exportStatus) {
+          exportStatus.textContent = text;
+          exportStatus.dataset.statusTone = tone;
+        }
+      };
+
+      if (exportBtn) {
+        exportBtn.addEventListener('click', async () => {
+          if (exportBtn.dataset.busy === '1') {
+            return;
+          }
+          exportBtn.dataset.busy = '1';
+          exportBtn.classList.add('is-busy');
+          exportBtn.setAttribute('aria-disabled', 'true');
+          const originalLabel = exportBtn.innerHTML;
+          exportBtn.innerHTML = '⏳ Připravuji grafy…';
+          setStatus('Grafy ukládáme. Po dokončení otevřeme export.', 'info');
+          await saveAllCharts();
+          exportBtn.innerHTML = '✅ Grafy připraveny';
+          setStatus('Grafy jsou uložené, pokračuj na export PDF.', 'success');
+          setTimeout(() => {
+            exportBtn.dataset.busy = '0';
+            exportBtn.classList.remove('is-busy');
+            exportBtn.removeAttribute('aria-disabled');
+            exportBtn.innerHTML = originalLabel;
+            window.location.href = '{% url "exports:export_form" %}';
+          }, 900);
+        });
+      }
+
+      const cashflowSelect = document.getElementById('cashflow-year-select');
+      if (cashflowSelect) {
+        cashflowSelect.addEventListener('change', (event) => loadCashflowForYear(event.target.value));
+        if (cashflowSelect.value) {
+          loadCashflowForYear(cashflowSelect.value);
+        }
+      }
+    });
+  </script>
+{% endblock %}
+
 {% block content %}
-<div class="section-shell dashboard-page">
-  <section class="scb-panel scb-panel--intro">
-    <div class="page-heading">
-      <span class="page-eyebrow">Finanční přehled</span>
-      <h2 class="page-title">📊 Dashboard</h2>
-      <p class="page-subtitle">
-        Sledujte klíčové metriky firmy, porovnávejte období a mějte růst i ziskovost pod kontrolou v moderním rozhraní.
-      </p>
-    </div>
-    <div class="scb-filter-group">
-      <p class="filter-title">Vyber roky</p>
-      <div class="scb-chip-set">
-        {% for r in table_rows %}
-        <label class="scb-chip">
-          <input type="checkbox" class="year-filter" value="{{ r.year }}" checked>
-          <span>{{ r.year }}</span>
-        </label>
-        {% endfor %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 py-10">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+    <header class="flex flex-col md:flex-row md:items-baseline md:justify-between gap-4">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Dashboard</p>
+        <h1 class="text-3xl font-bold text-slate-900">Finanční cockpit</h1>
+        <p class="text-sm text-slate-500 mt-2">Souhrn zdraví firmy, doporučení a nástroje pro rychlý kontakt s koučem.</p>
       </div>
-    </div>
-    <div class="dashboard-actions">
-      <button type="button" class="scb-btn scb-btn-primary" id="chart-export-trigger">
-        📥 Připravit grafy pro export
-      </button>
-      <span class="dashboard-actions__hint" id="chart-export-status">Ulož grafy a pokračuj na export PDF.</span>
-      <a href="{% url 'exports:export_form' %}" class="scb-btn scb-btn-ghost">📝 Otevřít export PDF</a>
-    </div>
-  </section>
-
-  <section class="scb-panel scb-panel--charts">
-    <div class="chart-grid chart-grid--compact">
-      <article class="chart-card chart-card--compact">
-        <h3>Váš příběh zisku</h3>
-        <div class="chart-card__canvas">
-          <canvas id="profitStoryChart"></canvas>
-        </div>
-      </article>
-
-      <article class="chart-card chart-card--compact">
-        <h3>Trend ziskovosti</h3>
-        <div class="chart-card__canvas">
-          <canvas id="profitabilityTrendsChart"></canvas>
-        </div>
-      </article>
-
-      <article class="chart-card chart-card--compact">
-        <h3>Růst tržeb vs. růst nákladů na prodané zboží</h3>
-        <div class="chart-card__canvas">
-          <canvas id="revCogsGrowthChart"></canvas>
-        </div>
-      </article>
-
-      <article class="chart-card chart-card--compact">
-        <h3>Růst tržeb vs. růst provozních nákladů</h3>
-        <div class="chart-card__canvas">
-          <canvas id="revOverheadsGrowthChart"></canvas>
-        </div>
-      </article>
-    </div>
-  </section>
-
-  <section class="scb-panel scb-panel--table">
-    <div class="scb-panel-header">
-      <h3>📑 Přehled dat</h3>
-      <p class="panel-subtitle">Kompletní tabulka ukazatelů pro rychlou orientaci v jednotlivých rocích.</p>
-    </div>
-    <div class="scb-table-scroll">
-      <table class="table scb-data-table align-middle text-center">
-        <thead class="table-light">
-          <tr>
-            <th>
-              Rok
-              <span data-bs-toggle="tooltip" title="Rok, ke kterému se vztahují finanční výsledky.">❓</span>
-            </th>
-            <th>
-              Tržby (Kč)
-              <span data-bs-toggle="tooltip" title="Celkové výnosy z prodeje zboží nebo služeb (Revenue).">❓</span>
-            </th>
-            <th>
-              Náklady na prodané zboží (Kč)
-              <span data-bs-toggle="tooltip" title="Náklady spojené přímo s výrobou nebo nákupem prodaného zboží (COGS).">❓</span>
-            </th>
-            <th>
-              Hrubá marže (Kč)
-              <span data-bs-toggle="tooltip" title="Rozdíl mezi tržbami a náklady na prodané zboží (Revenue - COGS).">❓</span>
-            </th>
-            <th>
-              Provozní náklady (Kč)
-              <span data-bs-toggle="tooltip" title="Fixní a variabilní náklady na provoz firmy (Overheads).">❓</span>
-            </th>
-            <th>
-              EBIT (Kč)
-              <span data-bs-toggle="tooltip" title="Zisk před úroky a zdaněním – ukazatel provozní výkonnosti firmy.">❓</span>
-            </th>
-            <th>
-              Čistý zisk (Kč)
-              <span data-bs-toggle="tooltip" title="Zisk po zdanění, finální hospodářský výsledek (Net Profit).">❓</span>
-            </th>
-            <th>
-              Hrubá marže %
-              <span data-bs-toggle="tooltip" title="Podíl hrubé marže na tržbách: (Hrubá marže / Tržby) × 100.">❓</span>
-            </th>
-            <th>
-              Provozní marže %
-              <span data-bs-toggle="tooltip" title="Podíl EBIT na tržbách: (EBIT / Tržby) × 100.">❓</span>
-            </th>
-            <th>
-              Čistá marže %
-              <span data-bs-toggle="tooltip" title="Podíl čistého zisku na tržbách: (Čistý zisk / Tržby) × 100.">❓</span>
-            </th>
-            <th>
-              Růst tržeb %
-              <span data-bs-toggle="tooltip" title="Meziroční změna tržeb oproti předchozímu roku.">❓</span>
-            </th>
-            <th>
-              Růst nákladů na prodané zboží %
-              <span data-bs-toggle="tooltip" title="Meziroční změna nákladů na prodané zboží.">❓</span>
-            </th>
-            <th>
-              Růst provozních nákladů %
-              <span data-bs-toggle="tooltip" title="Meziroční změna provozních nákladů.">❓</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for r in table_rows %}
-          <tr>
-            <td>{{ r.year }}</td>
-            <td>{{ r.revenue }}</td>
-            <td>{{ r.cogs }}</td>
-            <td>{{ r.gross_margin }}</td>
-            <td>{{ r.overheads }}</td>
-            <td>{{ r.ebit }}</td>
-            <td>{{ r.net_profit }}</td>
-            <td>{{ r.profitability.gm_pct|floatformat:2 }}%</td>
-            <td>{{ r.profitability.op_pct|floatformat:2 }}%</td>
-            <td>{{ r.profitability.np_pct|floatformat:2 }}%</td>
-            <td>{{ r.growth.revenue|floatformat:2 }}%</td>
-            <td>{{ r.growth.cogs|floatformat:2 }}%</td>
-            <td>{{ r.growth.overheads|floatformat:2 }}%</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <section class="scb-panel scb-panel--charts">
-    <div class="chart-card">
-      <h3>📈 Meziroční přehled</h3>
-      <div class="chart-card__canvas">
-        <canvas id="allMetricsChart"></canvas>
-      </div>
-    </div>
-  </section>
-
-  <section class="scb-panel scb-panel--inline">
-    <div class="scb-panel-header">
-      <h3 class="mb-0">
-        💰 Zisk vs Peněžní tok
-        <span class="scb-metric-bubble" data-bs-toggle="tooltip" title="Porovnání účetního zisku s reálným peněžním tokem - ukazuje rozdíl mezi účetními výsledky a skutečnou hotovostí.">❓</span>
-      </h3>
-      <div class="scb-filter-group">
-        <p class="filter-title mb-1">Vyber rok</p>
-        <select id="cashflow-year-select" class="form-select scb-select-inline" onchange="loadCashflowForYear(this.value)">
-          {% for r in table_rows %}
-          <option value="{{ r.year }}" {% if r.year == selected_year %}selected{% endif %}>{{ r.year }}</option>
-          {% endfor %}
-        </select>
-      </div>
-    </div>
-
-    <div id="cashflow-content">
-      {% if cashflow %}
-      <div class="text-center py-3">
-        <div class="spinner-border" role="status">
-          <span class="visually-hidden">Načítání...</span>
-        </div>
-      </div>
-      {% else %}
-      <div class="alert alert-warning mt-3">
-        ⚠️ Analýzu Zisk vs Peněžní tok zatím nebylo možné vypočítat – zkontrolujte, že máte nahrané finanční výkazy pro vybraný rok.
+      {% if assigned_coach %}
+      <div class="bg-white/85 border border-slate-200/70 rounded-2xl px-4 py-3 shadow-sm">
+        <p class="text-xs uppercase tracking-wide text-slate-400">Tvůj kouč</p>
+        <p class="text-sm font-semibold text-slate-800">{{ assigned_coach.user.get_full_name|default:assigned_coach }}</p>
+        <p class="text-xs text-slate-500">Připraven reagovat na dotazy</p>
       </div>
       {% endif %}
+    </header>
+
+    <div class="grid grid-cols-1 xl:grid-cols-6 gap-6">
+      <section class="xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-6">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Skóre firmy</p>
+            <p class="mt-1 text-4xl font-bold text-slate-900">{{ company_score|default:"—" }}</p>
+            <p class="text-xs text-slate-500">průměr z posledního dotazníku</p>
+          </div>
+          {% if score_trend %}{% with trend=score_trend %}
+          <div class="text-right">
+            <span class="inline-flex items-center gap-1 text-sm font-semibold {% if trend > 0 %}text-emerald-600{% elif trend < 0 %}text-rose-600{% else %}text-slate-500{% endif %}">
+              {% if trend > 0 %}▲{% elif trend < 0 %}▼{% else %}▬{% endif %}
+              {{ trend|floatformat:1 }} bodů
+            </span>
+            <p class="text-xs text-slate-400">vs. předchozí měření</p>
+          </div>
+          {% endwith %}{% endif %}
+        </div>
+        <div class="h-16">
+          <canvas id="scoreSparkline"></canvas>
+        </div>
+        <p class="text-xs text-slate-500">Sleduj trend alespoň měsíčně, aby šlo zachytit změny včas.</p>
+      </section>
+
+      <section class="xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Nálada týmu</p>
+            <h2 class="mt-2 text-2xl font-semibold {% if mood_tone == 'positive' %}text-emerald-600{% elif mood_tone == 'negative' %}text-rose-600{% else %}text-indigo-500{% endif %}">{{ mood_label }}</h2>
+          </div>
+          <span class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold {% if mood_tone == 'positive' %}bg-emerald-100 text-emerald-700{% elif mood_tone == 'negative' %}bg-rose-100 text-rose-600{% else %}bg-indigo-100 text-indigo-600{% endif %}">
+            {% if mood_tone == 'positive' %}😊{% elif mood_tone == 'negative' %}⚠️{% else %}🙂{% endif %}
+            Stav týmu
+          </span>
+        </div>
+        <p class="text-sm text-slate-600 leading-relaxed">{{ mood_description }}</p>
+        <p class="text-xs text-slate-400">Nálada se odvíjí od numerického skóre i sentimentu odpovědí.</p>
+      </section>
+
+      <section class="xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
+        <div>
+          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Doporučení kouče</p>
+          <h2 class="mt-2 text-2xl font-semibold text-slate-900">Další kroky</h2>
+        </div>
+        {% if recommendation_points %}
+        <ul class="space-y-3 text-sm text-slate-600">
+          {% for item in recommendation_points %}
+          <li class="flex items-start gap-2">
+            <span class="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-sky-500"></span>
+            <span>{{ item }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% elif coach_recommendation %}
+        <p class="text-sm text-slate-600 leading-relaxed">{{ coach_recommendation }}</p>
+        {% else %}
+        <p class="text-sm text-slate-500">Až odešleš první dotazník nebo otevřenou analýzu, zobrazíme doporučení kouče.</p>
+        {% endif %}
+      </section>
+
+      <section class="xl:col-span-4 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Meziroční vývoj</p>
+            <h2 class="mt-2 text-2xl font-semibold text-slate-900">Finanční trajektorie</h2>
+          </div>
+          <div class="flex flex-wrap items-center gap-3 dashboard-actions">
+            <button type="button" class="scb-btn scb-btn-primary" id="chart-export-trigger">📥 Připravit grafy pro export</button>
+            <span class="dashboard-actions__hint" id="chart-export-status">Připravíme grafy a přesuneme tě k exportu PDF.</span>
+          </div>
+        </div>
+        <div class="h-80">
+          <canvas id="metricsTrendChart"></canvas>
+        </div>
+      </section>
+
+      <section class="xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
+        <div>
+          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Kontaktuj kouče</p>
+          <h2 class="mt-2 text-xl font-semibold text-slate-900">Potřebuješ revizi?</h2>
+        </div>
+        <form id="coachContactForm" class="space-y-4">
+          <textarea id="coachMessage" name="message" rows="4" class="block w-full rounded-2xl border-slate-200 bg-slate-50/70 text-sm text-slate-700 placeholder:text-slate-400 focus:border-sky-500 focus:ring-sky-500" placeholder="Zeptej se kouče na konkrétní problém nebo oblast."></textarea>
+          <button type="submit" class="scb-btn scb-btn-primary w-full justify-center">✉️ Odeslat koučovi</button>
+        </form>
+        <p id="coachContactStatus" class="text-xs text-slate-500" data-tone="info">Odpověď od AI vidíš hned, kouč ji dostane do revize.</p>
+      </section>
+
+      <section class="xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
+        <div>
+          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Revize dashboardu</p>
+          <h2 class="mt-2 text-xl font-semibold text-slate-900">Poznámky kouče</h2>
+        </div>
+        {% if coach_note %}
+          <p class="text-sm text-slate-600 leading-relaxed">{{ coach_note }}</p>
+        {% elif assigned_coach %}
+          <p class="text-sm text-slate-500">Tvůj kouč zatím nepřidal poznámku. Jakmile ji doplní, objeví se tady.</p>
+        {% else %}
+          <p class="text-sm text-slate-500">Když přiřadíme kouče, zobrazíme jeho zpětnou vazbu.</p>
+        {% endif %}
+      </section>
     </div>
-  </section>
+
+    <section class="bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-4">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Volba roku</p>
+          <h2 class="mt-2 text-lg font-semibold text-slate-900">Filtrovat zobrazené roky</h2>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          {% for r in table_rows %}
+          <label class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1.5 text-sm text-slate-700 bg-slate-50/80">
+            <input type="checkbox" class="year-filter rounded border-slate-300 text-sky-600 focus:ring-sky-500" value="{{ r.year }}" checked>
+            <span>{{ r.year }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-5">
+        <h3 class="text-lg font-semibold text-slate-900">Váš příběh zisku</h3>
+        <p class="text-xs text-slate-500 mb-3">Porovnání základních položek výsledovky napříč roky.</p>
+        <div class="h-72">
+          <canvas id="profitStoryChart"></canvas>
+        </div>
+      </div>
+      <div class="bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-5">
+        <h3 class="text-lg font-semibold text-slate-900">Trend ziskovosti</h3>
+        <p class="text-xs text-slate-500 mb-3">Hrubá, provozní a čistá marže v procentech.</p>
+        <div class="h-72">
+          <canvas id="profitabilityTrendsChart"></canvas>
+        </div>
+      </div>
+      <div class="bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-5">
+        <h3 class="text-lg font-semibold text-slate-900">Růst tržeb vs. nákladů na zboží</h3>
+        <p class="text-xs text-slate-500 mb-3">Porovnání meziročních růstů tržeb a COGS.</p>
+        <div class="h-72">
+          <canvas id="revCogsGrowthChart"></canvas>
+        </div>
+      </div>
+      <div class="bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-5">
+        <h3 class="text-lg font-semibold text-slate-900">Růst tržeb vs. provozních nákladů</h3>
+        <p class="text-xs text-slate-500 mb-3">Sleduj tempo nákladů oproti růstu tržeb.</p>
+        <div class="h-72">
+          <canvas id="revOverheadsGrowthChart"></canvas>
+        </div>
+      </div>
+      <div class="lg:col-span-2 bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-5">
+        <h3 class="text-lg font-semibold text-slate-900">Meziroční vývoj hlavních metrik</h3>
+        <p class="text-xs text-slate-500 mb-3">Vývoj tržeb, nákladů a ziskovosti za zvolené roky.</p>
+        <div class="h-80">
+          <canvas id="allMetricsChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6">
+      <h3 class="text-lg font-semibold text-slate-900">📑 Přehled dat</h3>
+      <p class="text-xs text-slate-500 mb-3">Kompletní tabulka hlavních finančních ukazatelů.</p>
+      <div class="overflow-x-auto">
+        <table class="table table-bordered align-middle text-center">
+          <thead class="table-light">
+            <tr>
+              <th>Rok</th>
+              <th>Tržby (Kč)</th>
+              <th>Náklady na prodané zboží (Kč)</th>
+              <th>Hrubá marže (Kč)</th>
+              <th>Provozní náklady (Kč)</th>
+              <th>EBIT (Kč)</th>
+              <th>Čistý zisk (Kč)</th>
+              <th>Hrubá marže %</th>
+              <th>Provozní marže %</th>
+              <th>Čistá marže %</th>
+              <th>Růst tržeb %</th>
+              <th>Růst nákladů na prodané zboží %</th>
+              <th>Růst provozních nákladů %</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in table_rows %}
+            <tr>
+              <td>{{ r.year }}</td>
+              <td>{{ r.revenue }}</td>
+              <td>{{ r.cogs }}</td>
+              <td>{{ r.gross_margin }}</td>
+              <td>{{ r.overheads }}</td>
+              <td>{{ r.ebit }}</td>
+              <td>{{ r.net_profit }}</td>
+              <td>{{ r.profitability.gm_pct|floatformat:2 }}%</td>
+              <td>{{ r.profitability.op_pct|floatformat:2 }}%</td>
+              <td>{{ r.profitability.np_pct|floatformat:2 }}%</td>
+              <td>{{ r.growth.revenue|floatformat:2 }}%</td>
+              <td>{{ r.growth.cogs|floatformat:2 }}%</td>
+              <td>{{ r.growth.overheads|floatformat:2 }}%</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    {% if cashflow %}
+    {% endif %}
+    <section class="bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-4">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h3 class="text-lg font-semibold text-slate-900">💰 Zisk vs peněžní tok</h3>
+          <p class="text-xs text-slate-500">Porovnání účetních výsledků se skutečným cash flow.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <label for="cashflow-year-select" class="text-xs uppercase tracking-[0.2em] text-slate-400">Rok</label>
+          <select id="cashflow-year-select" class="rounded-xl border-slate-300 text-sm focus:border-sky-500 focus:ring-sky-500">
+            {% for r in table_rows %}
+              <option value="{{ r.year }}" {% if r.year == selected_year %}selected{% endif %}>{{ r.year }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div id="cashflow-content" class="bg-slate-50/60 border border-slate-200 rounded-2xl p-4">
+        {% if cashflow %}
+        <div class="py-6 text-center text-slate-500 text-sm">Načítáme detailní přehled cash flow…</div>
+        {% else %}
+        <div class="py-6 text-center text-slate-500 text-sm">Pro tento rok zatím nemáme dostatek dat.</div>
+        {% endif %}
+      </div>
+    </section>
+  </div>
 </div>
-
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<script>
-// =======================
-// 🌍 Česká lokalizace Chart.js
-// =======================
-Chart.defaults.locale = 'cs';
-Chart.defaults.font.family = 'DejaVu Sans, Arial, Verdana, sans-serif';
-Chart.defaults.font.size = 12;
-Chart.defaults.font.weight = '500';
-Chart.defaults.color = '#041434';
-Chart.defaults.plugins.legend.labels.usePointStyle = true;
-Chart.defaults.plugins.legend.labels.boxWidth = 12;
-Chart.defaults.plugins.legend.labels.padding = 12;
-Chart.defaults.plugins.legend.align = 'start';
-Chart.defaults.plugins.tooltip.cornerRadius = 10;
-Chart.defaults.plugins.tooltip.titleFont = { size: 13, weight: '600' };
-Chart.defaults.plugins.tooltip.bodyFont = { size: 12 };
-Chart.defaults.plugins.tooltip.boxPadding = 6;
-
-// Aktivace tooltipů (Bootstrap)
-document.addEventListener("DOMContentLoaded", function() {
-  var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-  tooltipTriggerList.map(function (tooltipTriggerEl) {
-    return new bootstrap.Tooltip(tooltipTriggerEl);
-  });
-  
-  // Automaticky načteme cashflow pro vybraný rok při načtení stránky
-  const yearSelect = document.getElementById('cashflow-year-select');
-  if (yearSelect && yearSelect.value) {
-    loadCashflowForYear(yearSelect.value);
-  }
-});
-
-// ===== CASHFLOW FUNCTIONS =====
-async function loadCashflowForYear(year) {
-  try {
-    const response = await fetch(`/dashboard/api/cashflow/${year}/`);
-    if (response.ok) {
-      const html = await response.text();
-      document.getElementById('cashflow-content').innerHTML = html;
-      
-      // Znovu aktivujeme tooltips pro nový obsah
-      const tooltipTriggerList = document.querySelectorAll('#cashflow-content [data-bs-toggle="tooltip"]');
-      [...tooltipTriggerList].map(el => new bootstrap.Tooltip(el));
-    } else {
-      document.getElementById('cashflow-content').innerHTML = 
-        '<div class="alert alert-danger">⚠️ Nepodařilo se načíst cashflow data pro rok ' + year + '</div>';
-    }
-  } catch (error) {
-    console.error('Chyba při načítání cashflow:', error);
-    document.getElementById('cashflow-content').innerHTML = 
-      '<div class="alert alert-danger">⚠️ Chyba při načítání cashflow dat</div>';
-  }
-}
-
-// ===== DATA =====
-const rows = {{ rows|safe }};
-const years = {{ years|safe }};
-
-function getSelectedYears() {
-  return Array.from(document.querySelectorAll(".year-filter:checked")).map(cb => parseInt(cb.value));
-}
-function filterRowsByYears(selectedYears) {
-  return rows.filter(r => selectedYears.includes(r.year));
-}
-
-let profitStoryChart, profitabilityTrendsChart, revCogsGrowthChart, revOverheadsGrowthChart, allMetricsChart;
-
-function renderCharts() {
-  const selectedYears = getSelectedYears();
-  const dataRows = filterRowsByYears(selectedYears);
-  const labels = dataRows.map(r => r.year);
-
-  // ========================
-  // 📈 Váš příběh zisku
-  // ========================
-  const categories = ["Tržby", "Náklady na prodané zboží", "Hrubá marže", "Provozní náklady", "EBIT", "Čistý zisk"];
-  const datasets = dataRows.map((row, idx) => ({
-    label: row.year,
-    data: [row.revenue, row.cogs, row.gross_margin, row.overheads, row.ebit, row.net_profit],
-    backgroundColor: `hsl(${(idx * 70) % 360},70%,54%)`,
-    borderRadius: 12,
-    maxBarThickness: 40
-  }));
-  if (profitStoryChart) profitStoryChart.destroy();
-  profitStoryChart = new Chart(document.getElementById("profitStoryChart"), {
-    type: "bar",
-    data: { labels: categories, datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      layout: { padding: { top: 12, right: 18, bottom: 16, left: 16 } },
-      plugins: {
-        title: { display: false },
-        tooltip: {
-          callbacks: {
-            label: (item) => `${item.label}: ${item.formattedValue.toLocaleString('cs-CZ')} Kč`
-          },
-          displayColors: true,
-          backgroundColor: 'rgba(4, 20, 52, 0.92)'
-        },
-        legend: {
-          position: "top",
-          labels: { color: 'rgba(4,20,52,0.85)' }
-        }
-      },
-      scales: {
-        y: {
-          title: {
-            display: true,
-            text: "Hodnota (Kč)",
-            color: 'rgba(4,20,52,0.8)',
-            font: { size: 12, weight: '600' }
-          },
-          ticks: {
-            callback: (v) => v.toLocaleString('cs-CZ'),
-            color: 'rgba(4,20,52,0.65)',
-            font: { size: 11 }
-          },
-          grid: { color: 'rgba(4, 20, 52, 0.08)', drawBorder: false }
-        },
-        x: {
-          ticks: {
-            color: 'rgba(4,20,52,0.7)',
-            font: { size: 11 }
-          },
-          grid: { display: false }
-        }
-      }
-    }
-  });
-
-  // ========================
-  // 📊 Trend ziskovosti
-  // ========================
-  const datasetsTrends = dataRows.map((row, idx) => ({
-    label: row.year,
-    data: [row.profitability.gm_pct, row.profitability.op_pct, row.profitability.np_pct],
-    backgroundColor: `hsl(${(idx * 70) % 360},70%,54%)`,
-    borderRadius: 12,
-    maxBarThickness: 40
-  }));
-  if (profitabilityTrendsChart) profitabilityTrendsChart.destroy();
-  profitabilityTrendsChart = new Chart(document.getElementById("profitabilityTrendsChart"), {
-    type: "bar",
-    data: { labels: ["Hrubá marže %", "Provozní marže %", "Čistá marže %"], datasets: datasetsTrends },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      layout: { padding: { top: 12, right: 18, bottom: 16, left: 16 } },
-      plugins: {
-        title: { display: false },
-        tooltip: {
-          callbacks: {
-            label: (item) => `${item.label}: ${item.formattedValue}%`
-          },
-          backgroundColor: 'rgba(4, 20, 52, 0.92)'
-        },
-        legend: {
-          position: "top",
-          labels: { color: 'rgba(4,20,52,0.85)' }
-        }
-      },
-      scales: {
-        y: {
-          ticks: {
-            callback: (v) => v + "%",
-            color: 'rgba(4,20,52,0.65)',
-            font: { size: 11 }
-          },
-          grid: { color: 'rgba(4, 20, 52, 0.08)', drawBorder: false }
-        },
-        x: {
-          ticks: { color: 'rgba(4,20,52,0.7)', font: { size: 11 } },
-          grid: { display: false }
-        }
-      }
-    }
-  });
-
-  // ========================
-  // 📈 Růst tržeb vs. COGS
-  // ========================
-  const revGrowth = dataRows.map(r => r.growth.revenue);
-  const cogsGrowth = dataRows.map(r => r.growth.cogs);
-  if (revCogsGrowthChart) revCogsGrowthChart.destroy();
-  revCogsGrowthChart = new Chart(document.getElementById("revCogsGrowthChart"), {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [
-        { label: "Růst tržeb (%)", data: revGrowth, backgroundColor: "rgba(0,123,255,0.75)", borderRadius: 10, maxBarThickness: 42 },
-        { label: "Růst nákladů na prodané zboží (%)", data: cogsGrowth, backgroundColor: "rgba(255,99,132,0.75)", borderRadius: 10, maxBarThickness: 42 }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      layout: { padding: { top: 12, right: 18, bottom: 16, left: 16 } },
-      plugins: {
-        title: { display: false },
-        tooltip: {
-          callbacks: { label: (item) => `${item.dataset.label}: ${item.formattedValue}%` },
-          backgroundColor: 'rgba(4, 20, 52, 0.92)'
-        },
-        legend: {
-          position: "top",
-          labels: { color: 'rgba(4,20,52,0.85)' }
-        }
-      },
-      scales: {
-        y: {
-          ticks: {
-            callback: (v) => `${v}%`,
-            color: 'rgba(4,20,52,0.65)',
-            font: { size: 11 }
-          },
-          grid: { color: 'rgba(4, 20, 52, 0.08)', drawBorder: false }
-        },
-        x: {
-          ticks: { color: 'rgba(4,20,52,0.7)', font: { size: 11 } },
-          grid: { display: false }
-        }
-      }
-    }
-  });
-
-  // ========================
-  // 📈 Růst tržeb vs. provozní náklady
-  // ========================
-  const overheadsGrowth = dataRows.map(r => r.growth.overheads);
-  if (revOverheadsGrowthChart) revOverheadsGrowthChart.destroy();
-  revOverheadsGrowthChart = new Chart(document.getElementById("revOverheadsGrowthChart"), {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [
-        { label: "Růst tržeb (%)", data: revGrowth, backgroundColor: "rgba(0,123,255,0.75)", borderRadius: 10, maxBarThickness: 42 },
-        { label: "Růst provozních nákladů (%)", data: overheadsGrowth, backgroundColor: "rgba(255,206,86,0.75)", borderRadius: 10, maxBarThickness: 42 }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      layout: { padding: { top: 12, right: 18, bottom: 16, left: 16 } },
-      plugins: {
-        title: { display: false },
-        tooltip: {
-          callbacks: { label: (item) => `${item.dataset.label}: ${item.formattedValue}%` },
-          backgroundColor: 'rgba(4, 20, 52, 0.92)'
-        },
-        legend: {
-          position: "top",
-          labels: { color: 'rgba(4,20,52,0.85)' }
-        }
-      },
-      scales: {
-        y: {
-          ticks: {
-            callback: (v) => `${v}%`,
-            color: 'rgba(4,20,52,0.65)',
-            font: { size: 11 }
-          },
-          grid: { color: 'rgba(4, 20, 52, 0.08)', drawBorder: false }
-        },
-        x: {
-          ticks: { color: 'rgba(4,20,52,0.7)', font: { size: 11 } },
-          grid: { display: false }
-        }
-      }
-    }
-  });
-
-  // ========================
-  // 📊 Meziroční přehled (All Metrics)
-  // ========================
-  if (allMetricsChart) allMetricsChart.destroy();
-  allMetricsChart = new Chart(document.getElementById("allMetricsChart"), {
-    type: "line",
-    data: {
-      labels,
-      datasets: [
-        { label: "Tržby", data: dataRows.map(r => r.revenue), borderColor: "#2563eb", backgroundColor: "rgba(37,99,235,0.15)", tension: 0.35, borderWidth: 3, pointRadius: 4, pointHoverRadius: 6, fill: true },
-        { label: "COGS (náklady na prodané zboží)", data: dataRows.map(r => r.cogs), borderColor: "#f97316", backgroundColor: "rgba(249,115,22,0.15)", tension: 0.35, borderWidth: 3, pointRadius: 4, pointHoverRadius: 6, fill: true },
-        { label: "Hrubá marže", data: dataRows.map(r => r.gross_margin), borderColor: "#10b981", backgroundColor: "rgba(16,185,129,0.15)", tension: 0.35, borderWidth: 3, pointRadius: 4, pointHoverRadius: 6, fill: true },
-        { label: "Provozní náklady", data: dataRows.map(r => r.overheads), borderColor: "#facc15", backgroundColor: "rgba(250,204,21,0.18)", tension: 0.35, borderWidth: 3, pointRadius: 4, pointHoverRadius: 6, fill: true },
-        { label: "EBIT", data: dataRows.map(r => r.ebit), borderColor: "#a855f7", backgroundColor: "rgba(168,85,247,0.15)", tension: 0.35, borderWidth: 3, pointRadius: 4, pointHoverRadius: 6, fill: true },
-        { label: "Čistý zisk", data: dataRows.map(r => r.net_profit), borderColor: "#ef4444", backgroundColor: "rgba(239,68,68,0.15)", tension: 0.35, borderWidth: 3, pointRadius: 4, pointHoverRadius: 6, fill: true }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      layout: { padding: { top: 12, right: 18, bottom: 18, left: 18 } },
-      plugins: {
-        title: { display: false },
-        tooltip: {
-          callbacks: { label: (item) => `${item.dataset.label}: ${item.formattedValue.toLocaleString('cs-CZ')} Kč` },
-          backgroundColor: 'rgba(4, 20, 52, 0.92)'
-        },
-        legend: {
-          position: "top",
-          labels: { color: 'rgba(4,20,52,0.85)' }
-        }
-      },
-      scales: {
-        y: {
-          ticks: {
-            callback: (v) => v.toLocaleString('cs-CZ') + " Kč",
-            color: 'rgba(4,20,52,0.65)',
-            font: { size: 11 }
-          },
-          grid: { color: 'rgba(4, 20, 52, 0.08)', drawBorder: false }
-        },
-        x: {
-          ticks: { color: 'rgba(4,20,52,0.7)', font: { size: 11 } },
-          grid: { color: 'rgba(4,20,52,0.04)' }
-        }
-      }
-    }
-  });
-}
-
-document.querySelectorAll(".year-filter").forEach(cb => cb.addEventListener("change", renderCharts));
-renderCharts();
-</script>
-<script>
-// ===== EXPORT FUNKCE =====
-
-function getCookie(name) {
-  let cookieValue = null;
-  if (document.cookie && document.cookie !== '') {
-    const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.substring(0, name.length + 1) === (name + '=')) {
-        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-        break;
-      }
-    }
-  }
-  return cookieValue;
-}
-
-// =============================
-// 💾 Uložení jednoho grafu
-// =============================
-async function saveChartAsImage(chart, chartId) {
-  if (!chart) {
-    console.warn(`⚠️ Graf ${chartId} nebyl nalezen.`);
-    return;
-  }
-
-  const imgData = chart.toBase64Image();
-
-  if (!imgData || imgData.length < 100) {
-    console.error(`❌ Graf ${chartId} je prázdný nebo neplatný.`);
-    return;
-  }
-
-  try {
-    const response = await fetch("/dashboard/save_chart/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": getCookie("csrftoken")
-      },
-      body: JSON.stringify({
-        image: imgData,
-        chart_id: chartId
-      })
-    });
-
-    const text = await response.text(); // načteme i v případě chyby
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      console.error("⚠️ Server nevrátil JSON:", text);
-      return;
-    }
-
-    if (data.status !== "ok") {
-      console.error(`❌ Chyba při ukládání grafu ${chartId}:`, data.message);
-    } else {
-      console.log(`✅ Graf uložen:`, data.file);
-    }
-
-    await new Promise(resolve => setTimeout(resolve, 150)); // krátká pauza
-  } catch (e) {
-    console.error("❌ Fetch error:", e);
-  }
-}
-
-// =============================
-// 💾 Uložení všech grafů
-// =============================
-async function saveAllCharts() {
-  const charts = [
-    { chart: profitStoryChart, id: "profit_story" },
-    { chart: profitabilityTrendsChart, id: "profitability_trends" },
-    { chart: revCogsGrowthChart, id: "rev_cogs_growth" },
-    { chart: revOverheadsGrowthChart, id: "rev_overheads_growth" },
-    { chart: allMetricsChart, id: "all_metrics" }
-  ];
-
-  console.log(`🟡 Nahrávám ${charts.length} grafů…`);
-  for (const c of charts) {
-    await saveChartAsImage(c.chart, c.id);
-  }
-  console.log("✅ Všechny grafy odeslány!");
-}
-
-// =============================
-// 📤 Tlačítko exportu
-// =============================
-document.addEventListener("DOMContentLoaded", () => {
-  const exportBtn = document.getElementById("chart-export-trigger");
-  const statusEl = document.getElementById("chart-export-status");
-
-  if (!exportBtn) {
-    console.warn("⚠️ Export button pro grafy nebyl nalezen.");
-    return;
-  }
-
-  const setStatus = (text, tone = "info") => {
-    if (!statusEl) return;
-    statusEl.textContent = text;
-    statusEl.dataset.statusTone = tone;
-  };
-
-  exportBtn.addEventListener("click", async () => {
-    if (exportBtn.dataset.busy === "1") {
-      return;
-    }
-
-    exportBtn.dataset.busy = "1";
-    const originalLabel = exportBtn.innerHTML;
-    exportBtn.innerHTML = "⏳ Ukládám grafy…";
-    exportBtn.setAttribute("aria-disabled", "true");
-    exportBtn.classList.add("is-busy");
-    setStatus("Chvíli strpení, grafy se připravují…", "info");
-
-    try {
-      await saveAllCharts();
-      exportBtn.innerHTML = "✅ Grafy připraveny";
-      setStatus("Grafy byly úspěšně uloženy. Pokračuj na export PDF.", "success");
-
-      setTimeout(() => {
-        exportBtn.innerHTML = originalLabel;
-        exportBtn.dataset.busy = "0";
-        exportBtn.removeAttribute("aria-disabled");
-        exportBtn.classList.remove("is-busy");
-        window.location.href = "/exports/";
-      }, 900);
-    } catch (error) {
-      console.error("❌ Nepodařilo se uložit grafy:", error);
-      exportBtn.innerHTML = "Zkusit znovu";
-      exportBtn.dataset.busy = "0";
-      exportBtn.removeAttribute("aria-disabled");
-      exportBtn.classList.remove("is-busy");
-      setStatus("Nepodařilo se uložit grafy. Zkus to ještě jednou, případně obnov stránku.", "error");
-    }
-  });
-});
-</script>
 {% endblock %}

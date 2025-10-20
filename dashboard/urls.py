@@ -8,6 +8,7 @@ app_name = "dashboard"
 urlpatterns = [
     path("", views.index, name="index"),
     path("save_chart/", views.save_chart, name="save_chart"),
+    path("ask-coach/", views.ask_coach, name="ask_coach"),
     path("debug/", debug_views.debug_cashflow, name="debug_cashflow"),  # Debug view
 
     # Cashflow přehled

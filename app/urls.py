@@ -4,6 +4,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from . import views
 from accounts import views as account_views
+from chatbot import views as chatbot_views
 
 urlpatterns = [
     path("", views.landing, name="home"),
@@ -17,6 +18,7 @@ urlpatterns = [
     path("suropen/", include("suropen.urls")),
     path("exports/", include("exports.urls")),
     path("chatbot/", include("chatbot.urls")),
+    path("api/chat/", chatbot_views.chat_api, name="chat_api"),
     path("onboarding/", include("onboarding.urls")),
 ]
 

@@ -2,16 +2,57 @@
 import io
 import json
 import base64
-from ingest.models import FinancialStatement
-from django.shortcuts import render
+
 from django.conf import settings
-from django.http import JsonResponse, FileResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
+from django.db.models import Avg
+from django.http import JsonResponse, FileResponse, HttpResponse
+from django.shortcuts import render
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from openai import OpenAI
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
+
+from accounts.models import CompanyProfile, CoachClientNotes
+from ingest.models import FinancialStatement
+from survey.models import SurveySubmission
+from suropen.models import OpenAnswer
+
 from .cashflow import calculate_cashflow
+
+
+def _clean_text(text):
+    if not text:
+        return ""
+    return " ".join(str(text).strip().split())
+
+
+def _extract_recommendation_points(text, max_points=5):
+    if not text:
+        return []
+    points = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip("•-•— \t")
+        if not line:
+            continue
+        points.append(line)
+        if len(points) >= max_points:
+            break
+    if not points:
+        points = [text.strip()]
+    return points
+
+
+def _get_openai_client():
+    api_key = getattr(settings, "OPENAI_API_KEY", None)
+    if not api_key:
+        return None
+    try:
+        return OpenAI(api_key=api_key)
+    except Exception:
+        return None
 
 
 @login_required
@@ -97,21 +138,102 @@ def index(request):
                 "overheads": ((r["overheads"] - prev["overheads"]) / prev["overheads"] * 100) if prev["overheads"] else 0,
             }
 
-    # ðŸ’° VÃ½poÄet Cash Flow pro poslednÃ­ rok (pÅ™idÃ¡no z pÅ¯vodnÃ­ho kÃ³du)
+    # 📈 Insights from survey responses
+    survey_history = []
+    latest_submission = None
+    submissions_qs = SurveySubmission.objects.filter(user=request.user).order_by("created_at")
+    for submission in submissions_qs:
+        avg_score = None
+        if hasattr(submission, "responses"):
+            avg_score = submission.responses.aggregate(avg=Avg("score"))["avg"]
+        if avg_score is not None:
+            survey_history.append({
+                "ts": submission.created_at,
+                "value": round(avg_score, 1),
+            })
+        latest_submission = submission
+
+    company_score = survey_history[-1]["value"] if survey_history else None
+    score_trend = None
+    if len(survey_history) >= 2:
+        score_trend = round(survey_history[-1]["value"] - survey_history[-2]["value"], 1)
+
+    mood_label = "Bez dat"
+    mood_tone = "neutral"
+    mood_description = "Vyplň firemní dotazník a zobrazíme náladu ve firmě."
+    if company_score is not None:
+        if company_score >= 8:
+            mood_label = "Pozitivní energie"
+            mood_tone = "positive"
+            mood_description = "Odpovědi naznačují silnou motivaci a vysokou spokojenost týmu. Pokračujte v nastaveném tempu."
+        elif company_score >= 6:
+            mood_label = "Stabilní nálada"
+            mood_tone = "neutral"
+            mood_description = "Vývoj je vyrovnaný. Zaměřte se na konkrétní oblasti, které mohou přinést další růst."
+        else:
+            mood_label = "Potřebuje podporu"
+            mood_tone = "negative"
+            mood_description = "Tým hlásí napětí nebo únavu. Zvažte prioritizaci největších blokátorů a podporu leadershipu."
+
+    # 🧠 AI doporučení
+    coach_summary = _clean_text(latest_submission.ai_response) if (latest_submission and latest_submission.ai_response) else None
+    open_answer_summary = None
+    for answer in OpenAnswer.objects.filter(user=request.user).order_by("-created_at"):
+        if answer.ai_response:
+            open_answer_summary = _clean_text(answer.ai_response)
+            break
+    coach_recommendation = open_answer_summary or coach_summary
+    recommendation_points = _extract_recommendation_points(coach_recommendation) if coach_recommendation else []
+
+    profile = CompanyProfile.objects.filter(user=request.user).select_related("assigned_coach").first()
+    assigned_coach = getattr(profile, "assigned_coach", None)
+    coach_note_entry = None
+    if profile:
+        coach_note_entry = (
+            CoachClientNotes.objects.filter(client=profile)
+            .order_by("-updated_at")
+            .first()
+        )
+    coach_note_text = _clean_text(coach_note_entry.notes) if coach_note_entry and coach_note_entry.notes else None
+
+    chart_series = {
+        "labels": years,
+        "revenue": [r["revenue"] for r in rows],
+        "net_profit": [r["net_profit"] for r in rows],
+        "ebit": [r["ebit"] for r in rows],
+    }
+
+    # ðŸ’° Výpočet cash flow pro poslední rok (póvodní logika)
     cf = None
     selected_year = years[-1] if years else None
     if selected_year:
         try:
             cf = calculate_cashflow(request.user, selected_year)
-        except Exception as e:
-            print(f"âš ï¸ Chyba vÃ½poÄtu cashflow: {e}")
+        except Exception as exc:
+            print(f"⚠️ Chyba výpočtu cashflow: {exc}")
 
     return render(request, "dashboard/index.html", {
         "rows": json.dumps(rows),
         "years": json.dumps(years),
         "table_rows": rows,
-        "cashflow": cf,  # âœ… pÅ™idÃ¡no
+        "cashflow": cf,
         "selected_year": selected_year,
+        "company_score": company_score,
+        "score_trend": score_trend,
+        "score_history": json.dumps([
+            {"label": (item["ts"].strftime("%d.%m.%Y") if item["ts"] else str(idx)), "value": item["value"]}
+            for idx, item in enumerate(survey_history)
+        ]),
+        "mood_label": mood_label,
+        "mood_tone": mood_tone,
+        "mood_description": mood_description,
+        "coach_recommendation": coach_recommendation,
+        "recommendation_points": recommendation_points,
+        "assigned_coach": assigned_coach,
+        "coach_note": coach_note_text,
+        "chart_series": json.dumps(chart_series),
+        "has_openai_client": bool(getattr(settings, "OPENAI_API_KEY", "")),
+        "profile": profile,
     })
 
 
@@ -319,6 +441,58 @@ def save_chart(request):
         return JsonResponse({"status": "ok", "file": file_path})
 
     return JsonResponse({"status": "error", "message": "invalid method"}, status=405)
+
+
+@login_required
+def ask_coach(request):
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "invalid_method"}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8")) if request.body else {}
+    except json.JSONDecodeError:
+        payload = {}
+
+    message = (payload.get("message") or "").strip()
+    if not message:
+        return JsonResponse({"success": False, "error": "empty_message"}, status=400)
+
+    reply_text = None
+    client = _get_openai_client()
+    if client:
+        try:
+            model_name = getattr(settings, "OPENAI_MODEL", "gpt-4o-mini")
+            completion = client.chat.completions.create(
+                model=model_name,
+                temperature=0.55,
+                max_tokens=380,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Jsi kouč Scaleupboardu. Reaguj stručně, konkrétně a povzbudivě."
+                            " Zaměř se na další krok, potvrď pochopení a nabídni pomocné kroky."
+                        ),
+                    },
+                    {"role": "user", "content": message},
+                ],
+            )
+            reply_text = completion.choices[0].message.content.strip()
+        except Exception as exc:
+            print(f"⚠️ OpenAI ask_coach error: {exc}")
+            reply_text = None
+
+    if not reply_text:
+        reply_text = (
+            "Zprávu předáme koučovi. Připrav si prosím konkrétní situace a údaje,"
+            " které chceš probrat – pomůže to urychlit společné řešení."
+        )
+
+    profile = CompanyProfile.objects.filter(user=request.user).select_related("assigned_coach").first()
+    if profile and profile.assigned_coach:
+        CoachClientNotes.objects.get_or_create(coach=profile.assigned_coach, client=profile)
+
+    return JsonResponse({"success": True, "reply": reply_text})
 
 
 def export_full_pdf(request):
