@@ -1,39 +1,51 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container mt-4">
-  <h2>📊 Moje vyplněné dotazníky</h2>
+<div class="section-shell">
+  <section class="scb-panel">
+    <div class="page-heading">
+      <span class="page-eyebrow">Survey</span>
+      <h2 class="page-title">📊 Moje vyplněné dotazníky</h2>
+      <p class="page-subtitle">
+        Projděte si historii vyplněných hodnocení, zobrazte zkrácené shrnutí a otevřete detail s grafy a AI komentářem.
+      </p>
+    </div>
 
-  <table class="table table-striped mt-3 align-middle">
-    <thead>
-      <tr>
-        <th>Datum</th>
-        <th>Celkové hodnocení</th>
-        <th>AI Shrnutí</th>
-        <th>Akce</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for batch in batches %}
-      <tr>
-        <td>{{ batch.created_at|date:"d.m.Y H:i" }}</td>
-        <td><strong>{{ batch.avg_score }}</strong></td>
-        <td style="max-width: 450px;">
-          {% if batch.ai_response %}
-            <div class="text-truncate" title="{{ batch.ai_response }}">
-              {{ batch.ai_response|truncatechars:200 }}
-            </div>
-          {% else %}
-            <span class="text-muted">Zatím bez shrnutí</span>
-          {% endif %}
-        </td>
-        <td>
-          <a href="{% url 'survey:detail' batch.batch_id %}" class="btn btn-sm btn-primary">Zobrazit</a>
-        </td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="4" class="text-center text-muted">Zatím žádné vyplněné dotazníky</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+    <div class="scb-table-scroll mt-4">
+      <table class="table scb-data-table align-middle">
+        <thead>
+          <tr>
+            <th>Datum</th>
+            <th>Celkové hodnocení</th>
+            <th>AI Shrnutí</th>
+            <th>Akce</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for batch in batches %}
+          <tr>
+            <td>{{ batch.created_at|date:"d.m.Y H:i" }}</td>
+            <td><strong>{{ batch.avg_score }}</strong></td>
+            <td>
+              {% if batch.ai_response %}
+              <div class="text-truncate" title="{{ batch.ai_response }}">
+                {{ batch.ai_response|truncatechars:200 }}
+              </div>
+              {% else %}
+              <span class="text-muted">Zatím bez shrnutí</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{% url 'survey:detail' batch.batch_id %}" class="btn btn-sm btn-primary">Zobrazit</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="4" class="text-center text-muted">Zatím žádné vyplněné dotazníky</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
 </div>
 {% endblock %}

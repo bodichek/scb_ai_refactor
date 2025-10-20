@@ -1,49 +1,61 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container">
-  <h2>📋 Detail dotazníku</h2>
-  <p><b>Vyplněno:</b> {{ submission.created_at|date:"d.m.Y H:i" }}</p>
+<div class="section-shell">
+  <section class="scb-panel scb-panel--inline">
+    <div class="page-heading">
+      <span class="page-eyebrow">Survey</span>
+      <h2 class="page-title">📋 Detail dotazníku</h2>
+      <p class="page-subtitle">
+        Kompletní pohled na jednotlivé odpovědi, průměrné skóre i automatické shrnutí od asistenta.
+      </p>
+    </div>
+    <div class="mt-2">
+      <span class="scb-metric-bubble">Vyplněno: {{ submission.created_at|date:"d.m.Y H:i" }}</span>
+    </div>
 
-  <!-- Seznam odpovědí -->
-  <ul class="list-group mb-3">
-    {% for r in responses %}
-      <li class="list-group-item d-flex justify-content-between align-items-center">
-        <span>{{ r.question }}</span>
-        <!-- 🔹 Barevný badge podle skóre -->
+    <ul class="scb-list mt-4">
+      {% for r in responses %}
+      <li class="scb-list-item">
+        <div>
+          <strong>{{ r.question }}</strong>
+        </div>
         <span class="badge score-badge" data-score="{{ r.score }}">{{ r.label }}</span>
       </li>
-    {% endfor %}
-  </ul>
+      {% endfor %}
+    </ul>
 
-  <!-- Průměr -->
-  <div class="alert alert-info">
-    <b>Průměrné skóre:</b> {{ avg_score|floatformat:1 }}
-  </div>
-
-  <!-- 🧩 Shrnutí AI -->
-  {% if submission.ai_response %}
-    <div class="card shadow-sm mb-4 border-0">
-      <div class="card-body">
-        <h4 class="card-title">🧠 Shrnutí AI</h4>
-        <p class="card-text" style="white-space: pre-line;">{{ submission.ai_response }}</p>
-      </div>
+    <div class="alert alert-info mt-4 mb-0">
+      <b>Průměrné skóre:</b> {{ avg_score|floatformat:1 }}
     </div>
-  {% else %}
-    <div class="alert alert-secondary mb-4">
+  </section>
+
+  <section class="scb-panel">
+    {% if submission.ai_response %}
+    <div class="page-heading">
+      <h3 class="page-title" style="font-size:1.5rem;">🧠 Shrnutí AI</h3>
+      <p class="page-subtitle">Automaticky generované doporučení a komentáře na míru.</p>
+    </div>
+    <div class="mt-3">
+      <p class="panel-subtitle" style="white-space: pre-line;">{{ submission.ai_response }}</p>
+    </div>
+    {% else %}
+    <div class="alert alert-secondary mb-0">
       <em>AI shrnutí zatím nebylo vygenerováno.</em>
     </div>
-  {% endif %}
+    {% endif %}
+  </section>
 
-  <!-- 🔹 Graf vývoje průměrného skóre -->
-  <div class="mt-5">
-    <h3>📈 Vývoj průměrného skóre v čase</h3>
-    <canvas id="historyChart"></canvas>
-  </div>
-
-  <a href="{% url 'survey:summary' %}" class="btn btn-secondary mt-4">← Zpět na přehled</a>
+  <section class="scb-panel">
+    <div class="chart-card">
+      <h3>📈 Vývoj průměrného skóre v čase</h3>
+      <div class="chart-card__canvas">
+        <canvas id="historyChart"></canvas>
+      </div>
+    </div>
+    <a href="{% url 'survey:summary' %}" class="btn btn-outline-light mt-4">← Zpět na přehled</a>
+  </section>
 </div>
 
-<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   const ctx = document.getElementById('historyChart').getContext('2d');
@@ -54,10 +66,10 @@
       datasets: [{
         label: 'Průměrné skóre',
         data: {{ chart_data|safe }},
-        borderColor: 'blue',
-        backgroundColor: 'rgba(0,123,255,0.2)',
+        borderColor: 'rgba(47, 132, 255, 1)',
+        backgroundColor: 'rgba(47, 132, 255, 0.18)',
         fill: true,
-        tension: 0.2,
+        tension: 0.25,
         pointRadius: 5,
         pointHoverRadius: 7
       }]
@@ -78,22 +90,20 @@
   });
 </script>
 
-<!-- 🔹 Barvení odpovědí podle skóre -->
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".score-badge").forEach(el => {
-    const score = parseFloat(el.dataset.score); // hodnota 1–10
-    const ratio = (score - 1) / 9; // převod na 0–1
-    const hue = 0 + (120 * ratio); // 0 = červená, 120 = zelená
+    const score = parseFloat(el.dataset.score);
+    const ratio = (score - 1) / 9;
+    const hue = 0 + (120 * ratio);
 
     el.style.backgroundColor = `hsl(${hue}, 80%, 40%)`;
     el.style.color = "white";
     el.style.fontWeight = "bold";
-    el.style.padding = "6px 10px";
-    el.style.borderRadius = "8px";
-    el.style.minWidth = "250px";
+    el.style.padding = "0.5rem 0.9rem";
+    el.style.borderRadius = "999px";
+    el.style.minWidth = "200px";
     el.style.textAlign = "center";
-    el.style.whiteSpace = "normal";
   });
 });
 </script>

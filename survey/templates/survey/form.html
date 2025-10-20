@@ -1,28 +1,38 @@
 {% extends "base.html" %}
 {% block content %}
-<div>
-  <h2>📝 Dotazník – hodnocení</h2>
-
-  {% if error %}
-    <div style="color: darkred;">{{ error }}</div>
-  {% endif %}
-
-  <form method="post">
-    {% csrf_token %}
-    {% for q in questions %}
-      <div style="margin-bottom: 1em;">
-        <label><b>{{ q.text }}</b></label><br>
-        <input type="range" name="q-{{ forloop.counter0 }}" min="1" max="10" value="5">
-      </div>
-    {% endfor %}
-    <button type="submit">Odeslat</button>
-  </form>
-
-  {% if ai_text %}
-    <div style="margin-top: 2em; border: 1px solid blue; padding: 1em;">
-      <h4>💡 Doporučení od AI</h4>
-      <pre style="white-space:pre-wrap;">{{ ai_text }}</pre>
+<div class="section-shell">
+  <section class="scb-panel scb-panel--inline">
+    <div class="page-heading">
+      <span class="page-eyebrow">Survey</span>
+      <h2 class="page-title">📝 Dotazník – hodnocení</h2>
+      <p class="page-subtitle">
+        Posuďte jednotlivé oblasti firmy pomocí škály 1–10. Získáte personalizované shrnutí a doporučení.
+      </p>
     </div>
-  {% endif %}
+
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" class="mt-3">
+      {% csrf_token %}
+      <div class="survey-history-list">
+        {% for q in questions %}
+        <div class="card scb-question-card p-4">
+          <label class="form-label mb-2"><b>{{ q.text }}</b></label>
+          <input type="range" class="form-range" name="q-{{ forloop.counter0 }}" min="1" max="10" value="5">
+        </div>
+        {% endfor %}
+      </div>
+      <button type="submit" class="btn btn-success mt-4 px-4">Odeslat</button>
+    </form>
+
+    {% if ai_text %}
+    <div class="alert alert-info mt-4 mb-0">
+      <h4 class="mb-2">💡 Doporučení od AI</h4>
+      <p class="mb-0" style="white-space: pre-wrap;">{{ ai_text }}</p>
+    </div>
+    {% endif %}
+  </section>
 </div>
 {% endblock %}

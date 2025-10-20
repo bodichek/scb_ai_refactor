@@ -1,10 +1,32 @@
 {% extends "base.html" %}{% block content %}
-<h3>Report</h3>
-<ul class="list-group">
-  {% for s in statements %}
-    <li class="list-group-item">
-      <b>{{ s.year }}</b> — Tržby: {{ s.data.Revenue|default:0 }}, Čistý zisk: {{ s.data.NetProfit|default:0 }}
-    </li>
-  {% endfor %}
-</ul>
+<div class="section-shell">
+  <section class="scb-panel">
+    <div class="page-heading">
+      <span class="page-eyebrow">Výstupy</span>
+      <h2 class="page-title">📄 Souhrnný report</h2>
+      <p class="page-subtitle">
+        Rychlý přehled hlavních metrik napříč roky pro potřeby prezentací i interních porad.
+      </p>
+    </div>
+
+    <ul class="scb-list mt-4">
+      {% for s in statements %}
+      <li class="scb-list-item">
+        <div>
+          <strong>{{ s.year }}</strong>
+          <span class="d-block">Tržby: {{ s.data.Revenue|default:0 }}</span>
+        </div>
+        <span class="scb-metric-bubble">Čistý zisk: {{ s.data.NetProfit|default:0 }}</span>
+      </li>
+      {% empty %}
+      <li class="scb-list-item">
+        <div>
+          <strong>Žádná data</strong>
+          <span class="d-block">Jakmile nahrajete první výkazy, uvidíte je zde.</span>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
 {% endblock %}

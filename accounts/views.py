@@ -11,7 +11,20 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 
 from coaching.models import Coach
-from .models import CompanyProfile, UserRole
+from .models import CompanyProfile, UserRole, OnboardingProgress
+
+
+def _get_onboarding_redirect(user):
+    progress, _ = OnboardingProgress.objects.get_or_create(user=user)
+    if progress.is_completed or progress.current_step == OnboardingProgress.Steps.DONE:
+        return reverse("dashboard:index")
+
+    step_urls = {
+        OnboardingProgress.Steps.UPLOAD: reverse("onboarding:upload"),
+        OnboardingProgress.Steps.SURVEY: reverse("onboarding:survey"),
+        OnboardingProgress.Steps.OPEN_SURVEY: reverse("onboarding:open_survey"),
+    }
+    return step_urls.get(progress.current_step, reverse("onboarding:upload"))
 
 
 def login_view(request):
@@ -23,17 +36,16 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
         if user is not None:
             login(request, user)
-            
-            # Zkontroluj, jestli je uživatel kouč
+
             try:
                 user_role = user.userrole.role
-                if user_role == 'coach':
-                    return redirect('coaching:my_clients')
-                else:
-                    return redirect('dashboard:index')
-            except:
-                # Pokud userrole neexistuje, přesměruj na dashboard
-                return redirect('dashboard:index')
+            except Exception:
+                user_role = "company"
+
+            if user_role == "coach":
+                return redirect("coaching:my_clients")
+
+            return redirect(_get_onboarding_redirect(user))
         else:
             messages.error(request, 'Neplatné přihlašovací údaje.')
     
@@ -64,12 +76,12 @@ def login_api(request):
 
     login(request, user)
 
-    redirect_url = reverse("dashboard:index")
+    redirect_url = _get_onboarding_redirect(user)
     try:
-        user_role = user.userrole.role
-        if user_role == "coach":
+        if user.userrole.role == "coach":
             redirect_url = reverse("coaching:my_clients")
     except Exception:
+        # Pokud role neexistuje, zůstaň u onboarding redirectu
         pass
 
     return JsonResponse({"success": True, "redirect": redirect_url})
@@ -185,7 +197,7 @@ def register(request):
         )
 
         login(request, user)
-        return redirect("dashboard:index")
+        return redirect(_get_onboarding_redirect(user))
 
     coaches = Coach.objects.all()
     return render(request, "accounts/register.html", {"coaches": coaches})

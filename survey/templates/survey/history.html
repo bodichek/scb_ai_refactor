@@ -1,57 +1,68 @@
 {% extends "base.html" %}
 {% block content %}
-<div>
-  <h2>📚 Moje historie dotazníků (hodnocení)</h2>
+<div class="section-shell">
+  <section class="scb-panel">
+    <div class="page-heading">
+      <span class="page-eyebrow">Survey</span>
+      <h2 class="page-title">📚 Moje historie dotazníků</h2>
+      <p class="page-subtitle">
+        Přehled všech odeslaných dotazníků včetně celkového skóre, AI shrnutí a jednotlivých odpovědí.
+      </p>
+    </div>
 
-  {% if not batches %}
-    <div>Zatím nemáš žádné odeslané záznamy.</div>
-  {% else %}
-    {% for b in batches %}
-      <div style="border: 1px solid #ddd; padding: 1em; margin-bottom: 1.5em;">
-        <div style="display: flex; justify-content: space-between; font-size: small; color: gray;">
-          <span><b>Batch:</b> {{ b.batch_id }}</span>
+    {% if not batches %}
+    <div class="alert alert-secondary mt-3 mb-0">
+      Zatím nemáš žádné odeslané záznamy.
+    </div>
+    {% else %}
+    <div class="survey-history-list mt-4">
+      {% for b in batches %}
+      <div class="survey-history-card">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 small text-muted">
+          <span><strong>Batch:</strong> {{ b.batch_id }}</span>
           <span>{{ b.created_at|date:"d.m.Y H:i" }}</span>
         </div>
 
-        <!-- 🔹 Celkové hodnocení -->
         {% if b.avg_score %}
-          <div style="margin-top: 0.5em;">
-            <b>Celkové hodnocení:</b>
-            <span class="badge score-badge" data-score="{{ b.avg_score }}">
-              {{ b.avg_score }}
-            </span>
-          </div>
+        <div class="mt-3">
+          <span class="filter-title d-block mb-1 text-uppercase">Celkové hodnocení</span>
+          <span class="badge score-badge" data-score="{{ b.avg_score }}">{{ b.avg_score }}</span>
+        </div>
         {% endif %}
 
         {% if b.ai_response %}
+        <div class="mt-3">
           <h5>💡 AI shrnutí</h5>
-          <pre style="white-space:pre-wrap;">{{ b.ai_response }}</pre>
-          <hr>
+          <p class="panel-subtitle" style="white-space: pre-wrap;">{{ b.ai_response }}</p>
+        </div>
         {% endif %}
 
-        {% for item in b.items %}
-          <div style="margin-bottom: 1em;">
-            <div><b>{{ item.question }}</b></div>
-            <div>{{ item.answer }}</div>
+        <div class="mt-3">
+          {% for item in b.items %}
+          <div class="mb-3">
+            <strong>{{ item.question }}</strong>
+            <p class="panel-subtitle mb-0">{{ item.answer }}</p>
           </div>
-        {% endfor %}
+          {% endfor %}
+        </div>
       </div>
-    {% endfor %}
-  {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
 </div>
 
-<!-- 🔹 Script na barvení badge -->
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".score-badge").forEach(el => {
-    const score = parseFloat(el.dataset.score); // 1–10
-    const ratio = (score - 1) / 9; // normalizace 0–1
-    const hue = 0 + (120 * ratio); // 0 = červená, 120 = zelená
+    const score = parseFloat(el.dataset.score);
+    const ratio = (score - 1) / 9;
+    const hue = 0 + (120 * ratio);
     el.style.backgroundColor = `hsl(${hue}, 80%, 40%)`;
     el.style.color = "white";
     el.style.fontWeight = "bold";
-    el.style.padding = "0.4em 0.7em";
-    el.style.borderRadius = "0.5em";
+    el.style.padding = "0.45rem 0.85rem";
+    el.style.borderRadius = "999px";
   });
 });
 </script>

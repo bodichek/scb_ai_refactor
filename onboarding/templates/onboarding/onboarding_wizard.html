@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+
+    @keyframes floatyFade {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes ping-soft {
+      0% { transform: scale(1); opacity: 0.6; }
+      75%, 100% { transform: scale(1.5); opacity: 0; }
+    }
+
+    .animate-floaty { animation: floatyFade 0.6s ease forwards; }
+    .animate-ping-soft { animation: ping-soft 1.4s linear infinite; }
+  </style>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <script>
+    document.addEventListener('alpine:init', () => {
+      const surveyPrefillElement = document.getElementById('survey-prefill-data');
+      const surveyPrefill = surveyPrefillElement ? JSON.parse(surveyPrefillElement.textContent || '{}') : {};
+      const openPrefillElement = document.getElementById('open-survey-prefill-data');
+      const openPrefill = openPrefillElement ? JSON.parse(openPrefillElement.textContent || '{}') : {};
+
+      Alpine.data('surveyWizard', ({ totalSections = 0, totalQuestions = 0 }) => ({
+        current: 0,
+        total: totalSections,
+        totalQuestions,
+        responses: {},
+        init() {
+          this.$nextTick(() => {
+            this.$root.querySelectorAll('[data-survey-key]').forEach((input) => {
+              const key = input.dataset.surveyKey;
+              let value = surveyPrefill[key];
+              if (value === undefined || value === null || value === '') {
+                value = 5;
+              }
+              value = Number(value);
+              this.responses[key] = value;
+              input.value = value;
+            });
+          });
+        },
+        progress() {
+          if (this.total <= 1) { return 100; }
+          return Math.round(((this.current + 1) / this.total) * 100);
+        },
+        next() {
+          if (this.current < this.total - 1) { this.current += 1; }
+        },
+        prev() {
+          if (this.current > 0) { this.current -= 1; }
+        },
+      }));
+
+      Alpine.data('openSurveyWizard', ({ totalSections = 0 }) => ({
+        current: 0,
+        total: totalSections,
+        answers: {},
+        init() {
+          this.$nextTick(() => {
+            this.$root.querySelectorAll('[data-open-key]').forEach((field) => {
+              const key = field.dataset.openKey;
+              const value = openPrefill[key] !== undefined ? openPrefill[key] : '';
+              this.answers[key] = value;
+              field.value = value;
+            });
+          });
+        },
+        next() {
+          if (this.current < this.total - 1) { this.current += 1; }
+        },
+        prev() {
+          if (this.current > 0) { this.current -= 1; }
+        },
+        progress() {
+          if (this.total <= 1) { return 100; }
+          return Math.round(((this.current + 1) / this.total) * 100);
+        },
+      }));
+    });
+  </script>
+{% endblock %}
+
+{% block content %}
+{{ prefill_scores|json_script:"survey-prefill-data" }}
+{{ prefill_open_answers|json_script:"open-survey-prefill-data" }}
+<div class="min-h-[calc(100vh-140px)] bg-gradient-to-b from-sky-50/80 via-white to-slate-100 py-10">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+
+    {% if messages %}
+      <div class="space-y-3">
+        {% for message in messages %}
+          {% with tag=message.tags %}
+            <div class="rounded-2xl border border-slate-200/70 bg-white/90 shadow-sm px-5 py-4 flex items-start gap-3">
+              {% if 'error' in tag %}
+                <span class="mt-1 inline-flex h-8 w-8 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+                  <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10A8 8 0 11.001 10 8 8 0 0118 10zm-9-4a1 1 0 10-2 0v4a1 1 0 002 0V6zm0 6a1 1 0 11-2 0 1 1 0 012 0z" clip-rule="evenodd"></path></svg>
+                </span>
+              {% elif 'success' in tag %}
+                <span class="mt-1 inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                  <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 00-1.414 0L8 12.586 4.707 9.293a1 1 0 10-1.414 1.414l4 4a1 1 0 001.414 0l8-8a1 1 0 000-1.414z" clip-rule="evenodd"></path></svg>
+                </span>
+              {% else %}
+                <span class="mt-1 inline-flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-sky-600">
+                  <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 011 1v8a1 1 0 102 0V3a1 1 0 10-2 0v6H9V3a1 1 0 01-1-1z"></path><path d="M9 16a1 1 0 102 0 1 1 0 00-2 0z"></path></svg>
+                </span>
+              {% endif %}
+              <div class="text-sm text-slate-600 leading-relaxed">{{ message }}</div>
+            </div>
+          {% endwith %}
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="bg-white/80 backdrop-blur-md rounded-3xl border border-slate-200/70 shadow-xl shadow-slate-900/5 p-6 sm:p-10 relative overflow-hidden">
+      <div class="absolute -top-24 -right-10 h-48 w-48 rounded-full bg-sky-100 blur-3xl opacity-80 pointer-events-none"></div>
+      <div class="absolute -bottom-16 -left-16 h-60 w-60 rounded-full bg-indigo-100 blur-3xl opacity-70 pointer-events-none"></div>
+
+      <div class="relative space-y-10 animate-floaty">
+        <header class="space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Onboarding průvodce</p>
+              <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">Dokonči rychlé tři kroky a odemkni dashboard</h1>
+            </div>
+            <span class="inline-flex items-center gap-2 rounded-full bg-sky-100 px-4 py-1.5 text-sm font-medium text-sky-700">
+              <span class="relative flex h-2.5 w-2.5">
+                <span class="absolute inline-flex h-full w-full rounded-full bg-sky-500 opacity-75 animate-ping-soft"></span>
+                <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-sky-600"></span>
+              </span>
+              <span>Průběh: {{ progress_percent }}&nbsp;%</span>
+            </span>
+          </div>
+
+          <div class="space-y-4">
+            <div class="flex items-center justify-between">
+              {% for item in wizard_steps %}
+                <div class="flex-1 flex items-center {% if not forloop.first %}pl-3{% endif %}">
+                  <div class="flex items-center gap-3">
+                    <div class="relative">
+                      <div class="flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold transition-all duration-300 {% if forloop.counter0 <= current_index %}bg-sky-600 text-white{% else %}bg-slate-200 text-slate-500{% endif %}">
+                        {{ forloop.counter }}
+                      </div>
+                      {% if forloop.counter0 == current_index %}
+                        <div class="absolute inset-0 rounded-full border-4 border-sky-200 animate-ping-soft"></div>
+                      {% endif %}
+                    </div>
+                    <span class="text-xs sm:text-sm font-medium {% if forloop.counter0 <= current_index %}text-slate-800{% else %}text-slate-400{% endif %}">{{ item.label }}</span>
+                  </div>
+                  {% if not forloop.last %}
+                    <div class="flex-1 h-1.5 mx-3 rounded-full bg-slate-200 overflow-hidden">
+                      <div class="h-full bg-gradient-to-r from-sky-400 to-indigo-500 transition-all duration-500 {% if forloop.counter0 < current_index %}w-full{% elif forloop.counter0 == current_index %}w-1/2{% else %}w-0{% endif %}"></div>
+                    </div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+            <div class="h-2 rounded-full bg-slate-200 overflow-hidden">
+              <div class="h-full bg-gradient-to-r from-sky-400 via-sky-500 to-indigo-500 transition-all duration-500" style="width: {{ progress_percent }}%;"></div>
+            </div>
+          </div>
+        </header>
+
+        {% if step == progress.Steps.UPLOAD %}
+          <section class="relative">
+            <div class="bg-white/90 border border-slate-200 rounded-2xl shadow-md shadow-slate-900/5 p-8 space-y-6">
+              <h2 class="text-xl font-semibold text-slate-900">1. Nahraj poslední finanční výkaz</h2>
+              <p class="text-sm leading-relaxed text-slate-600">Formát PDF, doporučené dokumenty: Výkaz zisku a ztrát nebo Rozvaha. Po nahrání souboru ho automaticky zanalyzujeme.</p>
+              <form method="post" enctype="multipart/form-data" class="space-y-6">
+                {% csrf_token %}
+                <label class="relative flex flex-col items-center justify-center w-full h-48 rounded-2xl border-2 border-dashed border-sky-200 bg-sky-50/60 text-sky-500 hover:border-sky-400 hover:bg-sky-50 transition-colors cursor-pointer">
+                  <input type="file" name="pdf_file" accept="application/pdf" class="absolute inset-0 opacity-0 cursor-pointer">
+                  <div class="text-center space-y-2">
+                    <span class="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white text-sky-500 shadow-sm">
+                      <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16.5V19a2 2 0 002 2h12a2 2 0 002-2v-2.5M16 10l-4-4m0 0l-4 4m4-4V16" /></svg>
+                    </span>
+                    <div class="text-sm font-medium">Přetáhni sem PDF nebo klikni pro výběr</div>
+                    <p class="text-xs text-slate-500">Max 10 MB • Povolený formát PDF</p>
+                  </div>
+                </label>
+                <div class="flex items-center justify-end gap-3">
+                  <a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="text-sm text-slate-500 hover:text-slate-700">Zpět</a>
+                  <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-600/30 hover:bg-sky-700 focus:outline-none focus:ring-4 focus:ring-sky-200 transition">
+                    Pokračovat
+                  </button>
+                </div>
+              </form>
+            </div>
+          </section>
+        {% elif step == progress.Steps.SURVEY %}
+          <section x-data="surveyWizard({ totalSections: {{ survey_sections|length }}, totalQuestions: {{ total_questions }} })" x-cloak>
+            <form method="post" class="space-y-8">
+              {% csrf_token %}
+              <div class="flex items-center justify-between">
+                <div>
+                  <h2 class="text-xl font-semibold text-slate-900">2. Firemní dotazník</h2>
+                  <p class="text-sm text-slate-600">Odpověz na tvrzení škálou 1–10. Pomůže nám pochopit, jak se firmě daří.</p>
+                  <a href="{% url 'onboarding:upload' %}" class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-sky-600 hover:text-sky-700">
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7 7-7" /><path stroke-linecap="round" stroke-linejoin="round" d="M3 12h18" /></svg>
+                    Zpět na nahrání PDF
+                  </a>
+                </div>
+                <div class="w-40">
+                  <div class="h-2 rounded-full bg-slate-200 overflow-hidden">
+                    <div class="h-full bg-gradient-to-r from-sky-400 to-indigo-500 transition-all duration-500" :style="`width: ${progress()}%`"></div>
+                  </div>
+                  <p class="mt-1 text-xs font-medium text-slate-500" x-text="`Sekce ${current + 1} / ${total}`"></p>
+                </div>
+              </div>
+
+              <div class="space-y-8">
+                {% for section in survey_sections %}
+                  <div x-show="current === {{ forloop.counter0 }}" x-transition:enter="transition ease-out duration-400" x-transition:enter-start="opacity-0 translate-y-6" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 translate-y-4">
+                    <div class="rounded-2xl bg-white/95 border border-slate-200 shadow-sm px-6 py-5 mb-6">
+                      <h3 class="text-lg font-semibold text-slate-900">{{ section.title }}</h3>
+                      <p class="mt-1 text-sm text-slate-500">Posuď aktuální stav na škále 1–10. Hodnota 1 znamená nejnižší spokojenost, 10 nejlepší stav.</p>
+                    </div>
+
+                    <div class="space-y-6">
+                      {% for question in section.questions %}
+                        <div class="rounded-2xl border border-slate-200 bg-white/95 p-5 shadow-sm">
+                          <p class="text-sm font-medium text-slate-800">{{ question.question }}</p>
+                          <div class="mt-5 flex items-center gap-4">
+                            <input type="range" name="q{{ question.index }}" min="1" max="10" step="1" data-survey-key="q{{ question.index }}" x-model.number="responses['q{{ question.index }}']" class="w-full accent-sky-600">
+                            <span class="w-12 text-center text-lg font-semibold text-sky-600" x-text="responses['q{{ question.index }}'] ?? 5"></span>
+                          </div>
+                          <div class="mt-4 grid grid-cols-2 md:grid-cols-5 gap-2 text-[11px] text-slate-500 leading-snug">
+                            {% for score_range, meaning in question.labels.items %}
+                              <div class="rounded-lg bg-slate-50 px-3 py-2 border border-slate-100">
+                                <div class="font-semibold text-slate-600">{{ score_range }}</div>
+                                <div class="mt-1">{{ meaning }}</div>
+                              </div>
+                            {% endfor %}
+                          </div>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+
+              <div class="flex items-center justify-between pt-4 border-t border-slate-200">
+                <button type="button" class="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 transition" x-show="current > 0" @click="prev">
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                  Zpět
+                </button>
+                <div class="ml-auto flex items-center gap-3">
+                  <button type="button" class="inline-flex items-center gap-2 rounded-xl bg-sky-100 px-4 py-2 text-sm font-semibold text-sky-600 hover:bg-sky-200 transition" x-show="current < total - 1" @click="next">
+                    Další sekce
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+                  </button>
+                  <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-200 transition" x-show="current === total - 1">
+                    Odeslat dotazník
+                  </button>
+                </div>
+              </div>
+            </form>
+          </section>
+        {% elif step == progress.Steps.OPEN_SURVEY %}
+          <section x-data="openSurveyWizard({ totalSections: {{ suropen_questions|length }} })" x-cloak>
+            <form method="post" class="space-y-8">
+              {% csrf_token %}
+              <div class="flex items-center justify-between">
+                <div>
+                  <h2 class="text-xl font-semibold text-slate-900">3. Otevřený dotazník</h2>
+                  <p class="text-sm text-slate-600">Zapiš vlastní úvahy – sdílej priority, obavy i vize. Krátké, ale upřímné odpovědi stačí.</p>
+                  <a href="{% url 'onboarding:survey' %}" class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700">
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7 7-7" /><path stroke-linecap="round" stroke-linejoin="round" d="M3 12h18" /></svg>
+                    Zpět na firemní dotazník
+                  </a>
+                </div>
+                <div class="w-40">
+                  <div class="h-2 rounded-full bg-slate-200 overflow-hidden">
+                    <div class="h-full bg-gradient-to-r from-indigo-400 to-purple-500 transition-all duration-500" :style="`width: ${progress()}%`"></div>
+                  </div>
+                  <p class="mt-1 text-xs font-medium text-slate-500" x-text="`Sekce ${current + 1} / ${total}`"></p>
+                </div>
+              </div>
+
+              <div class="space-y-8">
+                {% for block in suropen_questions %}
+                  <div x-show="current === {{ forloop.counter0 }}" x-transition:enter="transition ease-out duration-400" x-transition:enter-start="opacity-0 translate-y-6" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 translate-y-4">
+                    <div class="rounded-2xl bg-white/95 border border-slate-200 shadow-sm px-6 py-5 mb-6">
+                      <h3 class="text-lg font-semibold text-slate-900">{{ block.section }}</h3>
+                      <p class="mt-1 text-sm text-slate-500">Odpověz volně – stačí pár vět, které vystihnou aktuální situaci.</p>
+                    </div>
+
+                    <div class="space-y-6">
+                      {% for question in block.items %}
+                        <div class="rounded-2xl border border-slate-200 bg-white/95 p-5 shadow-sm">
+                          <label class="text-sm font-medium text-slate-800" for="q-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}">{{ question }}</label>
+                          <textarea id="q-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}" name="q-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}" rows="3" data-open-key="q-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}" x-model="answers['q-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}']" class="mt-3 block w-full rounded-xl border-slate-200 bg-slate-50/70 text-sm text-slate-700 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-indigo-500" placeholder="Tvoje odpověď..."></textarea>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+
+              <div class="flex items-center justify-between pt-4 border-t border-slate-200">
+                <button type="button" class="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 transition" x-show="current > 0" @click="prev">
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                  Zpět
+                </button>
+                <div class="ml-auto flex items-center gap-3">
+                  <button type="button" class="inline-flex items-center gap-2 rounded-xl bg-indigo-100 px-4 py-2 text-sm font-semibold text-indigo-600 hover:bg-indigo-200 transition" x-show="current < total - 1" @click="next">
+                    Další sekce
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+                  </button>
+                  <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/30 hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200 transition" x-show="current === total - 1">
+                    Odeslat a dokončit
+                  </button>
+                </div>
+              </div>
+            </form>
+          </section>
+        {% else %}
+          <div class="text-center space-y-4">
+            <h2 class="text-2xl font-semibold text-slate-900">Onboarding je dokončen</h2>
+            <p class="text-sm text-slate-600">Můžeš přejít na dashboard a začít používat všechny funkce platformy.</p>
+            <a href="{% url 'dashboard:index' %}" class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-600/30 hover:bg-sky-700 transition">
+              Pokračovat na dashboard
+            </a>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

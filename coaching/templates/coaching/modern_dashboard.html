@@ -123,7 +123,7 @@
           <!-- První řada grafů -->
           <div class="row g-4 mb-4">
             <div class="col-md-6">
-              <div class="card border-0 shadow-sm h-100">
+              <div class="card border-0 shadow-sm h-100 chart-expandable" id="profitStoryCard">
                 <div class="card-header bg-gradient bg-primary text-white border-0">
                   <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Profit Story</h6>
                 </div>
@@ -287,9 +287,50 @@
   </div>
 </div>
 
+<div id="chartZoomBackdrop" class="chart-zoom-backdrop" aria-hidden="true"></div>
+
 <!-- Moderní CSS styling -->
 <style>
 /* Moderní minimalistické styly */
+.chart-expandable {
+  position: relative;
+  overflow: visible;
+  cursor: zoom-in;
+  transition: transform 0.35s ease, box-shadow 0.35s ease;
+  transform-origin: center center;
+  will-change: transform;
+}
+
+.chart-expandable.expanded {
+  transform: scale(3);
+  z-index: 1055;
+  cursor: zoom-out;
+  box-shadow: 0 2rem 4rem rgba(4, 20, 52, 0.38) !important;
+}
+
+.chart-expandable.expanded .card-body {
+  overflow: visible;
+}
+
+.chart-zoom-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 20, 52, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 1050;
+}
+
+.chart-zoom-backdrop.active {
+  opacity: 1;
+  pointer-events: all;
+}
+
+body.chart-expanded {
+  overflow: hidden;
+}
+
 .avatar-lg {
   width: 60px;
   height: 60px;
@@ -411,6 +452,39 @@ canvas {
 <!-- JavaScript functionality -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const profitCard = document.getElementById('profitStoryCard');
+    const chartBackdrop = document.getElementById('chartZoomBackdrop');
+
+    const toggleChartExpansion = (expanded) => {
+        if (!profitCard || !chartBackdrop) return;
+        if (expanded) {
+            profitCard.classList.add('expanded');
+            chartBackdrop.classList.add('active');
+            document.body.classList.add('chart-expanded');
+        } else {
+            profitCard.classList.remove('expanded');
+            chartBackdrop.classList.remove('active');
+            document.body.classList.remove('chart-expanded');
+        }
+    };
+
+    if (profitCard && chartBackdrop) {
+        profitCard.addEventListener('click', () => {
+            const isExpanded = !profitCard.classList.contains('expanded');
+            toggleChartExpansion(isExpanded);
+        });
+
+        chartBackdrop.addEventListener('click', () => {
+            toggleChartExpansion(false);
+        });
+
+        document.addEventListener('keydown', (evt) => {
+            if (evt.key === "Escape" && profitCard.classList.contains('expanded')) {
+                toggleChartExpansion(false);
+            }
+        });
+    }
+
     const clientSearchInput = document.getElementById('clientSearchInput');
     const searchResults = document.getElementById('searchResults');
     const dropdownIndicator = document.getElementById('dropdownIndicator');

@@ -1,31 +1,58 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Dashboard Kouče</h2>
+<div class="section-shell">
+  <section class="scb-panel scb-panel--inline">
+    <div class="page-heading">
+      <span class="page-eyebrow">Coaching</span>
+      <h2 class="page-title">🤝 Dashboard kouče</h2>
+      <p class="page-subtitle">
+        Přepínejte mezi klienty, sledujte jejich poslední výkazy a připravte si cílené doporučení během chvilky.
+      </p>
+    </div>
 
-<p>👤 Kouč: {{ request.user.username }}</p>
+    <div class="d-flex flex-wrap align-items-center gap-3">
+      <span class="scb-metric-bubble">👤 {{ request.user.username }}</span>
+      <form method="get" class="d-flex flex-wrap align-items-center gap-2">
+        <label class="filter-title mb-0" for="client">Vyber klienta</label>
+        <select name="client" id="client" class="form-select scb-select-inline" onchange="this.form.submit()">
+          <option value="">-- Vyber --</option>
+          {% for c in clients %}
+          <option value="{{ c.id }}" {% if selected_client and selected_client.id == c.id %}selected{% endif %}>
+            {{ c.username }} ({{ c.companyprofile.company_name }})
+          </option>
+          {% endfor %}
+        </select>
+      </form>
+    </div>
+  </section>
 
-<form method="get">
-  <label>Vyber klienta:</label>
-  <select name="client" onchange="this.form.submit()">
-    <option value="">-- Vyber --</option>
-    {% for c in clients %}
-      <option value="{{ c.id }}" {% if selected_client and selected_client.id == c.id %}selected{% endif %}>
-        {{ c.username }} ({{ c.companyprofile.company_name }})
-      </option>
-    {% endfor %}
-  </select>
-</form>
-
-{% if selected_client %}
-  <h4>Data pro: {{ company.company_name }}</h4>
-  <ul>
-    {% for s in statements %}
-      <li>{{ s.year }} – {{ s.document.doc_type }} – {{ s.data }}</li>
-    {% empty %}
-      <li>Žádná data</li>
-    {% endfor %}
-  </ul>
-{% else %}
-  <p>Vyberte klienta pro zobrazení dat.</p>
-{% endif %}
+  <section class="scb-panel">
+    {% if selected_client %}
+    <div class="scb-panel-header">
+      <h3>📄 Data pro: {{ company.company_name }}</h3>
+      <p class="panel-subtitle">Souhrn posledních importovaných výkazů klienta.</p>
+    </div>
+    <ul class="scb-list mt-3">
+      {% for s in statements %}
+      <li class="scb-list-item">
+        <div>
+          <strong>{{ s.year }}</strong>
+          <span class="d-block">{{ s.document.doc_type }}</span>
+        </div>
+        <span class="scb-code">{{ s.data|truncatechars:60 }}</span>
+      </li>
+      {% empty %}
+      <li class="scb-list-item">
+        <div>
+          <strong>Žádná data</strong>
+          <span class="d-block">Požádejte klienta o nahrání finančních dokumentů.</span>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="panel-subtitle mb-0">Vyberte klienta pro zobrazení dat.</p>
+    {% endif %}
+  </section>
+</div>
 {% endblock %}

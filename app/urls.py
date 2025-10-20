@@ -17,6 +17,7 @@ urlpatterns = [
     path("suropen/", include("suropen.urls")),
     path("exports/", include("exports.urls")),
     path("chatbot/", include("chatbot.urls")),
+    path("onboarding/", include("onboarding.urls")),
 ]
 
 # Serve media files during development

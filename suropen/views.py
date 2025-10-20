@@ -96,7 +96,7 @@ def _ask_openai(messages, model=None):
         )
 
 
-def _create_submission(user, answers):
+def _create_submission(user, answers, *, existing_batch_id=None, ignore_cooldown=False):
     cleaned = []
     for item in answers:
         section = item.get("section", "").strip()
@@ -107,14 +107,17 @@ def _create_submission(user, answers):
     if not any(entry["answer"] for entry in cleaned):
         raise NoAnswerProvided("Vyplňte alespoň jednu odpověď.")
 
-    last = OpenAnswer.objects.filter(user=user).order_by("-created_at").first()
-    if last and (timezone.now() - last.created_at) < timedelta(seconds=COOLDOWN_SECONDS):
-        raise DuplicateSubmissionError("Formulář byl odeslán příliš rychle po sobě.")
+    if not ignore_cooldown:
+        last = OpenAnswer.objects.filter(user=user).order_by("-created_at").first()
+        if last and (timezone.now() - last.created_at) < timedelta(seconds=COOLDOWN_SECONDS):
+            raise DuplicateSubmissionError("Formulář byl odeslán příliš rychle po sobě.")
 
     ai_text = _ask_openai(_build_ai_prompt(cleaned))
-    batch_id = uuid4()
+    batch_id = existing_batch_id or uuid4()
 
     with transaction.atomic():
+        if existing_batch_id:
+            OpenAnswer.objects.filter(user=user, batch_id=existing_batch_id).delete()
         for entry in cleaned:
             OpenAnswer.objects.create(
                 user=user,

@@ -1,5 +1,9 @@
+import uuid
+
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils.translation import gettext_lazy as _
+
 from coaching.models import Coach
 
 
@@ -62,3 +66,50 @@ class CoachClientNotes(models.Model):
 
     def __str__(self):
         return f"Poznámky kouče {self.coach} o {self.client.company_name}"
+
+
+class OnboardingProgress(models.Model):
+    class Steps(models.TextChoices):
+        UPLOAD = "upload", _("Nahrání PDF")
+        SURVEY = "survey", _("Dotazník")
+        OPEN_SURVEY = "open_survey", _("Otevřený dotazník")
+        DONE = "done", _("Dokončeno")
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="onboarding_progress")
+    current_step = models.CharField(max_length=32, choices=Steps.choices, default=Steps.UPLOAD)
+    is_completed = models.BooleanField(default=False)
+    survey_submission = models.ForeignKey(
+        "survey.SurveySubmission",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="onboarding_progresses",
+    )
+    suropen_batch_id = models.UUIDField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Onboarding průvodce"
+        verbose_name_plural = "Onboarding průvodci"
+
+    def __str__(self):
+        status = dict(self.Steps.choices).get(self.current_step, self.current_step)
+        return f"Onboarding {self.user.username} – {status}"
+
+    def mark_step(self, step, *, survey_submission=None, suropen_batch_id=None, completed=False, commit=True):
+        self.current_step = step
+        if survey_submission is not None:
+            self.survey_submission = survey_submission
+        if suropen_batch_id is not None:
+            if suropen_batch_id == "":
+                self.suropen_batch_id = None
+            elif isinstance(suropen_batch_id, uuid.UUID):
+                self.suropen_batch_id = suropen_batch_id
+            else:
+                self.suropen_batch_id = uuid.UUID(str(suropen_batch_id))
+        if completed:
+            self.is_completed = True
+            self.current_step = self.Steps.DONE
+        if commit:
+            self.save()

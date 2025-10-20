@@ -4,7 +4,11 @@ import os
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")
+dotenv_path = BASE_DIR / ".env"
+if dotenv_path.exists():
+    load_dotenv(dotenv_path)
+else:
+    load_dotenv(BASE_DIR.parent / ".env")
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")  # fallback pro vývoj
 DEBUG = True #os.getenv("DEBUG", "False") == "True"
@@ -21,7 +25,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
-    "accounts",
+    "accounts.apps.AccountsConfig",
     "coaching",
     "ingest",
     "dashboard",
@@ -29,6 +33,7 @@ INSTALLED_APPS = [
     "suropen",
     "exports",
     "chatbot",
+    "onboarding.apps.OnboardingConfig",
 ]
 
 MIDDLEWARE = [
@@ -37,6 +42,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "accounts.middleware.OnboardingProgressMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]

@@ -1,15 +1,42 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Dashboard - {{ company.company_name }}</h2>
+<div class="section-shell">
+  <section class="scb-panel">
+    <div class="page-heading">
+      <span class="page-eyebrow">Firemní profil</span>
+      <h2 class="page-title">📊 {{ company.company_name }}</h2>
+      <p class="page-subtitle">
+        Přehled všech finančních dokumentů a přístupů pro společnost včetně základních informací o přihlášeném uživateli.
+      </p>
+    </div>
+    <div class="mt-3">
+      <span class="scb-metric-bubble">👤 {{ request.user.username }}</span>
+    </div>
+  </section>
 
-<p>👤 Přihlášený uživatel: {{ request.user.username }}</p>
-
-<h4>Moje výkazy</h4>
-<ul>
-  {% for s in statements %}
-    <li>{{ s.year }} – {{ s.document.doc_type }} – {{ s.data }}</li>
-  {% empty %}
-    <li>Žádná data</li>
-  {% endfor %}
-</ul>
+  <section class="scb-panel">
+    <div class="scb-panel-header">
+      <h3>📄 Moje výkazy</h3>
+      <p class="panel-subtitle">Dostupné dokumenty a automaticky zpracovaná data.</p>
+    </div>
+    <ul class="scb-list mt-3">
+      {% for s in statements %}
+      <li class="scb-list-item">
+        <div>
+          <strong>{{ s.year }}</strong>
+          <span class="d-block">{{ s.document.doc_type }}</span>
+        </div>
+        <span class="scb-code">{{ s.data|truncatechars:60 }}</span>
+      </li>
+      {% empty %}
+      <li class="scb-list-item">
+        <div>
+          <strong>Žádná data</strong>
+          <span class="d-block">Nahrajte první výkaz a začněte analyzovat.</span>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
 {% endblock %}

@@ -1,16 +1,36 @@
 {% extends "base.html" %}{% block content %}
-<h3>Ziskovost</h3>
-<table class="table table-striped">
-  <thead><tr><th>Rok</th><th>Třžby</th><th>Hrubá marže</th><th>Čistý zisk</th></tr></thead>
-  <tbody>
-  {% for s in statements %}
-    <tr>
-      <td>{{ s.year }}</td>
-      <td>{{ s.data.Revenue|default:0 }}</td>
-      <td>{{ s.data.GrossMargin|default:0 }}</td>
-      <td>{{ s.data.NetProfit|default:0 }}</td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
+<div class="section-shell">
+  <section class="scb-panel">
+    <div class="page-heading">
+      <span class="page-eyebrow">Výsledovka</span>
+      <h2 class="page-title">📈 Ziskovost</h2>
+      <p class="page-subtitle">
+        Srovnání klíčových metrik napříč lety vám pomůže rychle odhalit trendy v tržbách, maržích i čistém zisku.
+      </p>
+    </div>
+
+    <div class="scb-table-scroll mt-4">
+      <table class="table scb-data-table align-middle text-center">
+        <thead>
+          <tr>
+            <th>Rok</th>
+            <th>Tržby</th>
+            <th>Hrubá marže</th>
+            <th>Čistý zisk</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in statements %}
+          <tr>
+            <td>{{ s.year }}</td>
+            <td>{{ s.data.Revenue|default:0 }}</td>
+            <td>{{ s.data.GrossMargin|default:0 }}</td>
+            <td>{{ s.data.NetProfit|default:0 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
 {% endblock %}

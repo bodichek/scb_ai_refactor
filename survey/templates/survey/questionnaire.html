@@ -1,61 +1,71 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="container mt-4">
-  <h2>📝 Nový dotazník</h2>
+{% extends "base.html" %}{% block content %}
+<div class="section-shell">
+  <section class="scb-panel scb-panel--inline">
+    <div class="page-heading">
+      <span class="page-eyebrow">Survey</span>
+      <h2 class="page-title">📝 Nový dotazník</h2>
+      <p class="page-subtitle">
+        Zhodnoťte aktuální stav firmy v jednotlivých oblastech. Výsledky okamžitě porovnáme s předchozími odpověďmi.
+      </p>
+    </div>
 
-  <!-- Formulář dotazníku -->
-<form method="post">
-  {% csrf_token %}
-  {% for q in questions %}
-    <div class="card p-3 mb-4 shadow-sm">
-      <h5><b>{{ q.category }}:</b> {{ q.question }}</h5>
+    <form method="post" class="mt-3">
+      {% csrf_token %}
+      <div class="survey-history-list">
+        {% for q in questions %}
+        <div class="card scb-question-card p-4">
+          <h5 class="mb-0"><b>{{ q.category }}:</b> {{ q.question }}</h5>
 
-      <!-- Tabulka popisků pro hodnoty -->
-      <div class="row text-center mt-3 mb-2 small">
-        {% for range, label in q.labels.items %}
-          <div class="col">
-            <b>{{ range }}</b><br>
-            <span>{{ label }}</span>
+          <div class="row text-center mt-3 mb-2 small">
+            {% for range, label in q.labels.items %}
+            <div class="col py-2">
+              <b>{{ range }}</b><br>
+              <span>{{ label }}</span>
+            </div>
+            {% endfor %}
           </div>
+
+          <div class="d-flex align-items-center">
+            <input type="range" class="form-range flex-grow-1"
+                   name="q{{ forloop.counter0 }}"
+                   min="1" max="10" value="5"
+                   oninput="this.parentNode.querySelector('output').value = this.value">
+            <output class="badge bg-warning text-dark ms-3">5</output>
+          </div>
+        </div>
         {% endfor %}
       </div>
-
-      <!-- Slider s aktuální hodnotou -->
-      <div class="d-flex align-items-center">
-        <input type="range" class="form-range flex-grow-1"
-               name="q{{ forloop.counter0 }}"
-               min="1" max="10" value="5"
-               oninput="this.parentNode.querySelector('output').value = this.value">
-        <output class="badge bg-warning text-dark ms-3">5</output>
+      <div class="mt-4">
+        <button type="submit" class="btn btn-success btn-lg px-4">Odeslat dotazník</button>
       </div>
+    </form>
+  </section>
+
+  <section class="scb-panel mt-2">
+    <div class="scb-panel-header">
+      <h3>📊 Moje vyplněné dotazníky</h3>
+      <p class="panel-subtitle">Porovnejte trend hodnocení a otevřete detaily s AI komentářem.</p>
     </div>
-  {% endfor %}
-  <button type="submit" class="btn btn-success">Odeslat dotazník</button>
-</form>
-
-
-  <!-- Přehled vyplněných dotazníků -->
-  <div class="card mt-5 p-3">
-    <h3>📊 Moje vyplněné dotazníky</h3>
-    <table class="table table-striped mt-3">
-      <thead>
-        <tr>
-          <th>Datum</th>
-          <th>Celkové hodnocení</th>
-          <th>Akce</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for s in submissions %}
+    <div class="scb-table-scroll mt-3">
+      <table class="table scb-data-table align-middle">
+        <thead>
+          <tr>
+            <th>Datum</th>
+            <th>Celkové hodnocení</th>
+            <th>Akce</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in submissions %}
           <tr>
             <td>{{ s.created_at|date:"d.m.Y H:i" }}</td>
             <td>
               {% if s.avg_score %}
-                <span class="badge score-badge" data-score="{{ s.avg_score }}">
-                  {{ s.avg_score }}
-                </span>
+              <span class="badge score-badge" data-score="{{ s.avg_score }}">
+                {{ s.avg_score }}
+              </span>
               {% else %}
-                -
+              -
               {% endif %}
             </td>
             <td>
@@ -64,24 +74,24 @@
               </a>
             </td>
           </tr>
-        {% empty %}
+          {% empty %}
           <tr>
             <td colspan="3" class="text-muted">Zatím nemáš žádné záznamy.</td>
           </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
 </div>
 
-<!-- Barevné zvýraznění skóre -->
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".score-badge").forEach(el => {
     const score = parseFloat(el.dataset.score);
     if (isNaN(score)) return;
-    const ratio = (score - 1) / 9; // 0–1
-    const hue = 0 + (120 * ratio); // 0=červená → 120=zelená
+    const ratio = (score - 1) / 9;
+    const hue = 0 + (120 * ratio);
     el.style.backgroundColor = `hsl(${hue}, 80%, 40%)`;
     el.style.color = "white";
     el.style.fontWeight = "bold";

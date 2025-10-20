@@ -3,6 +3,10 @@
 <div class="container">
   <h2>📤 Exportovat do PDF</h2>
 
+  <div class="alert alert-info" role="alert">
+    Než spustíte export, otevřete hlavní <a href="{% url 'dashboard:index' %}">dashboard</a> a klikněte na tlačítko <strong>„📥 Připravit grafy pro export“</strong>. Připravíme tím aktuální grafy pro vložení do PDF.
+  </div>
+
   <form method="post" action="{% url 'exports:export_pdf' %}">
     {% csrf_token %}
 

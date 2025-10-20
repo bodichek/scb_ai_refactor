@@ -1,13 +1,45 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container text-center mt-5">
-    <h1 class="mb-4">📊 Vítejte v aplikaci FinApp</h1>
-    <p class="lead">Sledujte a analyzujte své finanční výkazy jednoduše a přehledně.</p>
-
-    <div class="mt-4">
-        <a href="{% url 'accounts:login' %}" class="btn btn-primary btn-lg mx-2">Přihlásit se</a>
-        <a href="{% url 'accounts:register' %}" class="btn btn-success btn-lg mx-2">Registrovat firmu</a>
+<section class="hero-section" id="overview">
+  <div class="hero-inner">
+    <div class="hero-copy">
+      <span class="hero-eyebrow">SCB Fin assistant</span>
+      <h1 class="hero-title">Visualize your financial data fast</h1>
+      <p class="hero-description">
+        Upload financial files for instant AI analysis. Access interactive charts, tables, and dashboards.
+        Multi-user view supports both personal and coaching needs for a seamless decision workflow.
+        <span class="hero-highlight">Secure, accurate, and comprehensive insights.</span>
+      </p>
+      <div class="hero-buttons">
+        <a href="{% url 'accounts:login' %}" class="btn btn-primary">Analyze now</a>
+        <a href="#features" class="btn btn-outline-light">View demo</a>
+      </div>
+      <div class="hero-metrics">
+        <div class="hero-metric">
+          <div class="hero-metric-value">4.9★</div>
+          <p class="hero-metric-label mb-0">Average client rating</p>
+        </div>
+        <div class="hero-metric">
+          <div class="hero-metric-value">24h</div>
+          <p class="hero-metric-label mb-0">Insight turnaround</p>
+        </div>
+        <div class="hero-metric">
+          <div class="hero-metric-value">+67%</div>
+          <p class="hero-metric-label mb-0">Faster reporting cycles</p>
+        </div>
+      </div>
+      <div class="hero-badges">
+        <span class="hero-badge">Automated insights</span>
+        <span class="hero-badge">Team sharing</span>
+        <span class="hero-badge">Coach-ready views</span>
+      </div>
     </div>
-</div>
+    <div class="hero-visual" aria-hidden="true">
+      <div class="hero-card hero-card--secondary"></div>
+      <div class="hero-card hero-card--primary"></div>
+      <div class="hero-card hero-card--tertiary"></div>
+    </div>
+  </div>
+</section>
 {% endblock %}
