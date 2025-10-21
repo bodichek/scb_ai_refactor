@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db.models import Avg
 from django.http import JsonResponse, FileResponse, HttpResponse
+from django.template.loader import render_to_string
 from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -16,7 +17,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 
 from accounts.models import CompanyProfile, CoachClientNotes
-from ingest.models import FinancialStatement
+from ingest.models import Document, FinancialStatement
 from survey.models import SurveySubmission
 from suropen.models import OpenAnswer
 
@@ -43,6 +44,49 @@ def _extract_recommendation_points(text, max_points=5):
     if not points:
         points = [text.strip()]
     return points
+
+
+def _build_cashflow_table(cf):
+    if not cf:
+        return []
+
+    def entry(label, key, highlight=False):
+        return {
+            "label": label,
+            "value": cf.get(key),
+            "highlight": highlight,
+        }
+
+    return [
+        {
+            "title": "Provozní činnost",
+            "rows": [
+                entry("Čistý zisk", "net_profit"),
+                entry("Odpisy", "depreciation"),
+                entry("Změna pracovního kapitálu", "working_capital_change"),
+                entry("Zaplatili jsme na úrocích", "interest_paid"),
+                entry("Daň z příjmů", "income_tax_paid"),
+                entry("Provozní cash flow", "operating_cf", highlight=True),
+            ],
+        },
+        {
+            "title": "Investiční činnost",
+            "rows": [
+                entry("Prodej majetku", "asset_sales"),
+                entry("Investice do majetku (CapEx)", "capex"),
+                entry("Investiční cash flow", "investing_cf", highlight=True),
+            ],
+        },
+        {
+            "title": "Finanční činnost",
+            "rows": [
+                entry("Přijaté úvěry", "loans_received"),
+                entry("Splacené úvěry", "loans_repaid"),
+                entry("Vyplacené dividendy", "dividends_paid"),
+                entry("Finanční cash flow", "financing_cf", highlight=True),
+            ],
+        },
+    ]
 
 
 def _get_openai_client():
@@ -196,6 +240,47 @@ def index(request):
         )
     coach_note_text = _clean_text(coach_note_entry.notes) if coach_note_entry and coach_note_entry.notes else None
 
+    document_status_map = {}
+    document_qs = (
+        Document.objects.filter(owner=request.user, doc_type__in=["rozvaha", "vysledovka"])
+        .values("year", "doc_type")
+    )
+    for item in document_qs:
+        year = item.get("year")
+        doc_type = item.get("doc_type")
+        if year is None or doc_type not in ("rozvaha", "vysledovka"):
+            continue
+        try:
+            year_int = int(year)
+        except (TypeError, ValueError):
+            continue
+        entry = document_status_map.setdefault(
+            year_int,
+            {"year": year_int, "has_rozvaha": False, "has_vysledovka": False},
+        )
+        if doc_type == "rozvaha":
+            entry["has_rozvaha"] = True
+        elif doc_type == "vysledovka":
+            entry["has_vysledovka"] = True
+
+    statement_years = {
+        int(s.year)
+        for s in statements
+        if getattr(s, "year", None) is not None
+    }
+    upload_years = sorted(
+        set(document_status_map.keys()).union(statement_years),
+        reverse=True,
+    )
+    document_upload_status = [
+        {
+            "year": year,
+            "has_rozvaha": document_status_map.get(year, {}).get("has_rozvaha", False),
+            "has_vysledovka": document_status_map.get(year, {}).get("has_vysledovka", False),
+        }
+        for year in upload_years
+    ]
+
     chart_series = {
         "labels": years,
         "revenue": [r["revenue"] for r in rows],
@@ -206,17 +291,21 @@ def index(request):
     # ðŸ’° Výpočet cash flow pro poslední rok (póvodní logika)
     cf = None
     selected_year = years[-1] if years else None
+    cashflow_table = []
     if selected_year:
         try:
             cf = calculate_cashflow(request.user, selected_year)
         except Exception as exc:
             print(f"⚠️ Chyba výpočtu cashflow: {exc}")
+        else:
+            cashflow_table = _build_cashflow_table(cf)
 
     return render(request, "dashboard/index.html", {
         "rows": json.dumps(rows),
         "years": json.dumps(years),
         "table_rows": rows,
         "cashflow": cf,
+        "cashflow_table": cashflow_table,
         "selected_year": selected_year,
         "company_score": company_score,
         "score_trend": score_trend,
@@ -234,6 +323,7 @@ def index(request):
         "chart_series": json.dumps(chart_series),
         "has_openai_client": bool(getattr(settings, "OPENAI_API_KEY", "")),
         "profile": profile,
+        "document_upload_status": document_upload_status,
     })
 
 
@@ -247,165 +337,15 @@ def cashflow_view(request, year):
 
 @login_required
 def api_cashflow(request, year):
-    """API endpoint pro naÄÃ­tÃ¡nÃ­ Profit vs Cash Flow tabulky pro specifickÃ½ rok"""
+    """API endpoint pro načítání Profit vs Cash Flow tabulky pro specifický rok"""
     cf = calculate_cashflow(request.user, year)
-    
-    if cf:
-        # VypoÄÃ­tÃ¡me variance (rozdÃ­ly)
-        revenue_variance = cf["gross_cash_profit"] - cf["gross_margin"]
-        operating_variance = cf["operating_cash_flow"] - cf["operating_cash_profit"] 
-        net_variance = cf["net_cash_flow"] - cf["retained_profit"]
-        
-        def format_variance(value):
-            if value > 0:
-                return f'<span class="text-success">+{value:,.0f}</span>'
-            elif value < 0:
-                return f'<span class="text-danger">{value:,.0f}</span>'
-            else:
-                return '<span class="text-muted">-</span>'
-        
-        # Renderujeme Profit vs Cash Flow tabulku v ÄeÅ¡tinÄ› podle daÅˆovÃ©ho Å™Ã¡du ÄŒR
-        cashflow_html = f'''
-        <table class="table table-bordered align-middle mt-3">
-          <thead class="table-dark text-center">
-            <tr>
-              <th width="35%">Zisk (ÃºÄetnÃ­)</th>
-              <th width="35%">PenÄ›Å¾nÃ­ tok (hotovost)</th>
-              <th width="30%">RozdÃ­l</th>
-            </tr>
-          </thead>
-          <tbody>
-            <!-- TrÅ¾by -->
-            <tr>
-              <td><strong>TrÅ¾by za prodej zboÅ¾Ã­ a sluÅ¾eb</strong> 
-                <span data-bs-toggle="tooltip" title="ÃšÄetnÃ­ trÅ¾by dle Â§ 23 zÃ¡kona o ÃºÄetnictvÃ­ - zahrnujÃ­ vÅ¡echny faktury vystavenÃ© v danÃ©m obdobÃ­">â“</span>
-                <br><span class="text-primary">{cf["revenue"]:,.0f} KÄ</span></td>
-              <td><strong>PÅ™Ã­jmy od zÃ¡kaznÃ­kÅ¯</strong>
-                <span data-bs-toggle="tooltip" title="SkuteÄnÄ› pÅ™ijatÃ© penÄ›Å¾nÃ­ prostÅ™edky od zÃ¡kaznÃ­kÅ¯ - liÅ¡Ã­ se od trÅ¾eb kvÅ¯li pohledÃ¡vkÃ¡m">â“</span>
-                <br><span class="text-primary">{cf["revenue"] * 0.93:,.0f} KÄ</span></td>
-              <td class="text-center">{format_variance((cf["revenue"] * 0.93) - cf["revenue"])}</td>
-            </tr>
-            
-            <!-- NÃ¡klady na prodanÃ© zboÅ¾Ã­ -->
-            <tr>
-              <td><strong>NÃ¡klady na prodanÃ© zboÅ¾Ã­</strong>
-                <span data-bs-toggle="tooltip" title="ÃšÄetnÃ­ nÃ¡klady na zboÅ¾Ã­ podle Â§ 25 zÃ¡kona o ÃºÄetnictvÃ­ - zaÃºÄtovanÃ© nÃ¡klady za prodanÃ© zboÅ¾Ã­">â“</span>
-                <br><span class="text-danger">{cf["cogs"]:,.0f} KÄ</span></td>
-              <td><strong>VÃ½daje dodavatelÅ¯m</strong>
-                <span data-bs-toggle="tooltip" title="SkuteÄnÄ› zaplacenÃ© ÄÃ¡stky dodavatelÅ¯m - liÅ¡Ã­ se od nÃ¡kladÅ¯ kvÅ¯li zÃ¡vazkÅ¯m a zÃ¡sob">â“</span>
-                <br><span class="text-danger">{cf["cogs"] * 0.98:,.0f} KÄ</span></td>
-              <td class="text-center">{format_variance((cf["cogs"] * 0.98) - cf["cogs"])}</td>
-            </tr>
-            
-            <!-- HrubÃ¡ marÅ¾e -->
-            <tr class="table-light">
-              <td><strong>HrubÃ¡ marÅ¾e</strong>
-                <span data-bs-toggle="tooltip" title="HrubÃ½ zisk = TrÅ¾by - NÃ¡klady na prodanÃ© zboÅ¾Ã­. ZÃ¡kladnÃ­ ukazatel ziskovosti obchodnÃ­ Äinnosti">â“</span>
-                <br><span class="fw-bold text-success">{cf["gross_margin"]:,.0f} KÄ</span></td>
-              <td><strong>HrubÃ½ penÄ›Å¾nÃ­ tok</strong>
-                <span data-bs-toggle="tooltip" title="SkuteÄnÃ¡ hotovost z obchodnÃ­ Äinnosti = PÅ™Ã­jmy od zÃ¡kaznÃ­kÅ¯ - VÃ½daje dodavatelÅ¯m">â“</span>
-                <br><span class="fw-bold text-success">{cf["gross_cash_profit"]:,.0f} KÄ</span></td>
-              <td class="text-center fw-bold">{format_variance(cf["gross_cash_profit"] - cf["gross_margin"])}</td>
-            </tr>
-            
-            <!-- ProvoznÃ­ nÃ¡klady -->
-            <tr>
-              <td><strong>ProvoznÃ­ nÃ¡klady (bez odpisÅ¯)</strong><br><span class="text-warning">{cf["overheads"]:,.0f} KÄ</span></td>
-              <td><strong>ProvoznÃ­ nÃ¡klady (bez odpisÅ¯)</strong><br><span class="text-warning">{cf["overheads"]:,.0f} KÄ</span></td>
-              <td class="text-center"><span class="text-muted">-</span></td>
-            </tr>
-            
-            <!-- ProvoznÃ­ zisk -->
-            <tr class="table-light">
-              <td><strong>ProvoznÃ­ zisk</strong><br><span class="fw-bold text-info">{cf["operating_cash_profit"]:,.0f} KÄ</span></td>
-              <td><strong>ProvoznÃ­ penÄ›Å¾nÃ­ tok</strong><br><span class="fw-bold text-info">{cf["operating_cash_flow"]:,.0f} KÄ</span></td>
-              <td class="text-center fw-bold">{format_variance(cf["operating_cash_flow"] - cf["operating_cash_profit"])}</td>
-            </tr>
-            
-            <!-- OstatnÃ­ penÄ›Å¾nÃ­ vÃ½daje header -->
-            <tr class="table-secondary">
-              <td colspan="2" class="text-center"><strong>OstatnÃ­ penÄ›Å¾nÃ­ vÃ½daje</strong></td>
-              <td></td>
-            </tr>
-            
-            <!-- Ãšroky -->
-            <tr>
-              <td><strong>NÃ¡kladovÃ© Ãºroky</strong><br><span class="text-danger">-{cf["interest"]:,.0f} KÄ</span></td>
-              <td><strong>ZaplacenÃ© Ãºroky</strong><br><span class="text-danger">-{cf["interest"]:,.0f} KÄ</span></td>
-              <td class="text-center"><span class="text-muted">-</span></td>
-            </tr>
-            
-            <!-- DanÄ› -->
-            <tr>
-              <td><strong>DaÅˆ z pÅ™Ã­jmÅ¯</strong>
-                <span data-bs-toggle="tooltip" title="ÃšÄetnÃ­ daÅˆ z pÅ™Ã­jmÅ¯ podle Â§ 59 zÃ¡kona o ÃºÄetnictvÃ­ - splatnÃ¡ i odloÅ¾enÃ¡ daÅˆ">â“</span>
-                <br><span class="text-danger">{cf["taxation"]:,.0f} KÄ</span></td>
-              <td><strong>ZaplacenÃ¡ daÅˆ z pÅ™Ã­jmÅ¯</strong>
-                <span data-bs-toggle="tooltip" title="SkuteÄnÄ› zaplacenÃ¡ daÅˆ z pÅ™Ã­jmÅ¯ na ÃºÄet finanÄnÃ­ho ÃºÅ™adu">â“</span>
-                <br><span class="text-danger">{cf["taxation"]:,.0f} KÄ</span></td>
-              <td class="text-center"><span class="text-muted">-</span></td>
-            </tr>
-            
-            <!-- MimoÅ™Ã¡dnÃ© vÃ½nosy -->
-            <tr>
-              <td><strong>MimoÅ™Ã¡dnÃ© vÃ½nosy</strong><br><span class="text-success">+{cf["extraordinary"]:,.0f} KÄ</span></td>
-              <td><strong>MimoÅ™Ã¡dnÃ© pÅ™Ã­jmy</strong><br><span class="text-success">+{cf["extraordinary"]:,.0f} KÄ</span></td>
-              <td class="text-center"><span class="text-muted">-</span></td>
-            </tr>
-            
-            <!-- PodÃ­ly na zisku/Dividendy -->
-            <tr>
-              <td><strong>PodÃ­ly na zisku/Dividendy</strong><br><span class="text-danger">{cf["dividends"]:,.0f} KÄ</span></td>
-              <td><strong>VyplacenÃ© podÃ­ly/Dividendy</strong><br><span class="text-danger">{cf["dividends"]:,.0f} KÄ</span></td>
-              <td class="text-center"><span class="text-muted">-</span></td>
-            </tr>
-            
-            <!-- Odpisy -->
-            <tr>
-              <td><strong>Odpisy dlouhodobÃ©ho majetku</strong>
-                <span data-bs-toggle="tooltip" title="ÃšÄetnÃ­ odpisy podle Â§ 56 zÃ¡kona o ÃºÄetnictvÃ­ - vyjadÅ™ujÃ­ opotÅ™ebenÃ­ majetku, nejednÃ¡ se o penÄ›Å¾nÃ­ vÃ½daj">â“</span>
-                <br><span class="text-warning">-{cf["depreciation"]:,.0f} KÄ</span></td>
-              <td><strong>PoÅ™Ã­zenÃ­ dlouhodobÃ©ho majetku</strong>
-                <span data-bs-toggle="tooltip" title="SkuteÄnÃ© penÄ›Å¾nÃ­ vÃ½daje na nÃ¡kup dlouhodobÃ©ho majetku (budovy, stroje, vybavenÃ­)">â“</span>
-                <br><span class="text-danger">-{cf["fixed_assets"]:,.0f} KÄ</span></td>
-              <td class="text-center">{format_variance(-cf["fixed_assets"] + cf["depreciation"])}</td>
-            </tr>
-            
-            <!-- OstatnÃ­ aktiva -->
-            <tr>
-              <td></td>
-              <td><strong>NÃ¡rÅ¯st ostatnÃ­ch aktiv</strong><br><span class="text-danger">-{cf["other_assets"]:,.0f} KÄ</span></td>
-              <td class="text-center">{format_variance(-cf["other_assets"])}</td>
-            </tr>
-            
-            <!-- VÃ½bÄ›r kapitÃ¡lu -->
-            <tr>
-              <td></td>
-              <td><strong>VÃ½bÄ›r zÃ¡kladnÃ­ho kapitÃ¡lu</strong><br><span class="text-danger">-{cf["capital_withdrawn"]:,.0f} KÄ</span></td>
-              <td class="text-center">{format_variance(-cf["capital_withdrawn"])}</td>
-            </tr>
-            
-            <!-- CelkovÃ© souÄty -->
-            <tr class="table-dark">
-              <td><strong>Zisk po zdanÄ›nÃ­ (nerozdÄ›lenÃ½)</strong>
-                <span data-bs-toggle="tooltip" title="ÃšÄetnÃ­ vÃ½sledek hospodaÅ™enÃ­ po zdanÄ›nÃ­ - zisk, kterÃ½ mÅ¯Å¾e bÃ½t reinvestovÃ¡n nebo vyplacen akcionÃ¡Å™Å¯m">â“</span>
-                <br><span class="fw-bold text-light">{cf["retained_profit"]:,.0f} KÄ</span></td>
-              <td><strong>ÄŒistÃ½ penÄ›Å¾nÃ­ tok</strong>
-                <span data-bs-toggle="tooltip" title="SkuteÄnÃ¡ zmÄ›na hotovosti za obdobÃ­ - rozdÃ­l mezi vÅ¡emi pÅ™Ã­jmy a vÃ½daji">â“</span>
-                <br><span class="fw-bold text-light">{cf["net_cash_flow"]:,.0f} KÄ</span></td>
-              <td class="text-center fw-bold">{format_variance(cf["net_cash_flow"] - cf["retained_profit"])}</td>
-            </tr>
-          </tbody>
-        </table>
-        '''
-        return HttpResponse(cashflow_html)
-    else:
-        error_html = f'''
-        <div class="alert alert-warning mt-3">
-          âš ï¸ AnalÃ½zu Zisk vs PenÄ›Å¾nÃ­ tok zatÃ­m nebylo moÅ¾nÃ© vypoÄÃ­tat pro rok {year} â€“ zkontrolujte, Å¾e mÃ¡te nahranÃ© finanÄnÃ­ vÃ½kazy pro tento rok.
-        </div>
-        '''
-        return HttpResponse(error_html)
+    context = {
+        "cashflow": cf,
+        "cashflow_table": _build_cashflow_table(cf),
+    }
+    html = render_to_string("dashboard/partials/cashflow_table.html", context, request=request)
+    return HttpResponse(html)
+
 
 
 @csrf_exempt

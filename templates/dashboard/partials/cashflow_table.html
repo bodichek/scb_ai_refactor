@@ -1,0 +1,63 @@
+{% if cashflow_table %}
+<table class="min-w-full divide-y divide-slate-200 text-sm">
+  <thead class="bg-slate-50/80 text-slate-500 uppercase tracking-wide text-xs">
+    <tr>
+      <th class="px-4 py-3 text-left">Položka</th>
+      <th class="px-4 py-3 text-right">Hodnota (Kč)</th>
+    </tr>
+  </thead>
+  <tbody class="divide-y divide-slate-200/70 bg-white/90">
+    {% for block in cashflow_table %}
+    <tr class="bg-slate-50/90 text-slate-900 font-semibold">
+      <td class="px-4 py-3" colspan="2">{{ block.title }}</td>
+    </tr>
+    {% for row in block.rows %}
+    <tr>
+      <td class="px-4 py-3 text-slate-600">{{ row.label }}</td>
+      <td class="px-4 py-3 text-right {% if row.highlight %}font-semibold text-slate-900{% else %}text-slate-700{% endif %}">
+        {% if row.value is not None %}
+          {{ row.value|floatformat:0 }}
+        {% else %}
+          <span class="text-slate-400">–</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    {% endfor %}
+    <tr class="bg-slate-100/90 font-semibold text-slate-900">
+      <td class="px-4 py-3">Čistý peněžní tok</td>
+      <td class="px-4 py-3 text-right">
+        {% if cashflow %}
+          {{ cashflow.net_cash_flow|floatformat:0 }}
+        {% else %}
+          <span class="text-slate-400">–</span>
+        {% endif %}
+      </td>
+    </tr>
+    <tr class="bg-slate-50/90 text-slate-700">
+      <td class="px-4 py-3">Počáteční hotovost</td>
+      <td class="px-4 py-3 text-right">
+        {% if cashflow %}
+          {{ cashflow.cash_begin|floatformat:0 }}
+        {% else %}
+          <span class="text-slate-400">–</span>
+        {% endif %}
+      </td>
+    </tr>
+    <tr class="bg-slate-50/90 text-slate-700">
+      <td class="px-4 py-3">Konečná hotovost</td>
+      <td class="px-4 py-3 text-right">
+        {% if cashflow %}
+          {{ cashflow.cash_end|floatformat:0 }}
+        {% else %}
+          <span class="text-slate-400">–</span>
+        {% endif %}
+      </td>
+    </tr>
+  </tbody>
+</table>
+{% else %}
+<div class="py-8 text-center text-slate-500 text-sm bg-white/90">
+  Pro tento rok zatím nemáme dostatek dat.
+</div>
+{% endif %}

@@ -1,4 +1,4 @@
-{% load static %}
+{% load static custom_tags %}
 
 <!DOCTYPE html>
 <html lang="cs">
@@ -74,39 +74,113 @@
       font-size: 1.1rem;
     }
 
-    .scb-navbar .navbar-nav .nav-link {
-      color: rgba(255, 255, 255, 0.85);
+    .scb-navbar .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 1.1rem;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      width: 100%;
+    }
+
+    .scb-navbar .nav-links .nav-item {
+      display: flex;
+    }
+
+    .scb-navbar .nav-links .nav-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.45rem 1rem;
+      border-radius: 999px;
+      color: rgba(255, 255, 255, 0.88);
       font-weight: 500;
-      transition: color 0.2s ease, opacity 0.2s ease;
+      text-decoration: none;
+      transition:
+        color 0.2s ease,
+        background 0.25s ease,
+        box-shadow 0.25s ease,
+        transform 0.2s ease;
+      position: relative;
     }
 
-    .scb-navbar .navbar-nav .nav-link:hover,
-    .scb-navbar .navbar-nav .nav-link:focus {
-      color: #fff;
+    .scb-navbar .nav-links .nav-link:hover,
+    .scb-navbar .nav-links .nav-link:focus {
+      color: var(--scb-blue-900);
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: 0 12px 26px rgba(4, 20, 52, 0.18);
+      transform: translateY(-1px);
     }
 
-    .scb-navbar .navbar-nav .nav-link.nav-link-muted {
+    .scb-navbar .nav-links .nav-link.nav-link-muted {
       opacity: 0.85;
     }
 
-    .scb-navbar .navbar-nav .nav-link.nav-link-muted:hover {
+    .scb-navbar .nav-links .nav-link.nav-link-muted:hover {
       opacity: 1;
     }
 
-    .scb-navbar .navbar-nav .btn-cta {
+    .scb-navbar .nav-links .btn-cta {
       color: var(--scb-blue-900);
       background-color: #fff;
       border-radius: 999px;
       font-weight: 600;
       padding: 0.5rem 1.6rem;
       box-shadow: 0 10px 25px rgba(6, 62, 173, 0.25);
+      transform: none;
     }
 
-    .scb-navbar .navbar-nav .btn-ghost {
+    .scb-navbar .nav-links .btn-cta:hover,
+    .scb-navbar .nav-links .btn-cta:focus {
+      box-shadow: 0 16px 32px rgba(6, 62, 173, 0.28);
+      background: #fff;
+      color: var(--scb-blue-900);
+    }
+
+    .scb-navbar .nav-links .btn-ghost {
       border-radius: 999px;
       padding: 0.4rem 1.3rem;
       border: 1px solid rgba(255, 255, 255, 0.45);
       color: #fff;
+      background: rgba(255, 255, 255, 0.12);
+      transition:
+        color 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.25s ease,
+        transform 0.2s ease;
+    }
+
+    .scb-navbar .nav-links .btn-ghost:hover,
+    .scb-navbar .nav-links .btn-ghost:focus {
+      background: rgba(255, 255, 255, 0.24);
+      color: #fff;
+      box-shadow: 0 12px 24px rgba(4, 20, 52, 0.22);
+      transform: translateY(-1px);
+    }
+
+
+    .dashboard-card {
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .dashboard-card:hover,
+    .dashboard-card:focus-within {
+      transform: translateY(-6px) scale(1.01);
+      box-shadow: 0 26px 45px rgba(4, 20, 52, 0.16);
+    }
+
+    .dashboard-card:focus-visible {
+      outline: 2px solid var(--scb-blue-500);
+      outline-offset: 4px;
+    }
+    @media (max-width: 768px) {
+      .scb-navbar .nav-links {
+        justify-content: flex-start;
+        gap: 0.8rem 1rem;
+      }
     }
 
     .scb-btn {
@@ -176,26 +250,13 @@
       position: relative;
     }
 
-    .hero-section {
+      .hero-section {
+      /* hero layout styles trimmed to avoid covering the navbar */
       position: relative;
-      left: 50%;
-      right: 50%;
-      width: 100vw;
-      margin-left: calc(-50vw + 50%);
-      margin-right: calc(-50vw + 50%);
       background: linear-gradient(130deg, var(--scb-blue-700) 0%, var(--scb-blue-500) 60%, var(--scb-blue-300) 110%);
       color: #fff;
       padding: clamp(3rem, 6vw, 6rem) 0;
       overflow: hidden;
-    }
-
-    .hero-section::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), transparent 55%),
-                  radial-gradient(circle at 80% 40%, rgba(255, 255, 255, 0.12), transparent 65%);
-      pointer-events: none;
     }
 
     .hero-inner {
@@ -935,6 +996,17 @@
       max-width: 100%;
     }
 
+    .table {
+      font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+      font-size: 0.92rem;
+      color: var(--scb-navy);
+    }
+
+    .table thead th,
+    .table tbody td {
+      font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    }
+
     .table thead th {
       border-bottom: none;
     }
@@ -974,18 +1046,9 @@
 <body class="page-frame">
   <nav class="navbar navbar-expand-lg navbar-dark scb-navbar">
     <div class="container-fluid px-4">
-      <a class="navbar-brand" href="/">
-        <span class="brand-logo">★</span>
-        <span>SCB Fin assistant</span>
-      </a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-
-      <div class="collapse navbar-collapse" id="navbarNav">
-        <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2">
+      <ul class="nav-links">
           {% if user.is_authenticated %}
-            {% if user.userrole.role != 'coach' %}
+            {% if not user|is_coach_user %}
             <li class="nav-item">
               <a class="nav-link" href="{% url 'dashboard:index' %}">Dashboard</a>
             </li>
@@ -1002,7 +1065,7 @@
               <a class="nav-link" href="{% url 'exports:export_form' %}">Exporty</a>
             </li>
             {% endif %}
-            {% if user.userrole.role == 'coach' %}
+            {% if user|is_coach_user %}
             <li class="nav-item">
               <a class="nav-link" href="{% url 'coaching:my_clients' %}">Moji klienti</a>
             </li>
@@ -1030,11 +1093,10 @@
               <a class="nav-link btn-ghost" href="{% url 'accounts:login' %}">Sign in</a>
             </li>
             <li class="nav-item">
-              <a class="nav-link btn btn-cta" href="{% url 'accounts:register' %}">Try now</a>
+              <a class="nav-link btn-cta" href="{% url 'accounts:register' %}">Try now</a>
             </li>
           {% endif %}
-        </ul>
-      </div>
+      </ul>
     </div>
   </nav>
 

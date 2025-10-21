@@ -338,7 +338,7 @@
       if (!container || !year) {
         return;
       }
-      container.innerHTML = '<div class="py-6 text-sm text-slate-500 text-center">Načítáme peněžní tok…</div>';
+      container.innerHTML = '<div class="py-8 text-center text-sm text-slate-500 bg-white/90">Načítáme peněžní tok…</div>';
       try {
         const response = await fetch(`/dashboard/api/cashflow/${year}/`);
         if (!response.ok) {
@@ -352,7 +352,7 @@
         }
       } catch (error) {
         console.error('Chyba při načítání cashflow', error);
-        container.innerHTML = '<div class="py-6 text-sm text-rose-600 text-center">Nepodařilo se načíst cashflow data. Zkus to prosím znovu.</div>';
+        container.innerHTML = '<div class="py-8 text-sm text-rose-600 text-center bg-white/90">Nepodařilo se načíst cashflow data. Zkus to prosím znovu.</div>';
       }
     }
 
@@ -480,7 +480,7 @@
     </header>
 
     <div class="grid grid-cols-1 xl:grid-cols-6 gap-6">
-      <section class="xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-6">
+      <section class="dashboard-card xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-6">
         <div class="flex items-start justify-between">
           <div>
             <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Skóre firmy</p>
@@ -503,7 +503,7 @@
         <p class="text-xs text-slate-500">Sleduj trend alespoň měsíčně, aby šlo zachytit změny včas.</p>
       </section>
 
-      <section class="xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
+      <section class="dashboard-card xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Nálada týmu</p>
@@ -518,7 +518,7 @@
         <p class="text-xs text-slate-400">Nálada se odvíjí od numerického skóre i sentimentu odpovědí.</p>
       </section>
 
-      <section class="xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
+      <section class="dashboard-card xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
         <div>
           <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Doporučení kouče</p>
           <h2 class="mt-2 text-2xl font-semibold text-slate-900">Další kroky</h2>
@@ -539,7 +539,7 @@
         {% endif %}
       </section>
 
-      <section class="xl:col-span-4 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
+      <section class="dashboard-card xl:col-span-4 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Meziroční vývoj</p>
@@ -555,7 +555,7 @@
         </div>
       </section>
 
-      <section class="xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
+      <section class="dashboard-card xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
         <div>
           <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Kontaktuj kouče</p>
           <h2 class="mt-2 text-xl font-semibold text-slate-900">Potřebuješ revizi?</h2>
@@ -567,7 +567,7 @@
         <p id="coachContactStatus" class="text-xs text-slate-500" data-tone="info">Odpověď od AI vidíš hned, kouč ji dostane do revize.</p>
       </section>
 
-      <section class="xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
+      <section class="dashboard-card xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
         <div>
           <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Revize dashboardu</p>
           <h2 class="mt-2 text-xl font-semibold text-slate-900">Poznámky kouče</h2>
@@ -582,7 +582,52 @@
       </section>
     </div>
 
-    <section class="bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-4">
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <a href="{% url 'survey:questionnaire' %}" class="dashboard-card group bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4 text-slate-700 no-underline" aria-label="Spustit nový dotazník">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Dotazníky</p>
+            <h3 class="text-lg font-semibold text-slate-900">Nový dotazník</h3>
+          </div>
+          <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-sky-100 text-sky-600 text-lg">📝</span>
+        </div>
+        <p class="text-sm text-slate-500">Otevři finanční dotazník a nasbírej aktuální odpovědi od týmu.</p>
+        <span class="mt-auto inline-flex items-center gap-1 text-sm font-semibold text-sky-600 group-hover:text-sky-700">
+          Spustit
+          <span aria-hidden="true">→</span>
+        </span>
+      </a>
+      <a href="{% url 'suropen:form' %}" class="dashboard-card group bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4 text-slate-700 no-underline" aria-label="Nová analýza">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Analýzy</p>
+            <h3 class="text-lg font-semibold text-slate-900">Nová analýza</h3>
+          </div>
+          <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 text-lg">🧠</span>
+        </div>
+        <p class="text-sm text-slate-500">Proveď otevřenou analýzu a zachyť bariéry růstu firmy.</p>
+        <span class="mt-auto inline-flex items-center gap-1 text-sm font-semibold text-emerald-600 group-hover:text-emerald-700">
+          Spustit
+          <span aria-hidden="true">→</span>
+        </span>
+      </a>
+      <a href="{% url 'exports:export_form' %}" class="dashboard-card group bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4 text-slate-700 no-underline" aria-label="Export review">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Exporty</p>
+            <h3 class="text-lg font-semibold text-slate-900">Export review</h3>
+          </div>
+          <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 text-lg">📄</span>
+        </div>
+        <p class="text-sm text-slate-500">Vygeneruj nejnovější PDF s čísly a přehledem výkazů.</p>
+        <span class="mt-auto inline-flex items-center gap-1 text-sm font-semibold text-indigo-600 group-hover:text-indigo-700">
+          Otevřít
+          <span aria-hidden="true">→</span>
+        </span>
+      </a>
+    </section>
+
+    <section class="dashboard-card bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-4">
       <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Volba roku</p>
@@ -597,6 +642,48 @@
           {% endfor %}
         </div>
       </div>
+    </section>
+
+    <section class="dashboard-card bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-4">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div>
+          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Data z nahraných výkazů</p>
+          <h2 class="mt-2 text-lg font-semibold text-slate-900">Stav rozvahy a výsledovky</h2>
+          <p class="text-xs text-slate-500 mt-1">Rychlý přehled, jestli máme oba typy dokumentů pro jednotlivé roky.</p>
+        </div>
+      </div>
+      {% if document_upload_status %}
+      <div class="overflow-hidden border border-slate-200/70 rounded-2xl">
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+          <thead class="bg-slate-50/80 text-slate-500 uppercase tracking-wide text-xs">
+            <tr>
+              <th scope="col" class="px-4 py-3 text-left">Rok</th>
+              <th scope="col" class="px-4 py-3 text-left">Rozvaha</th>
+              <th scope="col" class="px-4 py-3 text-left">Výsledovka</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200/70 bg-white/80">
+            {% for row in document_upload_status %}
+            <tr>
+              <td class="px-4 py-3 font-medium text-slate-700">{{ row.year }}</td>
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold {% if row.has_rozvaha %}bg-emerald-100 text-emerald-700{% else %}bg-rose-100 text-rose-700{% endif %}">
+                  {{ row.has_rozvaha|yesno:"Ano,Ne" }}
+                </span>
+              </td>
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold {% if row.has_vysledovka %}bg-emerald-100 text-emerald-700{% else %}bg-rose-100 text-rose-700{% endif %}">
+                  {{ row.has_vysledovka|yesno:"Ano,Ne" }}
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-sm text-slate-500">Zatím nejsou nahrané žádné rozvahy ani výsledovky. Nahraj dokumenty v sekci Ingest, aby se přehled doplnil.</p>
+      {% endif %}
     </section>
 
     <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -637,44 +724,48 @@
       </div>
     </section>
 
-    <section class="bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6">
-      <h3 class="text-lg font-semibold text-slate-900">📑 Přehled dat</h3>
-      <p class="text-xs text-slate-500 mb-3">Kompletní tabulka hlavních finančních ukazatelů.</p>
-      <div class="overflow-x-auto">
-        <table class="table table-bordered align-middle text-center">
-          <thead class="table-light">
+    <section class="dashboard-card bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-4">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div>
+          <h3 class="text-lg font-semibold text-slate-900">📑 Přehled dat</h3>
+          <p class="text-xs text-slate-500">Kompletní tabulka hlavních finančních ukazatelů.</p>
+        </div>
+      </div>
+      <div class="overflow-hidden border border-slate-200/70 rounded-2xl">
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+          <thead class="bg-slate-50/80 text-slate-500 uppercase tracking-wide text-xs">
             <tr>
-              <th>Rok</th>
-              <th>Tržby (Kč)</th>
-              <th>Náklady na prodané zboží (Kč)</th>
-              <th>Hrubá marže (Kč)</th>
-              <th>Provozní náklady (Kč)</th>
-              <th>EBIT (Kč)</th>
-              <th>Čistý zisk (Kč)</th>
-              <th>Hrubá marže %</th>
-              <th>Provozní marže %</th>
-              <th>Čistá marže %</th>
-              <th>Růst tržeb %</th>
-              <th>Růst nákladů na prodané zboží %</th>
-              <th>Růst provozních nákladů %</th>
+              <th class="px-4 py-3 text-left">Rok</th>
+              <th class="px-4 py-3 text-right">Tržby (Kč)</th>
+              <th class="px-4 py-3 text-right">Náklady na prodané zboží (Kč)</th>
+              <th class="px-4 py-3 text-right">Hrubá marže (Kč)</th>
+              <th class="px-4 py-3 text-right">Provozní náklady (Kč)</th>
+              <th class="px-4 py-3 text-right">EBIT (Kč)</th>
+              <th class="px-4 py-3 text-right">Čistý zisk (Kč)</th>
+              <th class="px-4 py-3 text-right">Hrubá marže %</th>
+              <th class="px-4 py-3 text-right">Provozní marže %</th>
+              <th class="px-4 py-3 text-right">Čistá marže %</th>
+              <th class="px-4 py-3 text-right">Růst tržeb %</th>
+              <th class="px-4 py-3 text-right">Růst nákladů na prodané zboží %</th>
+              <th class="px-4 py-3 text-right">Růst provozních nákladů %</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="divide-y divide-slate-200/70 bg-white/90">
             {% for r in table_rows %}
-            <tr>
-              <td>{{ r.year }}</td>
-              <td>{{ r.revenue }}</td>
-              <td>{{ r.cogs }}</td>
-              <td>{{ r.gross_margin }}</td>
-              <td>{{ r.overheads }}</td>
-              <td>{{ r.ebit }}</td>
-              <td>{{ r.net_profit }}</td>
-              <td>{{ r.profitability.gm_pct|floatformat:2 }}%</td>
-              <td>{{ r.profitability.op_pct|floatformat:2 }}%</td>
-              <td>{{ r.profitability.np_pct|floatformat:2 }}%</td>
-              <td>{{ r.growth.revenue|floatformat:2 }}%</td>
-              <td>{{ r.growth.cogs|floatformat:2 }}%</td>
-              <td>{{ r.growth.overheads|floatformat:2 }}%</td>
+            <tr class="text-slate-700">
+              <td class="px-4 py-3 font-medium text-slate-800">{{ r.year }}</td>
+              <td class="px-4 py-3 text-right">{{ r.revenue|default_if_none:"–" }}</td>
+              <td class="px-4 py-3 text-right">{{ r.cogs|default_if_none:"–" }}</td>
+              <td class="px-4 py-3 text-right">{{ r.gross_margin|default_if_none:"–" }}</td>
+              <td class="px-4 py-3 text-right">{{ r.overheads|default_if_none:"–" }}</td>
+              <td class="px-4 py-3 text-right">{{ r.ebit|default_if_none:"–" }}</td>
+              <td class="px-4 py-3 text-right">{{ r.net_profit|default_if_none:"–" }}</td>
+              <td class="px-4 py-3 text-right">{{ r.profitability.gm_pct|floatformat:2 }}%</td>
+              <td class="px-4 py-3 text-right">{{ r.profitability.op_pct|floatformat:2 }}%</td>
+              <td class="px-4 py-3 text-right">{{ r.profitability.np_pct|floatformat:2 }}%</td>
+              <td class="px-4 py-3 text-right">{{ r.growth.revenue|floatformat:2 }}%</td>
+              <td class="px-4 py-3 text-right">{{ r.growth.cogs|floatformat:2 }}%</td>
+              <td class="px-4 py-3 text-right">{{ r.growth.overheads|floatformat:2 }}%</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -682,9 +773,7 @@
       </div>
     </section>
 
-    {% if cashflow %}
-    {% endif %}
-    <section class="bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-4">
+    <section class="dashboard-card bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-4">
       <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h3 class="text-lg font-semibold text-slate-900">💰 Zisk vs peněžní tok</h3>
@@ -699,12 +788,8 @@
           </select>
         </div>
       </div>
-      <div id="cashflow-content" class="bg-slate-50/60 border border-slate-200 rounded-2xl p-4">
-        {% if cashflow %}
-        <div class="py-6 text-center text-slate-500 text-sm">Načítáme detailní přehled cash flow…</div>
-        {% else %}
-        <div class="py-6 text-center text-slate-500 text-sm">Pro tento rok zatím nemáme dostatek dat.</div>
-        {% endif %}
+      <div class="overflow-hidden border border-slate-200/70 rounded-2xl" id="cashflow-content">
+        {% include 'dashboard/partials/cashflow_table.html' %}
       </div>
     </section>
   </div>
