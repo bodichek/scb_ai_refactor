@@ -125,24 +125,38 @@ def upload_step(request):
     origin_step = progress.current_step
 
     if request.method == "POST":
-        pdf_file = request.FILES.get("pdf_file")
-        if not pdf_file:
-            messages.error(request, "Vyberte prosím PDF soubor k nahrání.")
+        uploaded_files = request.FILES.getlist("pdf_file")
+        if not uploaded_files:
+            messages.error(request, "Vyberte prosím alespoň jeden PDF soubor k nahrání.")
         else:
-            try:
-                _process_uploaded_file(request.user, pdf_file)
-            except Exception as exc:  # pragma: no cover - log only
-                messages.error(request, f"Nahrání se nezdařilo: {exc}")
-            else:
+            successful = 0
+            for uploaded in uploaded_files:
+                try:
+                    _process_uploaded_file(request.user, uploaded)
+                    successful += 1
+                except Exception as exc:  # pragma: no cover - log only
+                    messages.error(
+                        request,
+                        f"Nahrání souboru {uploaded.name} se nezdařilo: {exc}",
+                    )
+
+            if successful:
                 if origin_step == OnboardingProgress.Steps.UPLOAD:
                     progress.mark_step(OnboardingProgress.Steps.SURVEY)
+                    messages.success(
+                        request,
+                        f"Nahráno {successful} souborů. Pokračujme na dotazník.",
+                    )
                     return redirect("onboarding:survey")
                 elif progress.is_completed:
                     progress.mark_step(OnboardingProgress.Steps.DONE, completed=True)
-                    messages.success(request, "PDF bylo znovu nahráno.")
                 else:
                     progress.mark_step(origin_step)
-                    messages.success(request, "PDF bylo znovu nahráno.")
+
+                messages.success(
+                    request,
+                    f"Úspěšně zpracováno {successful} souborů.",
+                )
 
     context = _wizard_context(request, OnboardingProgress.Steps.UPLOAD)
     return render(request, "onboarding/onboarding_wizard.html", context)

@@ -177,7 +177,7 @@
               <form method="post" enctype="multipart/form-data" class="space-y-6">
                 {% csrf_token %}
                 <label class="relative flex flex-col items-center justify-center w-full h-48 rounded-2xl border-2 border-dashed border-sky-200 bg-sky-50/60 text-sky-500 hover:border-sky-400 hover:bg-sky-50 transition-colors cursor-pointer">
-                  <input type="file" name="pdf_file" accept="application/pdf" class="absolute inset-0 opacity-0 cursor-pointer">
+                  <input type="file" name="pdf_file" accept="application/pdf" multiple class="absolute inset-0 opacity-0 cursor-pointer">
                   <div class="text-center space-y-2">
                     <span class="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white text-sky-500 shadow-sm">
                       <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16.5V19a2 2 0 002 2h12a2 2 0 002-2v-2.5M16 10l-4-4m0 0l-4 4m4-4V16" /></svg>

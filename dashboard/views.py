@@ -241,14 +241,21 @@ def index(request):
     coach_note_text = _clean_text(coach_note_entry.notes) if coach_note_entry and coach_note_entry.notes else None
 
     document_status_map = {}
+    doc_type_map = {
+        "rozvaha": "rozvaha",
+        "balance": "rozvaha",
+        "vysledovka": "vysledovka",
+        "income": "vysledovka",
+    }
     document_qs = (
-        Document.objects.filter(owner=request.user, doc_type__in=["rozvaha", "vysledovka"])
-        .values("year", "doc_type")
+        Document.objects.filter(owner=request.user, doc_type__in=list(doc_type_map.keys()))
+        .values("year", "doc_type", "analyzed")
     )
     for item in document_qs:
         year = item.get("year")
-        doc_type = item.get("doc_type")
-        if year is None or doc_type not in ("rozvaha", "vysledovka"):
+        doc_type = (item.get("doc_type") or "").lower()
+        mapped_type = doc_type_map.get(doc_type)
+        if year is None or mapped_type is None:
             continue
         try:
             year_int = int(year)
@@ -256,12 +263,14 @@ def index(request):
             continue
         entry = document_status_map.setdefault(
             year_int,
-            {"year": year_int, "has_rozvaha": False, "has_vysledovka": False},
+            {"year": year_int, "has_rozvaha": False, "has_vysledovka": False, "rozvaha_analyzed": False, "vysledovka_analyzed": False},
         )
-        if doc_type == "rozvaha":
+        if mapped_type == "rozvaha":
             entry["has_rozvaha"] = True
-        elif doc_type == "vysledovka":
+            entry["rozvaha_analyzed"] = entry["rozvaha_analyzed"] or bool(item.get("analyzed"))
+        elif mapped_type == "vysledovka":
             entry["has_vysledovka"] = True
+            entry["vysledovka_analyzed"] = entry["vysledovka_analyzed"] or bool(item.get("analyzed"))
 
     statement_years = {
         int(s.year)

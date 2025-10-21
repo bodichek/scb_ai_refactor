@@ -1,59 +1,94 @@
 {% extends "base.html" %}
+
 {% block content %}
-<div class="container">
-  <h2>📤 Exportovat do PDF</h2>
+<div class="min-h-[calc(100vh-140px)] bg-gradient-to-b from-indigo-50/50 via-white to-slate-100 py-10">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+    <section class="dashboard-card bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-6">
+      <div class="space-y-3">
+        <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Export</p>
+        <h1 class="text-2xl font-semibold text-slate-900">Exportovat do PDF</h1>
+        <p class="text-sm text-slate-500">
+          Než spustíš export, otevři hlavní dashboard a klikni na tlačítko
+          <span class="font-semibold text-sky-600">„Připravit grafy pro export“</span>, abychom načetli aktuální snímky grafů.
+        </p>
+      </div>
 
-  <div class="alert alert-info" role="alert">
-    Než spustíte export, otevřete hlavní <a href="{% url 'dashboard:index' %}">dashboard</a> a klikněte na tlačítko <strong>„📥 Připravit grafy pro export“</strong>. Připravíme tím aktuální grafy pro vložení do PDF.
+      <form method="post" action="{% url 'exports:export_pdf' %}" class="space-y-8">
+        {% csrf_token %}
+        <div class="grid gap-4 md:grid-cols-2">
+          <div class="flex flex-col gap-2">
+            <label for="year" class="text-sm font-semibold text-slate-700 uppercase tracking-[0.2em]">Rok</label>
+            <select name="year" id="year" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 focus:border-sky-500 focus:ring-sky-500" required>
+              {% if years %}
+                {% for y in years %}
+                  <option value="{{ y }}">{{ y }}</option>
+                {% endfor %}
+              {% else %}
+                <option disabled>Žádná data nejsou k dispozici</option>
+              {% endif %}
+            </select>
+          </div>
+          <div class="flex flex-col gap-2">
+            <span class="text-sm font-semibold text-slate-700 uppercase tracking-[0.2em]">Připravené grafy</span>
+            <p class="rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3 text-xs text-indigo-700">
+              Pokud se export nepodaří, vrať se na dashboard a potvrď export grafů tlačítkem v části “Finanční trajektorie”.
+            </p>
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <h2 class="text-lg font-semibold text-slate-900">Co zařadit do PDF</h2>
+          <div class="overflow-hidden border border-slate-200/70 rounded-2xl">
+            <table class="min-w-full divide-y divide-slate-200 text-sm">
+              <thead class="bg-slate-50/80 text-slate-500 uppercase tracking-wide text-xs">
+                <tr>
+                  <th class="px-4 py-3 text-left">Vybrat</th>
+                  <th class="px-4 py-3 text-left">Sekce</th>
+                  <th class="px-4 py-3 text-left">Popis</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-200/70 bg-white/90">
+                <tr>
+                  <td class="px-4 py-3">
+                    <input type="checkbox" name="sections" value="charts" class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+                  </td>
+                  <td class="px-4 py-3 font-medium text-slate-700">📊 Grafy</td>
+                  <td class="px-4 py-3 text-slate-500 text-sm">Finanční grafy z dashboardu</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">
+                    <input type="checkbox" name="sections" value="tables" class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+                  </td>
+                  <td class="px-4 py-3 font-medium text-slate-700">📑 Tabulky</td>
+                  <td class="px-4 py-3 text-slate-500 text-sm">Kompletní přehled čísel a analýza Zisk vs. peněžní tok</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">
+                    <input type="checkbox" name="sections" value="survey" class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+                  </td>
+                  <td class="px-4 py-3 font-medium text-slate-700">📝 Dotazník</td>
+                  <td class="px-4 py-3 text-slate-500 text-sm">Poslední vyplněný firemní dotazník včetně AI shrnutí</td>
+                </tr>
+                <tr>
+                  <td class="px-4 py-3">
+                    <input type="checkbox" name="sections" value="suropen" class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+                  </td>
+                  <td class="px-4 py-3 font-medium text-slate-700">🧭 Osobní analýza</td>
+                  <td class="px-4 py-3 text-slate-500 text-sm">Odpovědi ze suropen dotazníku a doporučení AI</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <p class="text-xs text-slate-500">Export vytvoří soubor PDF, který si můžeš uložit nebo sdílet s týmem.</p>
+          <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-600/30 hover:bg-sky-700 transition">
+            📦 Vygenerovat PDF
+          </button>
+        </div>
+      </form>
+    </section>
   </div>
-
-  <form method="post" action="{% url 'exports:export_pdf' %}">
-    {% csrf_token %}
-
-    <!-- 🧭 Výběr roku -->
-    <div class="mb-3">
-      <label for="year" class="form-label"><strong>Vyber rok pro export:</strong></label>
-      <select name="year" id="year" class="form-select" required>
-        {% if years %}
-          {% for y in years %}
-            <option value="{{ y }}">{{ y }}</option>
-          {% endfor %}
-        {% else %}
-          <option disabled>Žádná data nejsou k dispozici</option>
-        {% endif %}
-      </select>
-    </div>
-
-    <!-- 📦 Výběr sekcí (původní tabulka zachována 1:1) -->
-    <table class="table">
-      <thead>
-        <tr><th>Vyber</th><th>Obsah</th><th>Popis</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><input type="checkbox" name="sections" value="charts"></td>
-          <td>📊 Grafy</td>
-          <td>Finanční grafy z dashboardu</td>
-        </tr>
-        <tr>
-          <td><input type="checkbox" name="sections" value="tables"></td>
-          <td>📑 Tabulky</td>
-          <td>Kompletní přehled dat + Analýza Zisk vs Peněžní tok</td>
-        </tr>
-        <tr>
-          <td><input type="checkbox" name="sections" value="survey"></td>
-          <td>📝 Dotazník</td>
-          <td>Poslední vyplněný dotazník</td>
-        </tr>
-        <tr>
-          <td><input type="checkbox" name="sections" value="suropen"></td>
-          <td>🔎 Osobní analýza</td>
-          <td>Odpovědi + shrnutí od AI</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <button type="submit" class="btn btn-success">📥 Vygenerovat PDF</button>
-  </form>
 </div>
 {% endblock %}

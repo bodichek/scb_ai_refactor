@@ -1,67 +1,83 @@
 {% extends "base.html" %}
+
 {% block content %}
-<div class="container mt-4">
-  <div class="d-flex justify-content-between align-items-center">
-    <h3>📂 Moje dokumenty</h3>
-    <div>
-      {% if show_all %}
-        <a href="?vse=0" class="btn btn-outline-primary btn-sm">
-          ✅ Jen aktuální
-        </a>
-      {% else %}
-        <a href="?vse=1" class="btn btn-outline-secondary btn-sm">
-          📜 Zobrazit všechny
-        </a>
-      {% endif %}
-    </div>
-  </div>
+<div class="min-h-[calc(100vh-140px)] bg-gradient-to-b from-sky-50/60 via-white to-slate-100 py-10">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+    <section class="dashboard-card bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-6">
+      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Ingest</p>
+          <h1 class="mt-2 text-2xl font-semibold text-slate-900">Moje dokumenty</h1>
+          <p class="text-sm text-slate-500">Přehled nahraných výkazů a jejich stavů zpracování.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          {% if show_all %}
+          <a href="?vse=0" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:border-slate-300 transition">✅ Jen aktuální</a>
+          {% else %}
+          <a href="?vse=1" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:border-slate-300 transition">📚 Zobrazit vše</a>
+          {% endif %}
+        </div>
+      </div>
 
-  <table class="table table-striped align-middle mt-3">
-    <thead>
-      <tr>
-        <th>Rok</th>
-        <th>Typ</th>
-        <th>Název souboru</th>
-        <th>Analyzováno</th>
-        <th>Aktualizováno</th>
-        <th>Akce</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for d in documents %}
-        <tr>
-          <td>{{ d.year }}</td>
-          <td>{{ d.get_doc_type_display }}</td>
-          <td>{{ d.file.name }}</td>
-          <td>{% if d.analyzed %} ✅ Ano {% else %} ❌ Ne {% endif %}</td>
-          <td>
-            {% if d.last_updated %}
-              {{ d.last_updated|date:"d.m.Y H:i" }}
-            {% else %}
-              {{ d.uploaded_at|date:"d.m.Y H:i" }}
-            {% endif %}
-          </td>
-          <td>
-            <a href="{% url 'ingest:delete_document' d.id %}" 
-               class="btn btn-sm btn-danger"
-               onclick="return confirm('Opravdu chcete smazat tento dokument?');">
-              🗑 Smazat
-            </a>
-          </td>
-        </tr>
-      {% empty %}
-        <tr><td colspan="6">⚠️ Zatím žádné dokumenty.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+      <div class="overflow-hidden border border-slate-200/70 rounded-2xl">
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+          <thead class="bg-slate-50/80 text-slate-500 uppercase tracking-wide text-xs">
+            <tr>
+              <th class="px-4 py-3 text-left">Rok</th>
+              <th class="px-4 py-3 text-left">Typ</th>
+              <th class="px-4 py-3 text-left">Soubor</th>
+              <th class="px-4 py-3 text-left">Analyzováno</th>
+              <th class="px-4 py-3 text-left">Aktualizováno</th>
+              <th class="px-4 py-3 text-right">Akce</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200/70 bg-white/90">
+            {% for d in documents %}
+            <tr class="text-slate-700">
+              <td class="px-4 py-3 font-medium text-slate-800">{{ d.year }}</td>
+              <td class="px-4 py-3">{{ d.get_doc_type_display }}</td>
+              <td class="px-4 py-3">
+                <span class="text-slate-500 text-xs block">{{ d.filename }}</span>
+              </td>
+              <td class="px-4 py-3">
+                {% if d.analyzed %}
+                  <span class="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-3 py-1 text-xs font-semibold">Ano</span>
+                {% else %}
+                  <span class="inline-flex items-center rounded-full bg-amber-100 text-amber-700 px-3 py-1 text-xs font-semibold">Čeká na analýzu</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-3 text-sm text-slate-500">
+                {% if d.last_updated %}
+                  {{ d.last_updated|date:"d.m.Y H:i" }}
+                {% else %}
+                  {{ d.uploaded_at|date:"d.m.Y H:i" }}
+                {% endif %}
+              </td>
+              <td class="px-4 py-3 text-right">
+                <a href="{% url 'ingest:delete_document' d.id %}"
+                   class="inline-flex items-center gap-1 rounded-xl border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition"
+                   onclick="return confirm('Opravdu chcete smazat tento dokument?');">
+                  🗑️ Smazat
+                </a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="px-4 py-8 text-center text-sm text-slate-500 bg-white/90">⚠️ Zatím žádné dokumenty.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
 
-  <div class="mt-3">
-    <a href="{% url 'ingest:upload_many' %}" class="btn btn-success me-2">
-      📁 Nahrát více souborů
-    </a>
-    <a href="{% url 'ingest:upload_pdf' %}" class="btn btn-outline-primary">
-      ➕ Nahrát jeden soubor
-    </a>
+      <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
+        <p class="text-xs text-slate-500">Nahrané soubory zůstávají uložené pro další analýzy a exporty.</p>
+        <div class="flex flex-wrap gap-2">
+          <a href="{% url 'ingest:upload_many' %}" class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-600/30 hover:bg-sky-700 transition">📂 Nahrát více souborů</a>
+          <a href="{% url 'ingest:upload_pdf' %}" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 hover:border-slate-300 transition">➕ Nahrát jeden soubor</a>
+        </div>
+      </div>
+    </section>
   </div>
 </div>
 {% endblock %}
