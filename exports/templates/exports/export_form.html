@@ -1,5 +1,17 @@
 {% extends "base.html" %}
 
+{% block extra_head %}
+  <script>
+    window.tailwind = window.tailwind || {};
+    window.tailwind.config = {
+      corePlugins: {
+        preflight: false,
+      },
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+{% endblock %}
+
 {% block content %}
 <div class="min-h-[calc(100vh-140px)] bg-gradient-to-b from-indigo-50/50 via-white to-slate-100 py-10">
   <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
@@ -31,13 +43,13 @@
           <div class="flex flex-col gap-2">
             <span class="text-sm font-semibold text-slate-700 uppercase tracking-[0.2em]">Připravené grafy</span>
             <p class="rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3 text-xs text-indigo-700">
-              Pokud se export nepodaří, vrať se na dashboard a potvrď export grafů tlačítkem v části “Finanční trajektorie”.
+              Pokud se export nepodaří, vrať se na dashboard a potvrď export grafů tlačítkem v části „Finanční trajektorie“.
             </p>
           </div>
         </div>
 
         <div class="space-y-3">
-          <h2 class="text-lg font-semibold text-slate-900">Co zařadit do PDF</h2>
+          <h2 class="text-lg font-semibold text-slate-900">Co zahrnout do PDF</h2>
           <div class="overflow-hidden border border-slate-200/70 rounded-2xl">
             <table class="min-w-full divide-y divide-slate-200 text-sm">
               <thead class="bg-slate-50/80 text-slate-500 uppercase tracking-wide text-xs">
@@ -49,32 +61,32 @@
               </thead>
               <tbody class="divide-y divide-slate-200/70 bg-white/90">
                 <tr>
-                  <td class="px-4 py-3">
+                  <td class="px-4 py-3 align-middle">
                     <input type="checkbox" name="sections" value="charts" class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
                   </td>
                   <td class="px-4 py-3 font-medium text-slate-700">📊 Grafy</td>
-                  <td class="px-4 py-3 text-slate-500 text-sm">Finanční grafy z dashboardu</td>
+                  <td class="px-4 py-3 text-slate-500 text-sm">Finanční grafy z hlavního dashboardu</td>
                 </tr>
-                <tr>
-                  <td class="px-4 py-3">
+                <tr class="bg-slate-50/60">
+                  <td class="px-4 py-3 align-middle">
                     <input type="checkbox" name="sections" value="tables" class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
                   </td>
-                  <td class="px-4 py-3 font-medium text-slate-700">📑 Tabulky</td>
-                  <td class="px-4 py-3 text-slate-500 text-sm">Kompletní přehled čísel a analýza Zisk vs. peněžní tok</td>
+                  <td class="px-4 py-3 font-medium text-slate-700">📈 Tabulky</td>
+                  <td class="px-4 py-3 text-slate-500 text-sm">Kompletní přehled čísel včetně analýzy Zisk vs. peněžní tok</td>
                 </tr>
                 <tr>
-                  <td class="px-4 py-3">
+                  <td class="px-4 py-3 align-middle">
                     <input type="checkbox" name="sections" value="survey" class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
                   </td>
                   <td class="px-4 py-3 font-medium text-slate-700">📝 Dotazník</td>
-                  <td class="px-4 py-3 text-slate-500 text-sm">Poslední vyplněný firemní dotazník včetně AI shrnutí</td>
+                  <td class="px-4 py-3 text-slate-500 text-sm">Poslední firemní dotazník včetně AI shrnutí</td>
                 </tr>
-                <tr>
-                  <td class="px-4 py-3">
+                <tr class="bg-slate-50/60">
+                  <td class="px-4 py-3 align-middle">
                     <input type="checkbox" name="sections" value="suropen" class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
                   </td>
                   <td class="px-4 py-3 font-medium text-slate-700">🧭 Osobní analýza</td>
-                  <td class="px-4 py-3 text-slate-500 text-sm">Odpovědi ze suropen dotazníku a doporučení AI</td>
+                  <td class="px-4 py-3 text-slate-500 text-sm">Odpovědi z osobního dotazníku a doporučení AI</td>
                 </tr>
               </tbody>
             </table>
@@ -82,9 +94,9 @@
         </div>
 
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <p class="text-xs text-slate-500">Export vytvoří soubor PDF, který si můžeš uložit nebo sdílet s týmem.</p>
+          <p class="text-xs text-slate-500">Export vytvoří soubor PDF, který můžeš uložit nebo sdílet s týmem.</p>
           <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-600/30 hover:bg-sky-700 transition">
-            📦 Vygenerovat PDF
+            🚀 Vygenerovat PDF
           </button>
         </div>
       </form>

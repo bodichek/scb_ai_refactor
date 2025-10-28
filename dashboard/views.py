@@ -281,14 +281,16 @@ def index(request):
         set(document_status_map.keys()).union(statement_years),
         reverse=True,
     )
-    document_upload_status = [
-        {
+    document_upload_status = []
+    for year in upload_years:
+        entry = document_status_map.get(year, {})
+        document_upload_status.append({
             "year": year,
-            "has_rozvaha": document_status_map.get(year, {}).get("has_rozvaha", False),
-            "has_vysledovka": document_status_map.get(year, {}).get("has_vysledovka", False),
-        }
-        for year in upload_years
-    ]
+            "has_rozvaha": entry.get("has_rozvaha", False),
+            "has_vysledovka": entry.get("has_vysledovka", False),
+            "rozvaha_analyzed": entry.get("rozvaha_analyzed", False),
+            "vysledovka_analyzed": entry.get("vysledovka_analyzed", False),
+        })
 
     chart_series = {
         "labels": years,

@@ -1,85 +1,126 @@
 {% extends "base.html" %}
+
+{% block extra_head %}
+  <script>
+    window.tailwind = window.tailwind || {};
+    window.tailwind.config = {
+      corePlugins: {
+        preflight: false,
+      },
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+{% endblock %}
+
 {% block content %}
-<div class="container">
-  <h2 class="mb-4">🔎 Osobní analýza</h2>
+<div class="min-h-[calc(100vh-140px)] bg-gradient-to-b from-sky-50/60 via-white to-slate-100 py-10">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+    {% if error %}
+      <div class="rounded-2xl border border-rose-200/70 bg-rose-50/80 px-4 py-3 text-sm text-rose-700 shadow-sm">⚠ {{ error }}</div>
+    {% endif %}
+    {% if just_submitted %}
+      <div class="rounded-2xl border border-emerald-200/70 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-700 shadow-sm">✅ Analýza byla úspěšně odeslána, zkontroluj shrnutí v historii.</div>
+    {% endif %}
+    {% if duplicate %}
+      <div class="rounded-2xl border border-amber-200/70 bg-amber-50/80 px-4 py-3 text-sm text-amber-700 shadow-sm">⏳ Formulář už byl nedávno odeslán. Chvíli vyčkej a zkus to znovu.</div>
+    {% endif %}
 
-  {% if error %}
-    <div class="alert alert-danger">{{ error }}</div>
-  {% endif %}
-
-  {% if just_submitted %}
-    <div class="alert alert-success">✅ Dotazník byl úspěšně odeslán.</div>
-  {% elif duplicate %}
-    <div class="alert alert-warning">⚠️ Odpověď byla již nedávno odeslána, počkej prosím pár sekund.</div>
-  {% endif %}
-
-  <form method="post" class="card p-4 shadow-sm">
-    {% csrf_token %}
-    {% for block in questions %}
-      <div class="mb-5">
-        <h4 class="text-primary">{{ block.section }}</h4>
-        {% for q in block.items %}
-          <div class="mb-3">
-            <label class="form-label fw-bold">{{ q }}</label>
-            <textarea name="q-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}" 
-                      rows="3" class="form-control" placeholder="Tvoje odpověď..."></textarea>
-          </div>
-        {% endfor %}
+    <section class="dashboard-card bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-4">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div>
+          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Osobní analýza</p>
+          <h1 class="text-2xl font-semibold text-slate-900">Otevřené otázky</h1>
+          <p class="text-sm text-slate-500">Sdílej, co se děje, a AI doporučení doručíme přímo do dashboardu.</p>
+        </div>
+        <a href="{% url 'suropen:history' %}" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 hover:border-slate-300 transition">
+          📚 Historie analýz
+        </a>
       </div>
-    {% endfor %}
-    <button type="submit" class="btn btn-success">Odeslat</button>
-  </form>
+    </section>
 
-  {% if ai_text %}
-    <div class="card mt-5 p-4 bg-light">
-      <h4>🧠 Shrnutí od AI</h4>
-      <pre style="white-space: pre-wrap;">{{ ai_text }}</pre>
-    </div>
-  {% endif %}
-
-  {% if submissions %}
-    <div class="card mt-5 p-3">
-      <h3>📊 Moje předchozí analýzy</h3>
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Datum</th>
-            <th>Počet odpovědí</th>
-            <th>Akce</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for s in submissions %}
+    <section class="dashboard-card bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Moje analýzy</p>
+          <h2 class="text-lg font-semibold text-slate-900">Přehled odeslaných odpovědí</h2>
+        </div>
+        <span class="text-xs text-slate-500">Počet: {{ submissions|length }}</span>
+      </div>
+      <div class="overflow-hidden border border-slate-200/70 rounded-2xl">
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+          <thead class="bg-slate-50/80 text-slate-500 uppercase tracking-wide text-xs">
             <tr>
-              <td>{{ s.created_at|date:"d.m.Y H:i" }}</td>
-              <td>
-                {{ s.count|default:"—" }}
-              </td>
-              <td>
-                <a href="{% url 'suropen:history' %}?batch={{ s.batch_id }}" class="btn btn-sm btn-primary">
-                  Zobrazit detail
+              <th class="px-4 py-3 text-left">Datum</th>
+              <th class="px-4 py-3 text-left">Počet odpovědí</th>
+              <th class="px-4 py-3 text-right">Akce</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200/70 bg-white/90">
+            {% for s in submissions %}
+            <tr>
+              <td class="px-4 py-3 text-slate-700">{% if s.created_at %}{{ s.created_at|date:"d.m.Y H:i" }}{% else %}—{% endif %}</td>
+              <td class="px-4 py-3 text-slate-700">{{ s.count|default:0 }}</td>
+              <td class="px-4 py-3 text-right">
+                <a href="{% url 'suropen:history' %}?batch={{ s.batch_id }}" class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow shadow-sky-600/25 hover:bg-sky-700 transition">
+                  Detail
+                  <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
                 </a>
               </td>
             </tr>
-          {% empty %}
-            <tr><td colspan="3" class="text-muted">Zatím nemáš žádné záznamy.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  {% endif %}
-</div>
+            {% empty %}
+            <tr>
+              <td colspan="3" class="px-4 py-6 text-center text-sm text-slate-500">Zatím nemáš žádné analýzy. Vyplň formulář níže.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
 
+    <section class="dashboard-card bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-6">
+      <div>
+        <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Nová analýza</p>
+        <h2 class="text-lg font-semibold text-slate-900">Co je potřeba slyšet</h2>
+        <p class="text-xs text-slate-500">Odpovědi využijeme pro AI shrnutí a doporučení na následující období.</p>
+      </div>
+      <form method="post" id="suropen-form" class="space-y-5">
+        {% csrf_token %}
+        {% for block in questions %}
+        <div class="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm shadow-slate-900/5 space-y-4">
+          <h3 class="text-sm font-semibold text-slate-900">{{ block.section }}</h3>
+          <div class="space-y-4">
+            {% for q in block.items %}
+            <div class="space-y-2">
+              <label for="q-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}" class="text-sm font-medium text-slate-700">{{ q }}</label>
+              <textarea id="q-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}" name="q-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}" rows="3" class="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-sky-500 focus:ring-sky-500" placeholder="Tvoje odpověď..."></textarea>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+        <div class="flex justify-end">
+          <button type="submit" id="suropen-submit" class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/30 hover:bg-emerald-700 transition">
+            🚀 Odeslat analýzu
+          </button>
+        </div>
+      </form>
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
 <script>
-document.addEventListener("DOMContentLoaded", () => {
-  const form = document.querySelector("form");
-  form.addEventListener("submit", () => {
-    const btn = form.querySelector("button[type=submit]");
-    if (btn) {
-      btn.disabled = true;
-      btn.innerText = "Odesílám...";
+  document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('suropen-form');
+    const submitBtn = document.getElementById('suropen-submit');
+    if (form && submitBtn) {
+      form.addEventListener('submit', () => {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-70');
+        submitBtn.textContent = 'Odesílám…';
+      });
     }
   });
-});
 </script>
 {% endblock %}

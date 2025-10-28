@@ -90,6 +90,7 @@ def login_api(request):
 @login_required
 def profile_view(request):
     profile, _ = CompanyProfile.objects.get_or_create(user=request.user)
+    edit_mode = request.GET.get("edit") == "1"
 
     if request.method == "POST":
         profile.company_name = request.POST.get("company_name")
@@ -104,7 +105,7 @@ def profile_view(request):
         profile.save()
         return redirect("accounts:profile")
 
-    return render(request, "accounts/profile.html", {"profile": profile})
+    return render(request, "accounts/profile.html", {"profile": profile, "edit_mode": edit_mode})
 
 
 @login_required

@@ -1,5 +1,17 @@
 {% extends "base.html" %}
 
+{% block extra_head %}
+  <script>
+    window.tailwind = window.tailwind || {};
+    window.tailwind.config = {
+      corePlugins: {
+        preflight: false,
+      },
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+{% endblock %}
+
 {% block content %}
 <div class="min-h-[calc(100vh-140px)] bg-gradient-to-b from-sky-50/60 via-white to-slate-100 py-10">
   <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">

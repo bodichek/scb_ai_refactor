@@ -6,12 +6,12 @@ from django.db.models import Count, Q, Avg
 from django.db import models
 from django.utils import timezone
 from datetime import datetime, timedelta
-from accounts.models import CompanyProfile, Coach, CoachClientNotes
+from accounts.models import CompanyProfile, CoachClientNotes
 from accounts.permissions import coach_required, can_coach_access_client
 from ingest.models import Document, FinancialStatement
 from survey.models import SurveySubmission
 from dashboard.cashflow import calculate_cashflow
-from .models import Coach
+from .models import Coach, UserCoachAssignment
 
 
 @login_required
@@ -24,8 +24,15 @@ def my_clients(request):
         # Získáme search query
         search_query = request.GET.get('search', '').strip()
         
-        # Základní queryset - pouze klienti přiřazení tomuto kouči
-        clients = CompanyProfile.objects.filter(assigned_coach=coach).select_related('user')
+        clients = (
+            CompanyProfile.objects
+            .filter(
+                models.Q(assigned_coach=coach)
+                | models.Q(user__usercoachassignment__coach=coach)
+            )
+            .select_related('user')
+            .distinct()
+        )
         
         # Pokud je search query, filtrujeme podle názvu firmy nebo jména klienta
         if search_query:
@@ -671,7 +678,15 @@ def my_clients_api(request):
     coach = get_object_or_404(Coach, user=request.user)
     search_query = (request.GET.get('search') or '').strip()
 
-    clients_qs = CompanyProfile.objects.filter(assigned_coach=coach).select_related('user')
+    clients_qs = (
+        CompanyProfile.objects
+        .filter(
+            models.Q(assigned_coach=coach)
+            | models.Q(user__usercoachassignment__coach=coach)
+        )
+        .select_related('user')
+        .distinct()
+    )
     if search_query:
         clients_qs = clients_qs.filter(
             Q(company_name__icontains=search_query)

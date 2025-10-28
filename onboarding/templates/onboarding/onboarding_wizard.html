@@ -15,8 +15,25 @@
       75%, 100% { transform: scale(1.5); opacity: 0; }
     }
 
+    @keyframes uploadSpin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
     .animate-floaty { animation: floatyFade 0.6s ease forwards; }
     .animate-ping-soft { animation: ping-soft 1.4s linear infinite; }
+    .upload-loader {
+      inline-size: 48px;
+      block-size: 48px;
+      border-radius: 999px;
+      border: 4px solid rgba(14, 116, 144, 0.18);
+      border-top-color: #0ea5e9;
+      animation: uploadSpin 1s linear infinite;
+    }
+    .upload-overlay {
+      background: rgba(255, 255, 255, 0.84);
+      backdrop-filter: blur(6px);
+    }
   </style>
 {% endblock %}
 
@@ -28,6 +45,27 @@
       const surveyPrefill = surveyPrefillElement ? JSON.parse(surveyPrefillElement.textContent || '{}') : {};
       const openPrefillElement = document.getElementById('open-survey-prefill-data');
       const openPrefill = openPrefillElement ? JSON.parse(openPrefillElement.textContent || '{}') : {};
+
+      Alpine.data('onboardingUpload', () => ({
+        isUploading: false,
+        selectedNames: [],
+        handleFileChange(event) {
+          const files = Array.from(event?.target?.files || []);
+          this.selectedNames = files.map((file) => file.name);
+        },
+        beginUpload(event) {
+          const form = event?.target;
+          const fileInput = form ? form.querySelector('input[type=\"file\"]') : null;
+          const hasFiles = !!(fileInput && fileInput.files && fileInput.files.length);
+          if (hasFiles) {
+            this.isUploading = true;
+          }
+        },
+        resetUpload() {
+          this.isUploading = false;
+          this.selectedNames = [];
+        },
+      }));
 
       Alpine.data('surveyWizard', ({ totalSections = 0, totalQuestions = 0 }) => ({
         current: 0,
@@ -170,31 +208,59 @@
         </header>
 
         {% if step == progress.Steps.UPLOAD %}
-          <section class="relative">
-            <div class="bg-white/90 border border-slate-200 rounded-2xl shadow-md shadow-slate-900/5 p-8 space-y-6">
-              <h2 class="text-xl font-semibold text-slate-900">1. Nahraj poslední finanční výkaz</h2>
-              <p class="text-sm leading-relaxed text-slate-600">Formát PDF, doporučené dokumenty: Výkaz zisku a ztrát nebo Rozvaha. Po nahrání souboru ho automaticky zanalyzujeme.</p>
-              <form method="post" enctype="multipart/form-data" class="space-y-6">
-                {% csrf_token %}
-                <label class="relative flex flex-col items-center justify-center w-full h-48 rounded-2xl border-2 border-dashed border-sky-200 bg-sky-50/60 text-sky-500 hover:border-sky-400 hover:bg-sky-50 transition-colors cursor-pointer">
-                  <input type="file" name="pdf_file" accept="application/pdf" multiple class="absolute inset-0 opacity-0 cursor-pointer">
-                  <div class="text-center space-y-2">
-                    <span class="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white text-sky-500 shadow-sm">
-                      <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16.5V19a2 2 0 002 2h12a2 2 0 002-2v-2.5M16 10l-4-4m0 0l-4 4m4-4V16" /></svg>
-                    </span>
-                    <div class="text-sm font-medium">Přetáhni sem PDF nebo klikni pro výběr</div>
-                    <p class="text-xs text-slate-500">Max 10 MB • Povolený formát PDF</p>
-                  </div>
-                </label>
-                <div class="flex items-center justify-end gap-3">
-                  <a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="text-sm text-slate-500 hover:text-slate-700">Zpět</a>
-                  <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-600/30 hover:bg-sky-700 focus:outline-none focus:ring-4 focus:ring-sky-200 transition">
-                    Pokračovat
-                  </button>
+        <section class="relative" x-data="onboardingUpload()">
+          <div class="upload-overlay absolute inset-0 z-20 flex flex-col items-center justify-center text-center px-6" x-show="isUploading" x-transition.opacity x-cloak>
+            <div class="upload-loader mb-4"></div>
+            <p class="text-sm font-semibold text-slate-700">Nahráváme a analyzujeme dokumenty…</p>
+            <p class="mt-1 text-xs text-slate-500">Prosíme o chvilku strpení, běžně to trvá jen pár sekund.</p>
+            <ul class="mt-4 text-xs text-slate-500 space-y-1" x-show="selectedNames.length">
+              <template x-for="name in selectedNames" :key="name">
+                <li class="flex items-center gap-2 justify-center">
+                  <span class="inline-flex h-1.5 w-1.5 rounded-full bg-sky-500/80"></span>
+                  <span x-text="name"></span>
+                </li>
+              </template>
+            </ul>
+          </div>
+          <div class="bg-white/90 border border-slate-200 rounded-2xl shadow-md shadow-slate-900/5 p-8 space-y-6">
+            <h2 class="text-xl font-semibold text-slate-900">1. Nahraj poslední finanční výkaz</h2>
+            <p class="text-sm leading-relaxed text-slate-600">Formát PDF, doporučené dokumenty: Výkaz zisku a ztrát nebo Rozvaha. Po nahrání souboru ho automaticky zanalyzujeme.</p>
+            <form method="post" enctype="multipart/form-data" class="space-y-6" @submit="beginUpload($event)">
+              {% csrf_token %}
+              <label class="relative flex flex-col items-center justify-center w-full h-48 rounded-2xl border-2 border-dashed border-sky-200 bg-sky-50/60 text-sky-500 hover:border-sky-400 hover:bg-sky-50 transition-colors cursor-pointer" :class="{ 'opacity-60 pointer-events-none': isUploading }">
+                <input type="file" name="pdf_file" accept="application/pdf" multiple class="absolute inset-0 opacity-0 cursor-pointer" @change="handleFileChange($event)">
+                <div class="text-center space-y-2">
+                  <span class="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white text-sky-500 shadow-sm">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16.5V19a2 2 0 002 2h12a2 2 0 002-2v-2.5M16 10l-4-4m0 0l-4 4m4-4V16" /></svg>
+                  </span>
+                  <div class="text-sm font-medium">Přetáhni sem PDF nebo klikni pro výběr</div>
+                  <p class="text-xs text-slate-500">Max 10 MB • Povolené formáty PDF</p>
                 </div>
-              </form>
-            </div>
-          </section>
+              </label>
+              <div class="rounded-2xl border border-slate-200/70 bg-slate-50/60 px-4 py-3" x-show="selectedNames.length" x-cloak>
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">Vybrané soubory</p>
+                <ul class="space-y-1 text-sm text-slate-600">
+                  <template x-for="name in selectedNames" :key="name">
+                    <li class="flex items-center gap-2">
+                      <svg class="h-4 w-4 text-sky-500" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 12h16M4 17h10" /></svg>
+                      <span class="truncate" x-text="name"></span>
+                    </li>
+                  </template>
+                </ul>
+              </div>
+              <div class="flex items-center justify-end gap-3">
+                <a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="text-sm text-slate-500 hover:text-slate-700">Zpět</a>
+                <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-600/30 hover:bg-sky-700 focus:outline-none focus:ring-4 focus:ring-sky-200 transition disabled:opacity-60 disabled:cursor-not-allowed" :disabled="isUploading">
+                  <svg class="h-4 w-4 animate-spin" x-show="isUploading" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v2m0 12v2m8-8h-2M6 12H4m13.657-6.343l-1.414 1.414M7.757 16.243l-1.414 1.414m0-12.728l1.414 1.414m9.9 9.9l1.414 1.414" />
+                  </svg>
+                  <span x-show="!isUploading">Pokračovat</span>
+                  <span x-show="isUploading" class="font-medium">Analyzujeme…</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </section>
         {% elif step == progress.Steps.SURVEY %}
           <section x-data="surveyWizard({ totalSections: {{ survey_sections|length }}, totalQuestions: {{ total_questions }} })" x-cloak>
             <form method="post" class="space-y-8">

@@ -10,6 +10,10 @@ MODEL = settings.OPENAI_MODEL or "gpt-4o-mini"
 PROMPT_INCOME = """
 You are an expert in Czech accounting.
 You receive an INCOME STATEMENT (výkaz zisku a ztráty).
+Normalize the figures before returning them:
+- Detect whether the report states that values are provided in thousands (phrases like "v tis. Kc", "tisice Kc", etc.). If yes, multiply every extracted value by 1_000 so the JSON contains absolute CZK amounts.
+- If the report already uses full CZK amounts, keep the values unchanged.
+- Return numbers only (no strings) and default to 0 when data is missing.
 Extract the following metrics and return ONLY valid JSON:
 { "Revenue": number, "GrossMargin": number, "NetProfit": number, "Depreciation": number,
   "InterestPaid": number, "IncomeTaxPaid": number, "ExtraordinaryItems": number,
@@ -19,6 +23,10 @@ Extract the following metrics and return ONLY valid JSON:
 PROMPT_BALANCE = """
 You are an expert in Czech accounting.
 You receive a BALANCE SHEET (rozvaha).
+Normalize the figures before returning them:
+- Detect whether the report states that values are provided in thousands (phrases like "v tis. Kc", "tisice Kc", etc.). If yes, multiply every extracted value by 1_000 so the JSON contains absolute CZK amounts.
+- If the report already uses full CZK amounts, keep the values unchanged.
+- Return numbers only (no strings) and default to 0 when data is missing.
 Extract the following metrics and return ONLY valid JSON:
 { "TotalAssets": number, "Cash": number, "Receivables": number, "Inventory": number,
   "CurrentAssets": number, "TangibleAssets": number, "TotalLiabilities": number,

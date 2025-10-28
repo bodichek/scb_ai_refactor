@@ -1,41 +1,63 @@
 {% extends "base.html" %}
+
+{% block extra_head %}
+  <script>
+    window.tailwind = window.tailwind || {};
+    window.tailwind.config = {
+      corePlugins: {
+        preflight: false,
+      },
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+{% endblock %}
+
 {% block content %}
-<div class="container">
-  <h2 class="mb-4">📖 Historie osobní analýzy</h2>
-
-  {% for batch in batches %}
-    <div class="card my-4 shadow-sm">
-      <div class="card-header d-flex justify-content-between align-items-center">
+<div class="min-h-[calc(100vh-140px)] bg-gradient-to-b from-sky-50/60 via-white to-slate-100 py-10">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+    <section class="dashboard-card bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-4">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
-          <b>Vyplněno:</b> {{ batch.created_at|date:"d.m.Y H:i" }}
+          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Osobní analýza</p>
+          <h1 class="text-2xl font-semibold text-slate-900">Historie otevřených odpovědí</h1>
+          <p class="text-sm text-slate-500">Projdi si AI shrnutí a jednotlivé odpovědi za každou analýzu.</p>
         </div>
-        <div class="text-muted">
-          {{ batch.items|length }} odpovědí
-        </div>
+        <a href="{% url 'suropen:form' %}" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 hover:border-slate-300 transition">
+          ✏ Nová analýza
+        </a>
       </div>
-      <div class="card-body">
-        <!-- Moje odpovědi -->
-        <h5 class="mb-3">✍️ Moje odpovědi</h5>
-        <ul class="list-group mb-3">
-          {% for item in batch.items %}
-            <li class="list-group-item">
-              <p class="mb-1"><b>[{{ item.section }}]</b> {{ item.question }}</p>
-              <p class="mb-0"><span class="text-muted">Odpověď:</span> {{ item.answer }}</p>
-            </li>
-          {% endfor %}
-        </ul>
+    </section>
 
-        <!-- Shrnutí od AI -->
-        {% if batch.ai_response %}
-          <h5 class="mt-4">🧠 Shrnutí od AI</h5>
-          <div class="alert alert-info mb-0">
-            <pre style="white-space: pre-wrap; margin:0;">{{ batch.ai_response }}</pre>
+    <section class="space-y-4">
+      {% for batch in batches %}
+        <article class="dashboard-card bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-4">
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+            <div>
+              <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Záznam</p>
+              <h2 class="text-lg font-semibold text-slate-900">{% if batch.created_at %}{{ batch.created_at|date:"d.m.Y H:i" }}{% else %}Bez data{% endif %}</h2>
+            </div>
           </div>
-        {% endif %}
-      </div>
-    </div>
-  {% empty %}
-    <p class="text-muted">Zatím nemáš žádné odeslané analýzy.</p>
-  {% endfor %}
+
+          {% if batch.ai_response %}
+            <div class="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700 whitespace-pre-wrap">{{ batch.ai_response }}</div>
+          {% endif %}
+
+          <div class="rounded-2xl border border-slate-200/70 bg-white/95 p-4 space-y-4">
+            {% for answer in batch.answers %}
+            <div class="border border-slate-200 rounded-xl px-4 py-3 bg-slate-50/70">
+              <p class="text-xs uppercase tracking-[0.2em] text-slate-400">{{ answer.section }}</p>
+              <p class="mt-1 text-sm font-semibold text-slate-900">{{ answer.question }}</p>
+              <p class="mt-2 text-sm text-slate-700 whitespace-pre-wrap">{{ answer.answer }}</p>
+            </div>
+            {% endfor %}
+          </div>
+        </article>
+      {% empty %}
+        <div class="rounded-3xl border border-slate-200/70 bg-white/90 p-6 text-center text-sm text-slate-500 shadow-lg shadow-slate-900/5">
+          Zatím nemáš žádné otevřené analýzy. Vyplň formulář na stránce Osobní analýza.
+        </div>
+      {% endfor %}
+    </section>
+  </div>
 </div>
 {% endblock %}

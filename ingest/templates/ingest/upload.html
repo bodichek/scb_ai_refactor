@@ -1,22 +1,51 @@
 {% extends "base.html" %}
+
+{% block extra_head %}
+  <script>
+    window.tailwind = window.tailwind || {};
+    window.tailwind.config = {
+      corePlugins: {
+        preflight: false,
+      },
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+{% endblock %}
+
 {% block content %}
-<div class="container">
-  <h3>âž• NahrÃ¡t novÃ½ soubor</h3>
-  <form method="post" enctype="multipart/form-data">
-    {% csrf_token %}
-    <div class="mb-3">
-      <label for="year">Rok:</label>
-      <select name="year" class="form-select" required>
-        {% for y in years %}
-          <option value="{{ y }}">{{ y }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="mb-3">
-      <label for="pdf_file">Soubor PDF:</label>
-      <input type="file" name="pdf_file" class="form-control" required>
-    </div>
-    <button type="submit" class="btn btn-primary">NahrÃ¡t a analyzovat</button>
-  </form>
+<div class="min-h-[calc(100vh-140px)] bg-gradient-to-b from-sky-50/60 via-white to-slate-100 py-10">
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+    <section class="dashboard-card bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-6">
+      <div class="space-y-2">
+        <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Ingest</p>
+        <h1 class="text-2xl font-semibold text-slate-900">Nahrát nový financní výkaz</h1>
+        <p class="text-sm text-slate-500">Vyber PDF s výsledovkou nebo rozvahou. Analýzu spustíme automaticky.</p>
+      </div>
+
+      <form method="post" enctype="multipart/form-data" class="space-y-6">
+        {% csrf_token %}
+        <div class="flex flex-col gap-2">
+          <label for="year" class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Rok</label>
+          <select name="year" id="year" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 focus:border-sky-500 focus:ring-sky-500" required>
+            {% for y in years %}
+              <option value="{{ y }}">{{ y }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <label for="pdf_file" class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Soubor PDF</label>
+          <input type="file" name="pdf_file" id="pdf_file" accept="application/pdf" class="block w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 focus:border-sky-500 focus:ring-sky-500" required>
+          <p class="text-xs text-slate-400">Podporujeme PDF do 10 MB.</p>
+        </div>
+
+        <div class="flex justify-end">
+          <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-600/30 hover:bg-sky-700 transition">
+            ?? Nahrát a analyzovat
+          </button>
+        </div>
+      </form>
+    </section>
+  </div>
 </div>
 {% endblock %}
