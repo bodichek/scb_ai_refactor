@@ -10,6 +10,45 @@
     };
   </script>
   <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <style>
+    .score-label {
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      background-color: rgba(248, 250, 252, 0.85);
+      border-radius: 1.25rem;
+      padding: 1rem;
+      height: 100%;
+      transition: all 0.2s ease-in-out;
+    }
+
+    .score-label[data-active="1"] {
+      border-color: rgba(56, 189, 248, 0.55);
+      background-color: rgba(224, 242, 254, 0.95);
+      box-shadow: 0 18px 40px -24px rgba(56, 189, 248, 0.75);
+    }
+
+    .score-label__range {
+      font-size: 0.75rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgb(148, 163, 184);
+    }
+
+    .score-label[data-active="1"] .score-label__range {
+      color: rgb(14, 116, 144);
+    }
+
+    .score-label__text {
+      margin-top: 0.4rem;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      color: rgb(71, 85, 105);
+    }
+
+    .score-label[data-active="1"] .score-label__text {
+      color: rgb(30, 41, 59);
+      font-weight: 600;
+    }
+  </style>
 {% endblock %}
 
 {% block content %}
@@ -85,7 +124,7 @@
         {% csrf_token %}
         <div class="space-y-5">
           {% for q in questions %}
-          <div class="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm shadow-slate-900/5 space-y-4">
+          <div class="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm shadow-slate-900/5 space-y-4" data-question-block>
             <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
               <div>
                 <p class="text-xs font-semibold uppercase tracking-[0.25em] text-sky-500">{{ q.category }}</p>
@@ -93,12 +132,15 @@
               </div>
               <output id="score-output-{{ forloop.counter0 }}" class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-sky-100 text-sky-600 text-sm font-semibold">5</output>
             </div>
-            <input type="range" name="q{{ forloop.counter0 }}" min="1" max="10" value="5" step="1" data-output="score-output-{{ forloop.counter0 }}" class="w-full accent-sky-600">
-            <ul class="space-y-1 text-xs text-slate-500">
+            <input type="range" name="q{{ forloop.counter0 }}" min="1" max="10" value="5" step="1" data-output="score-output-{{ forloop.counter0 }}" class="w-full accent-sky-600 score-slider">
+            <div class="score-labels grid gap-3 text-xs" style="grid-template-columns: repeat({{ q.labels|length }}, minmax(0, 1fr));">
               {% for range, label in q.labels.items %}
-              <li><span class="font-semibold text-slate-600">{{ range }}</span> – {{ label }}</li>
+              <div class="score-label" data-range="{{ range }}">
+                <p class="score-label__range">{{ range }}</p>
+                <p class="score-label__text">{{ label }}</p>
+              </div>
               {% endfor %}
-            </ul>
+            </div>
           </div>
           {% endfor %}
         </div>
@@ -116,14 +158,44 @@
 {% block extra_scripts %}
 <script>
   document.addEventListener('DOMContentLoaded', () => {
+    const parseRange = (value) => {
+      if (!value) {
+        return [1, 10];
+      }
+      const numbers = String(value)
+        .split(/[^0-9]+/)
+        .filter(Boolean)
+        .map(Number);
+      if (!numbers.length) {
+        return [1, 10];
+      }
+      if (numbers.length === 1) {
+        return [numbers[0], numbers[0]];
+      }
+      return [Math.min(...numbers), Math.max(...numbers)];
+    };
+
     document.querySelectorAll('input[data-output]').forEach((input) => {
       const targetId = input.dataset.output;
       const target = targetId ? document.getElementById(targetId) : null;
+      const questionBlock = input.closest('[data-question-block]');
+      const labelNodes = questionBlock ? Array.from(questionBlock.querySelectorAll('[data-range]')) : [];
+      const labelRanges = labelNodes.map((el) => {
+        const [from, to] = parseRange(el.dataset.range);
+        return { el, from, to };
+      });
+
       const update = () => {
+        const value = Number(input.value);
         if (target) {
-          target.textContent = input.value;
+          target.textContent = value;
         }
+        labelRanges.forEach(({ el, from, to }) => {
+          const match = value >= from && value <= to;
+          el.dataset.active = match ? '1' : '0';
+        });
       };
+
       input.addEventListener('input', update);
       update();
     });

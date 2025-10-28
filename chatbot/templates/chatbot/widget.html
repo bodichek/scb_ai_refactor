@@ -1,4 +1,4 @@
-<!-- Chatbot Widget -->
+﻿<!-- Chatbot Widget -->
 <div id="chatbot-widget" class="chatbot-widget">
   <!-- Tlačítko pro otevření/zavření chatu -->
   <button id="chatbot-toggle" class="chatbot-toggle" title="Zeptej se na finanční pojmy">
@@ -195,7 +195,7 @@
 document.addEventListener('DOMContentLoaded', function() {
   const widget = document.getElementById('chatbot-widget');
   const toggle = document.getElementById('chatbot-toggle');
-  const window = document.getElementById('chatbot-window');
+  const chatWindow = document.getElementById('chatbot-window');
   const close = document.getElementById('chatbot-close');
   const messages = document.getElementById('chatbot-messages');
   const input = document.getElementById('chatbot-input');
@@ -221,12 +221,12 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   
   // Kontext je nyní pevně nastaven
-  const currentContext = 'dashboard';
+  const currentSection = 'dashboard';
   
   // Otevření/zavření chatu
   function toggleChat() {
     isOpen = !isOpen;
-    window.style.display = isOpen ? 'flex' : 'none';
+    chatWindow.style.display = isOpen ? 'flex' : 'none';
     if (isOpen) {
       input.focus();
     }
@@ -268,9 +268,10 @@ document.addEventListener('DOMContentLoaded', function() {
           'Content-Type': 'application/json',
           'X-CSRFToken': csrfToken
         },
+        credentials: 'same-origin',
         body: JSON.stringify({
           message: message,
-          context: 'dashboard'
+          section: currentSection
         })
       });
       

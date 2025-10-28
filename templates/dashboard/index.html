@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block extra_head %}
   <script>
@@ -21,6 +21,37 @@
     const scoreHistoryData = JSON.parse('{{ score_history|default:"[]"|escapejs }}');
 
     let profitStoryChart, profitabilityTrendsChart, revCogsGrowthChart, revOverheadsGrowthChart, allMetricsChart;
+
+    function normalizeMetric(value) {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+      }
+      if (value === null || value === undefined) {
+        return 0;
+      }
+      let cleaned = String(value).trim();
+      if (!cleaned) {
+        return 0;
+      }
+      cleaned = cleaned
+        .replace(/\s+/g, '')
+        .replace(/[^0-9.,-]/g, '');
+
+      const hasComma = cleaned.includes(',');
+      const hasDot = cleaned.includes('.');
+      if (hasComma && hasDot) {
+        if (cleaned.lastIndexOf(',') > cleaned.lastIndexOf('.')) {
+          cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+        } else {
+          cleaned = cleaned.replace(/,/g, '');
+        }
+      } else if (hasComma) {
+        cleaned = cleaned.replace(',', '.');
+      }
+
+      const parsed = Number(cleaned);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
 
     function getSelectedYears() {
       const selected = Array.from(document.querySelectorAll('.year-filter:checked')).map((cb) => parseInt(cb.value, 10));
@@ -53,7 +84,7 @@
           labels: ['Tržby', 'Náklady na prodané zboží', 'Hrubá marže', 'Provozní náklady', 'EBIT', 'Čistý zisk'],
           datasets: dataRows.map((row, idx) => ({
             label: row.year,
-            data: [row.revenue, row.cogs, row.gross_margin, row.overheads, row.ebit, row.net_profit],
+            data: [normalizeMetric(row.revenue), normalizeMetric(row.cogs), normalizeMetric(row.gross_margin), normalizeMetric(row.overheads), normalizeMetric(row.ebit), normalizeMetric(row.net_profit)],
             backgroundColor: `hsl(${(idx * 70) % 360}, 70%, 54%)`,
             borderRadius: 12,
             maxBarThickness: 40,
@@ -112,8 +143,8 @@
       window.profitabilityTrendsChart = profitabilityTrendsChart;
 
       // Revenue vs COGS growth
-      const revGrowth = dataRows.map((row) => row.growth.revenue);
-      const cogsGrowth = dataRows.map((row) => row.growth.cogs);
+      const revGrowth = dataRows.map((row) => normalizeMetric(row.growth ? row.growth.revenue : 0));
+      const cogsGrowth = dataRows.map((row) => normalizeMetric(row.growth ? row.growth.cogs : 0));
       destroyIfExists(revCogsGrowthChart);
       revCogsGrowthChart = new Chart(document.getElementById('revCogsGrowthChart'), {
         type: 'bar',
@@ -138,7 +169,7 @@
       window.revCogsGrowthChart = revCogsGrowthChart;
 
       // Revenue vs overheads growth
-      const overheadGrowth = dataRows.map((row) => row.growth.overheads);
+      const overheadGrowth = dataRows.map((row) => normalizeMetric(row.growth ? row.growth.overheads : 0));
       destroyIfExists(revOverheadsGrowthChart);
       revOverheadsGrowthChart = new Chart(document.getElementById('revOverheadsGrowthChart'), {
         type: 'bar',
@@ -169,12 +200,12 @@
         data: {
           labels,
           datasets: [
-            { label: 'Tržby', data: dataRows.map((r) => r.revenue), borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
-            { label: 'COGS', data: dataRows.map((r) => r.cogs), borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
-            { label: 'Hrubá marže', data: dataRows.map((r) => r.gross_margin), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
-            { label: 'Provozní náklady', data: dataRows.map((r) => r.overheads), borderColor: '#facc15', backgroundColor: 'rgba(250,204,21,0.18)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
-            { label: 'EBIT', data: dataRows.map((r) => r.ebit), borderColor: '#a855f7', backgroundColor: 'rgba(168,85,247,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
-            { label: 'Čistý zisk', data: dataRows.map((r) => r.net_profit), borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
+            { label: 'Tržby', data: dataRows.map((r) => normalizeMetric(r.revenue)), borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
+            { label: 'COGS', data: dataRows.map((r) => normalizeMetric(r.cogs)), borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
+            { label: 'Hrubá marže', data: dataRows.map((r) => normalizeMetric(r.gross_margin)), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
+            { label: 'Provozní náklady', data: dataRows.map((r) => normalizeMetric(r.overheads)), borderColor: '#facc15', backgroundColor: 'rgba(250,204,21,0.18)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
+            { label: 'EBIT', data: dataRows.map((r) => normalizeMetric(r.ebit)), borderColor: '#a855f7', backgroundColor: 'rgba(168,85,247,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
+            { label: 'Čistý zisk', data: dataRows.map((r) => normalizeMetric(r.net_profit)), borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
           ],
         },
         options: {
@@ -333,6 +364,178 @@
       }
     }
 
+    function formatCoachRecommendation() {
+      const container = document.querySelector('[data-coach-recommendation]');
+      if (!container) {
+        return;
+      }
+      const rawText = container.textContent || '';
+      const trimmed = rawText.trim();
+      if (!trimmed) {
+        return;
+      }
+
+      const cleanupInline = (value) => {
+        if (!value) {
+          return '';
+        }
+        return value
+          .replace(/\*\*(.+?)\*\*/g, '$1')
+          .replace(/__(.+?)__/g, '$1')
+          .replace(/`(.+?)`/g, '$1')
+          .replace(/\[(.+?)\]\((.+?)\)/g, '$1')
+          .replace(/\s+/g, ' ')
+          .trim();
+      };
+
+      const humanize = (label) => {
+        if (!label) {
+          return '';
+        }
+        return label
+          .replace(/[\-_]+/g, ' ')
+          .replace(/\s+/g, ' ')
+          .replace(/\b\w/g, (match) => match.toUpperCase())
+          .trim();
+      };
+
+      const renderMarkdown = (markdown, target) => {
+        const lines = markdown.split(/\r?\n+/).map((line) => line.trim()).filter(Boolean);
+        if (!lines.length) {
+          return;
+        }
+        let activeList = null;
+        let listType = null;
+
+        const closeList = () => {
+          if (activeList) {
+            target.appendChild(activeList);
+            activeList = null;
+            listType = null;
+          }
+        };
+
+        const ensureList = (type) => {
+          if (activeList && listType !== type) {
+            closeList();
+          }
+          if (!activeList) {
+            activeList = document.createElement(type === 'ol' ? 'ol' : 'ul');
+            activeList.className = type === 'ol' ? 'list-decimal pl-5 space-y-2' : 'list-disc pl-5 space-y-2';
+            listType = type;
+          }
+          return activeList;
+        };
+
+        const createHeading = (text, level) => {
+          const heading = document.createElement(level <= 3 ? 'h4' : 'h5');
+          heading.className = 'font-semibold text-slate-800';
+          heading.textContent = cleanupInline(text);
+          target.appendChild(heading);
+        };
+
+        lines.forEach((line) => {
+          const headingMatch = line.match(/^#{1,6}\s+(.*)$/);
+          if (headingMatch) {
+            closeList();
+            createHeading(headingMatch[1], headingMatch[0].length);
+            return;
+          }
+
+          const orderedMatch = line.match(/^(\d+)[\.)]\s+(.*)$/);
+          if (orderedMatch) {
+            const list = ensureList('ol');
+            const li = document.createElement('li');
+            li.textContent = cleanupInline(orderedMatch[2]);
+            list.appendChild(li);
+            return;
+          }
+
+          const unorderedMatch = line.match(/^[-*\u2022]\s+(.*)$/);
+          if (unorderedMatch) {
+            const list = ensureList('ul');
+            const li = document.createElement('li');
+            li.textContent = cleanupInline(unorderedMatch[1]);
+            list.appendChild(li);
+            return;
+          }
+
+          closeList();
+          const paragraph = document.createElement('p');
+          paragraph.className = 'text-slate-600';
+          paragraph.textContent = cleanupInline(line);
+          target.appendChild(paragraph);
+        });
+
+        closeList();
+      };
+
+      const jsonToMarkdown = (value, depth = 0) => {
+        if (value === null || value === undefined) {
+          return '';
+        }
+        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+          const textValue = cleanupInline(String(value));
+          if (!textValue) {
+            return '';
+          }
+          if (depth === 0) {
+            return textValue;
+          }
+          const indent = '  '.repeat(Math.max(depth - 1, 0));
+          return `${indent}- ${textValue}`;
+        }
+        if (Array.isArray(value)) {
+          return value
+            .map((item) => jsonToMarkdown(item, depth + 1))
+            .filter(Boolean)
+            .join('\n');
+        }
+        if (typeof value === 'object') {
+          const sections = [];
+          Object.entries(value).forEach(([key, val]) => {
+            const headingLevel = Math.min(6, depth + 3);
+            const heading = `${'#'.repeat(headingLevel)} ${humanize(key)}`;
+            const body = jsonToMarkdown(val, depth + 1);
+            sections.push(body ? `${heading}\n${body}` : heading);
+          });
+          return sections.join('\n');
+        }
+        return '';
+      };
+
+      let structured = null;
+      if (/^[\[{]/.test(trimmed)) {
+        try {
+          structured = JSON.parse(trimmed);
+        } catch (error) {
+          structured = null;
+        }
+      }
+
+      const output = document.createElement('div');
+      output.className = 'space-y-3';
+      container.innerHTML = '';
+
+      if (structured !== null) {
+        const markdown = jsonToMarkdown(structured);
+        if (markdown && markdown.trim()) {
+          renderMarkdown(markdown, output);
+        }
+      }
+
+      if (!output.hasChildNodes()) {
+        renderMarkdown(trimmed, output);
+      }
+
+      if (!output.hasChildNodes()) {
+        const fallback = document.createElement('p');
+        fallback.textContent = cleanupInline(trimmed);
+        output.appendChild(fallback);
+      }
+
+      container.appendChild(output);
+    }
     async function loadCashflowForYear(year) {
       const container = document.getElementById('cashflow-content');
       if (!container || !year) {
@@ -369,6 +572,8 @@
         const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
         tooltipTriggerList.map((tooltipTriggerEl) => new bootstrap.Tooltip(tooltipTriggerEl));
       }
+
+      formatCoachRecommendation();
 
       const contactForm = document.getElementById('coachContactForm');
       if (contactForm) {
@@ -533,7 +738,7 @@
           {% endfor %}
         </ul>
         {% elif coach_recommendation %}
-        <p class="text-sm text-slate-600 leading-relaxed">{{ coach_recommendation }}</p>
+        <div class="text-sm text-slate-600 leading-relaxed space-y-2" data-coach-recommendation>{{ coach_recommendation }}</div>
         {% else %}
         <p class="text-sm text-slate-500">Až odešleš první dotazník nebo otevřenou analýzu, zobrazíme doporučení kouče.</p>
         {% endif %}
@@ -807,3 +1012,4 @@
   </div>
 </div>
 {% endblock %}
+

@@ -1,16 +1,21 @@
-import json
+﻿import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
-from django.shortcuts import render
-from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
+from django.db.models import Prefetch
+from django.http import JsonResponse
+from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from exports.services import get_latest_export
+from ingest.models import Document, FinancialStatement
+from survey.models import Response, SurveySubmission
+from suropen.models import OpenAnswer
+
 from .models import ChatMessage
 
 # Načtení .env souboru
@@ -33,28 +38,30 @@ CLASSIFIER_MODEL = "gpt-4o-mini"
 ASSISTANT_MODEL = "gpt-4o"
 
 CONTEXT_PROMPTS = {
-    "ingest": "Uživatel právě nahrává finanční výkazy. Pomoz mu s interpretací dat.",
-    "dashboard": "Uživatel se dívá na finanční dashboard s grafy a tabulkami.",
-    "survey": "Uživatel vyplňuje dotazník o své firmě.",
-    "exports": "Uživatel chce exportovat data do PDF.",
+    "ingest": "Uzivatel prave nahrava financni vykazy. Pomoz mu s interpretaci dat.",
+    "dashboard": "Uzivatel se diva na financni dashboard s grafy a tabulkami.",
+    "survey": "Uzivatel vyplnuje dotaznik o sve firme.",
+    "exports": "Uzivatel chce exportovat data do PDF.",
 }
 
 CLASSIFIER_PROMPT = (
-    "Posuď, zda dotaz vyžaduje konkrétní finanční data z posledního exportu "
-    "uživatele (například výsledovku, růst tržeb, marže, cash flow nebo trendy). "
-    'Odpověz pouze slovem "context" nebo "general".'
+    "Posud, zda dotaz vyzaduje konkretni firemni data uzivatele. Data mohou pochazet z financnich exportu, "
+    "nahranych vykazu, seznamu dokumentu, vysledku pruzkumu nebo otevrenych odpovedi. "
+    'Odpovez pouze slovem "context" nebo "general".'
 )
 
-ASSISTANT_SYSTEM_PROMPT = """Jsi finanční analytik české aplikace ScaleupBoard.
-Pracuješ s čísly z exportů a pomáháš s vysvětlováním finančních ukazatelů i praktickou interpretací.
+ASSISTANT_SYSTEM_PROMPT = """Jsi financni analytik ceske aplikace ScaleupBoard.
+Pracujes s cisly z exportu a databaze a pomahas s vysvetlovanim financnich ukazatelu i praktickou interpretaci.
 
 Pokyny:
-- Odpovídej česky, věcně a srozumitelně.
-- Pokud obdržíš JSON s klíčem context_data, použij tato čísla pro výpočty a vysvětlení.
-- Pokud data chybí nebo některý ukazatel nelze spočítat, jasně to sděl a popiš, co je k výpočtu potřeba.
-- Nepřidávej neověřená čísla, vycházej pouze z poskytnutých dat nebo z obecných principů.
-- Navrhni konkrétní další kroky jen tehdy, když dávají smysl pro daný dotaz.
+- Odpovidej cesky, vecne a srozumitelne.
+- Pokud obdrzis JSON s klicem context_data, obsah muze zahrnovat latest_export, financial_statements, documents,
+  survey_history nebo open_answers. Pracuj pouze s tim, co je skutecne k dispozici a nevymyslej dalsi cisla.
+- Pokud data chybi nebo n�kter� ukazatel nelze spocitat, jasne to uved a popis, co je ke spocitani potreba.
+- Navrhni konkretni dalsi kroky jen tehdy, kdyz davaji smysl pro dany dotaz.
 """
+
+
 
 
 def _compose_system_prompt(section: Optional[str]) -> str:
@@ -125,6 +132,162 @@ def _build_messages(
     ]
 
 
+FINANCIAL_METRIC_KEYS: List[str] = [
+    "Revenue",
+    "COGS",
+    "GrossMargin",
+    "Overheads",
+    "Depreciation",
+    "EBIT",
+    "NetProfit",
+    "CashFromCustomers",
+    "CashToSuppliers",
+]
+
+
+def _collect_user_context(user) -> Dict[str, Any]:
+    # Build a snapshot of user-specific data that the assistant can leverage.
+    # Returns an empty dict if nothing useful is available.
+    context: Dict[str, Any] = {}
+
+    # Latest export payload
+    try:
+        export = get_latest_export(user, ensure_exists=True)
+    except Exception as exc:
+        logger.warning("Unable to obtain export snapshot: %s", exc)
+        export = None
+
+    if export:
+        export_payload = {
+            "statement_year": export.statement_year,
+            "created_at": export.created_at.isoformat(),
+            "source": export.source,
+            "data": export.data,
+        }
+        if export.metadata:
+            export_payload["metadata"] = export.metadata
+        context["latest_export"] = export_payload
+
+    # Financial statements overview
+    try:
+        statements = list(
+            FinancialStatement.objects.filter(owner=user)
+            .select_related("document")
+            .order_by("-year")[:3]
+        )
+    except Exception as exc:
+        logger.warning("Unable to load financial statements: %s", exc)
+        statements = []
+
+    if statements:
+        snapshot: List[Dict[str, Any]] = []
+        for stmt in statements:
+            data = stmt.data or {}
+            metrics = {key: data.get(key) for key in FINANCIAL_METRIC_KEYS if key in data}
+            entry: Dict[str, Any] = {
+                "year": stmt.year,
+                "created_at": stmt.created_at.isoformat(),
+                "metrics": metrics,
+                "data": data,
+            }
+            document = getattr(stmt, "document", None)
+            if document:
+                entry["document"] = {
+                    "id": document.id,
+                    "type": document.doc_type,
+                    "year": document.year,
+                    "filename": document.filename,
+                    "analyzed": document.analyzed,
+                    "uploaded_at": document.uploaded_at.isoformat() if document.uploaded_at else None,
+                }
+            snapshot.append(entry)
+        context["financial_statements"] = snapshot
+
+    # Uploaded documents (including those without statements yet)
+    try:
+        documents = list(
+            Document.objects.filter(owner=user)
+            .order_by("-uploaded_at")
+            .values("id", "doc_type", "year", "filename", "analyzed", "uploaded_at")[:10]
+        )
+    except Exception as exc:
+        logger.warning("Unable to load documents: %s", exc)
+        documents = []
+
+    if documents:
+        for doc in documents:
+            uploaded_at = doc.get("uploaded_at")
+            if uploaded_at:
+                doc["uploaded_at"] = uploaded_at.isoformat()
+        context["documents"] = documents
+
+    # Survey submissions with responses
+    try:
+        survey_prefetch = Prefetch(
+            "responses",
+            queryset=Response.objects.order_by("created_at"),
+        )
+        submissions = list(
+            SurveySubmission.objects.filter(user=user)
+            .prefetch_related(survey_prefetch)
+            .order_by("-created_at")[:3]
+        )
+    except Exception as exc:
+        logger.warning("Unable to load survey submissions: %s", exc)
+        submissions = []
+
+    if submissions:
+        records: List[Dict[str, Any]] = []
+        for submission in submissions:
+            responses = list(submission.responses.all())
+            scores = [resp.score for resp in responses if resp.score is not None]
+            avg_score = round(sum(scores) / len(scores), 2) if scores else None
+            records.append(
+                {
+                    "created_at": submission.created_at.isoformat(),
+                    "average_score": avg_score,
+                    "ai_summary": submission.ai_response,
+                    "responses": [
+                        {"question": resp.question, "score": resp.score}
+                        for resp in responses
+                    ],
+                }
+            )
+        context["survey_history"] = records
+
+    # Latest batch of open-ended answers (coaching form)
+    try:
+        latest_answer = (
+            OpenAnswer.objects.filter(user=user)
+            .order_by("-created_at")
+            .first()
+        )
+    except Exception as exc:
+        logger.warning("Unable to load open answers: %s", exc)
+        latest_answer = None
+
+    if latest_answer:
+        batch_answers = list(
+            OpenAnswer.objects.filter(user=user, batch_id=latest_answer.batch_id)
+            .order_by("created_at")
+        )
+        context["open_answers"] = {
+            "batch_id": str(latest_answer.batch_id),
+            "created_at": batch_answers[0].created_at.isoformat() if batch_answers else None,
+            "ai_summary": latest_answer.ai_response,
+            "entries": [
+                {
+                    "section": answer.section,
+                    "question": answer.question,
+                    "answer": answer.answer,
+                }
+                for answer in batch_answers
+            ],
+        }
+
+    return context
+
+
 @csrf_exempt
 @login_required
 @require_http_methods(["POST"])
@@ -172,13 +335,14 @@ def chat_api(request):
 
     query_type = _classify_query(client, user_message, section)
 
-    export_record = None
-    export_data = None
-
+    context_payload: Optional[Dict[str, Any]] = None
     if query_type == ChatMessage.QUERY_CONTEXT:
-        export_record = get_latest_export(request.user, ensure_exists=True)
-        if not export_record:
-            fallback_response = "Nemám aktuální exportní data, prosím nejdříve nahraj finanční výkaz."
+        context_payload = _collect_user_context(request.user)
+        if not context_payload:
+            fallback_response = (
+                "Nemam k dispozici zadna ulozena firemni data. "
+                "Nahraj prosim financni vykaz nebo vypln dotaznik a zkus to znovu."
+            )
             ChatMessage.objects.create(
                 user=request.user,
                 role=ChatMessage.ROLE_USER,
@@ -196,15 +360,9 @@ def chat_api(request):
                     "context_attached": False,
                 }
             )
-    else:
-        export_record = get_latest_export(request.user, ensure_exists=False)
-
-    if export_record:
-        export_data = export_record.data
 
     system_prompt = _compose_system_prompt(section)
-    context_for_model = export_data if query_type == ChatMessage.QUERY_CONTEXT else None
-    messages = _build_messages(system_prompt, user_message, section, context_for_model)
+    messages = _build_messages(system_prompt, user_message, section, context_payload)
 
     try:
         completion = client.chat.completions.create(
@@ -217,7 +375,7 @@ def chat_api(request):
     except Exception as exc:
         logger.exception("Assistant completion failed: %s", exc)
         return JsonResponse(
-            {"error": f"Chyba při komunikaci s AI: {exc}"},
+            {"error": f"Chyba pri komunikaci s AI: {exc}"},
             status=500,
         )
 
@@ -228,7 +386,7 @@ def chat_api(request):
         query_type=query_type,
         message=user_message,
         response=ai_response,
-        context_data=export_data,
+        context_data=context_payload,
     )
 
     return JsonResponse(
@@ -236,15 +394,16 @@ def chat_api(request):
             "response": ai_response,
             "success": True,
             "query_type": query_type,
-            "context_attached": context_for_model is not None,
+            "context_attached": bool(context_payload),
         }
     )
 
-
 @login_required
 def chat_history(request):
-    """Zobrazí historii chatů uživatele"""
+    """Display chat history for the current user."""
     messages = ChatMessage.objects.filter(user=request.user)[:20]
     return render(request, 'chatbot/history.html', {
         'messages': messages
     })
+
+

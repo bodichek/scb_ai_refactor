@@ -2,6 +2,7 @@
 import io
 import json
 import base64
+import re
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -25,25 +26,128 @@ from .cashflow import calculate_cashflow
 
 
 def _clean_text(text):
-    if not text:
+    if text is None:
         return ""
-    return " ".join(str(text).strip().split())
+    if isinstance(text, str):
+        return text.strip()
+    return str(text).strip()
 
+
+
+
+def _to_number(value):
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        try:
+            return float(value)
+        except Exception:
+            return None
+    if isinstance(value, str):
+        cleaned = (
+            value.replace(' ', '')
+            .replace(' ', '')
+            .replace('CZK', '')
+            .replace('Kc', '')
+            .replace('Kč', '')
+            .replace('eur', '')
+            .replace('EUR', '')
+            .strip()
+        )
+        if not cleaned:
+            return None
+        has_comma = ',' in cleaned
+        has_dot = '.' in cleaned
+        if has_comma and has_dot:
+            if cleaned.rfind(',') > cleaned.rfind('.'):
+                cleaned = cleaned.replace('.', '').replace(',', '.')
+            else:
+                cleaned = cleaned.replace(',', '')
+        elif has_comma:
+            cleaned = cleaned.replace(',', '.')
+        try:
+            return float(cleaned)
+        except Exception:
+            return None
+    return None
 
 def _extract_recommendation_points(text, max_points=5):
     if not text:
         return []
+
+    try:
+        parsed = json.loads(text) if isinstance(text, str) else None
+    except (TypeError, ValueError, json.JSONDecodeError):
+        parsed = None
+
     points = []
-    for raw_line in text.splitlines():
-        line = raw_line.strip("•-•— \t")
-        if not line:
-            continue
-        points.append(line)
+    seen = set()
+
+    preferred_keys = [
+        "action_plan",
+        "actions",
+        "recommendations",
+        "next_steps",
+        "steps",
+        "key_actions",
+        "actionItems",
+    ]
+
+    def add_point(value):
         if len(points) >= max_points:
-            break
+            return
+        cleaned = str(value).strip()
+        if not cleaned:
+            return
+        cleaned = re.sub(r"\s+", " ", cleaned)
+        lowered = cleaned.lower()
+        if lowered in seen:
+            return
+        seen.add(lowered)
+        points.append(cleaned)
+
+    def collect_from_json(value):
+        if len(points) >= max_points:
+            return
+        if isinstance(value, str):
+            add_point(value)
+        elif isinstance(value, (int, float)):
+            add_point(value)
+        elif isinstance(value, list):
+            for item in value:
+                collect_from_json(item)
+                if len(points) >= max_points:
+                    break
+        elif isinstance(value, dict):
+            for key in preferred_keys:
+                if key in value:
+                    collect_from_json(value[key])
+            if len(points) >= max_points:
+                return
+            for key, val in value.items():
+                if key not in preferred_keys:
+                    collect_from_json(val)
+
+    if parsed is not None:
+        collect_from_json(parsed)
+    else:
+        for raw_line in str(text).splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith('#'):
+                continue
+            line = re.sub(r"^[-*•]+\s*", "", line)
+            line = re.sub(r"^\d+[\.\)]\s*", "", line)
+            line = line.replace('**', '')
+            if not line:
+                continue
+            add_point(line)
+            if len(points) >= max_points:
+                break
+
     if not points:
-        points = [text.strip()]
-    return points
+        add_point(text)
+    return points[:max_points]
+
 
 
 def _build_cashflow_table(cf):
@@ -108,27 +212,55 @@ def index(request):
         d = s.data or {}
 
         # ZÃ¡kladnÃ­ vÃ½poÄty
-        revenue = d.get("Revenue", 0)
-        cogs = d.get("COGS", 0)
-        gross_margin = revenue - cogs
-        overheads = d.get("Overheads", 0)
-        depreciation = d.get("Depreciation", 0)
-        ebit = d.get("EBIT", gross_margin - overheads - depreciation)
-        net_profit = d.get("NetProfit", 0)
+        revenue = _to_number(d.get("Revenue")) or 0.0
+        cogs = _to_number(d.get("COGS")) or 0.0
+        gross_margin = _to_number(d.get("GrossMargin"))
+        if gross_margin is None:
+            gross_margin = revenue - cogs
+
+        overheads_raw = d.get("Overheads")
+        overheads = _to_number(overheads_raw)
+        depreciation = _to_number(d.get("Depreciation")) or 0.0
+
+        ebit_raw = d.get("EBIT")
+        ebit = _to_number(ebit_raw)
+        if ebit is None and gross_margin is not None:
+            ebit = gross_margin - (overheads or 0.0) - depreciation
+
+        if (overheads is None or abs(overheads) < 1e-6) and gross_margin is not None and ebit is not None:
+            derived_overheads = gross_margin - ebit - depreciation
+            if derived_overheads is not None:
+                overheads = derived_overheads
+
+        if overheads is None:
+            overheads = 0.0
+
+        if ebit is None:
+            ebit = gross_margin - overheads - depreciation
+
+        net_profit = _to_number(d.get("NetProfit"))
+        if net_profit is None:
+            net_profit = revenue - cogs - overheads - depreciation
 
         # Cashflow (jen zÃ¡kladnÃ­ bloky)
-        cash_from_customers = d.get("CashFromCustomers", revenue)
-        cash_to_suppliers = d.get("CashToSuppliers", cogs)
+        cash_from_customers = _to_number(d.get("CashFromCustomers"))
+        if cash_from_customers is None:
+            cash_from_customers = revenue
+        cash_to_suppliers = _to_number(d.get("CashToSuppliers"))
+        if cash_to_suppliers is None:
+            cash_to_suppliers = cogs
         gross_cash_profit = cash_from_customers - cash_to_suppliers
-        cash_overheads = d.get("Overheads", overheads)
+        cash_overheads = _to_number(d.get("Overheads"))
+        if cash_overheads is None:
+            cash_overheads = overheads
         operating_cf = gross_cash_profit - cash_overheads
 
-        interest = d.get("InterestPaid", 0)
-        tax = d.get("IncomeTaxPaid", 0)
-        extraordinary = d.get("ExtraordinaryItems", 0)
-        dividends = d.get("DividendsPaid", 0)
-        capex = d.get("Capex", 0)
-        other_assets = d.get("OtherAssets", 0)
+        interest = _to_number(d.get("InterestPaid")) or 0.0
+        tax = _to_number(d.get("IncomeTaxPaid")) or 0.0
+        extraordinary = _to_number(d.get("ExtraordinaryItems")) or 0.0
+        dividends = _to_number(d.get("DividendsPaid")) or 0.0
+        capex = _to_number(d.get("Capex")) or 0.0
+        other_assets = _to_number(d.get("OtherAssets")) or 0.0
 
         net_cf = operating_cf - interest - tax - extraordinary - dividends - capex + other_assets
 
@@ -619,3 +751,5 @@ def api_cashflow_summary(request):
         "current_year": selected_year,
         "cashflow": cf,
     })
+
+
