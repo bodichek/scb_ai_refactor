@@ -203,9 +203,8 @@ def _get_openai_client():
         return None
 
 
-@login_required
-def index(request):
-    statements = FinancialStatement.objects.filter(owner=request.user).order_by("year")
+def build_dashboard_context(target_user):
+    statements = FinancialStatement.objects.filter(owner=target_user).order_by("year")
 
     rows = []
     for s in statements:
@@ -317,7 +316,7 @@ def index(request):
     # 📈 Insights from survey responses
     survey_history = []
     latest_submission = None
-    submissions_qs = SurveySubmission.objects.filter(user=request.user).order_by("created_at")
+    submissions_qs = SurveySubmission.objects.filter(user=target_user).order_by("created_at")
     for submission in submissions_qs:
         avg_score = None
         if hasattr(submission, "responses"):
@@ -354,14 +353,14 @@ def index(request):
     # 🧠 AI doporučení
     coach_summary = _clean_text(latest_submission.ai_response) if (latest_submission and latest_submission.ai_response) else None
     open_answer_summary = None
-    for answer in OpenAnswer.objects.filter(user=request.user).order_by("-created_at"):
+    for answer in OpenAnswer.objects.filter(user=target_user).order_by("-created_at"):
         if answer.ai_response:
             open_answer_summary = _clean_text(answer.ai_response)
             break
     coach_recommendation = open_answer_summary or coach_summary
     recommendation_points = _extract_recommendation_points(coach_recommendation) if coach_recommendation else []
 
-    profile = CompanyProfile.objects.filter(user=request.user).select_related("assigned_coach").first()
+    profile = CompanyProfile.objects.filter(user=target_user).select_related("assigned_coach").first()
     assigned_coach = getattr(profile, "assigned_coach", None)
     coach_note_entry = None
     if profile:
@@ -380,7 +379,7 @@ def index(request):
         "income": "vysledovka",
     }
     document_qs = (
-        Document.objects.filter(owner=request.user, doc_type__in=list(doc_type_map.keys()))
+        Document.objects.filter(owner=target_user, doc_type__in=list(doc_type_map.keys()))
         .values("year", "doc_type", "analyzed")
     )
     for item in document_qs:
@@ -437,13 +436,13 @@ def index(request):
     cashflow_table = []
     if selected_year:
         try:
-            cf = calculate_cashflow(request.user, selected_year)
+            cf = calculate_cashflow(target_user, selected_year)
         except Exception as exc:
             print(f"⚠️ Chyba výpočtu cashflow: {exc}")
         else:
             cashflow_table = _build_cashflow_table(cf)
 
-    return render(request, "dashboard/index.html", {
+    return {
         "rows": json.dumps(rows),
         "years": json.dumps(years),
         "table_rows": rows,
@@ -467,7 +466,13 @@ def index(request):
         "has_openai_client": bool(getattr(settings, "OPENAI_API_KEY", "")),
         "profile": profile,
         "document_upload_status": document_upload_status,
-    })
+    }
+
+
+@login_required
+def index(request):
+    context = build_dashboard_context(request.user)
+    return render(request, "dashboard/index.html", context)
 
 
 @login_required

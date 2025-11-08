@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% load static %}
 
 {% block extra_head %}
@@ -16,15 +16,92 @@
 {% block title %}Kouč – přehled klientů{% endblock %}
 
 {% block content %}
-<div class="min-h-[calc(100vh-140px)] bg-gradient-to-br from-slate-50 via-white to-slate-100 py-10">
-  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 py-10">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
     <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
       <div>
-        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Coach Dashboard</p>
-        <h1 class="mt-2 text-3xl font-bold text-slate-900">Moji klienti</h1>
-        <p class="mt-2 text-sm text-slate-500">Rychlý přehled o firmách, které máš aktuálně na starosti – poslední aktivita, počet dokumentů a dostupná data.</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Coach dashboard</p>
+        <h1 class="mt-2 text-3xl font-bold text-slate-900">Moje klientské firmy</h1>
+        <p class="mt-2 text-sm text-slate-500">Stejný vzhled jako hlavní cockpit – jen s nástroji, které kouč opravdu potřebuje.</p>
       </div>
-      <form method="get" class="w-full md:w-80">
+      <div class="text-sm text-slate-500">
+        Přihlášený kouč: <span class="font-semibold text-slate-900">{{ request.user.get_full_name|default:request.user.username }}</span>
+      </div>
+    </header>
+
+    <div class="grid grid-cols-1 xl:grid-cols-6 gap-6">
+      <section class="dashboard-card xl:col-span-4 bg-gradient-to-r from-sky-50 via-white to-indigo-50 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
+        {% if coach_profile %}
+        {% with coach_user=coach_profile.user %}
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div>
+            <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Váš profil</p>
+            <h3 class="text-2xl font-semibold text-slate-900">
+              {{ coach_user.get_full_name|default:coach_user.username }}
+            </h3>
+            {% if coach_profile.specialization %}
+              <p class="text-sm text-slate-500 mt-1">{{ coach_profile.specialization }}</p>
+            {% endif %}
+          </div>
+          <a href="{% url 'coaching:edit_coach' %}" class="inline-flex items-center gap-2 rounded-full bg-slate-900 text-white px-4 py-2 text-sm font-semibold shadow-sm hover:bg-slate-800">
+            Upravit profil
+            <span aria-hidden="true">→</span>
+          </a>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <p class="text-[0.65rem] uppercase tracking-[0.25em] text-slate-400">E-mail</p>
+            <p class="text-sm font-medium text-slate-800">{{ coach_profile.email|default:coach_user.email|default:"—" }}</p>
+          </div>
+          <div>
+            <p class="text-[0.65rem] uppercase tracking-[0.25em] text-slate-400">Telefon</p>
+            <p class="text-sm font-medium text-slate-800">{{ coach_profile.phone|default:"—" }}</p>
+          </div>
+          <div>
+            <p class="text-[0.65rem] uppercase tracking-[0.25em] text-slate-400">Lokace</p>
+            <p class="text-sm font-medium text-slate-800">{{ coach_profile.city|default:"—" }}</p>
+          </div>
+        </div>
+        {% endwith %}
+        {% else %}
+        <div class="flex flex-col gap-3">
+          <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Profil kouče</p>
+          <h3 class="text-2xl font-semibold text-slate-900">Doplňte své údaje</h3>
+          <p class="text-sm text-slate-600">Vyplněný profil se promítne do exportů i do klientského cockpit.</p>
+          <div>
+            <a href="{% url 'coaching:edit_coach' %}" class="inline-flex items-center gap-2 rounded-full bg-slate-900 text-white px-4 py-2 text-sm font-semibold shadow-sm hover:bg-slate-800">
+              Upravit profil
+              <span aria-hidden="true">→</span>
+            </a>
+          </div>
+        </div>
+        {% endif %}
+      </section>
+
+      <section class="dashboard-card xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
+        <div>
+          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Notifikace</p>
+          <h2 class="mt-2 text-xl font-semibold text-slate-900">Co tě čeká dál</h2>
+        </div>
+        <p class="text-sm text-slate-500">Sekce pro upozornění na nové dokumenty, dotazníky nebo termíny. Obsah doplníme v další iteraci.</p>
+        <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 px-4 py-6 text-center text-sm text-slate-400">
+          Notifikace se připravují…
+        </div>
+      </section>
+    </div>
+
+    <section class="dashboard-card bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-6">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div>
+          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Vyhledávání klienta</p>
+          <h2 class="mt-2 text-lg font-semibold text-slate-900">Najdi firmu během pár vteřin</h2>
+          <p class="text-xs text-slate-500">Filtruj podle názvu, kontaktní osoby nebo e-mailu.</p>
+        </div>
+        <div class="text-sm text-slate-500">
+          Celkem klientů: <span class="font-semibold text-slate-900">{{ clients_count }}</span>
+        </div>
+      </div>
+      <form method="get" class="space-y-1">
         <label for="client-search" class="sr-only">Vyhledat klienta</label>
         <div class="relative">
           <span class="absolute inset-y-0 left-3 flex items-center text-slate-400">
@@ -36,43 +113,11 @@
           <input id="client-search"
                  name="search"
                  value="{{ search_query }}"
-                 placeholder="Hledat podle názvu, jména nebo e-mailu…"
-                 class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 pl-9 text-sm text-slate-700 placeholder:text-slate-400 focus:border-sky-500 focus:ring-sky-500" />
+                 placeholder="Zadej název firmy nebo e-mail…"
+                 class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 pl-10 text-sm text-slate-700 placeholder:text-slate-400 focus:border-sky-500 focus:ring-sky-500" />
+          <button type="submit" class="sr-only">Hledat</button>
         </div>
       </form>
-    </header>
-
-    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="rounded-3xl bg-white/95 border border-slate-200/70 shadow-lg shadow-slate-900/5 p-5">
-        <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Klienti</p>
-        <p class="mt-2 text-2xl font-semibold text-slate-900">{{ clients_count }}</p>
-        <p class="text-xs text-slate-500 mt-1">počet přiřazených firem v portfoliu</p>
-      </div>
-      <div class="rounded-3xl bg-white/95 border border-slate-200/70 shadow-lg shadow-slate-900/5 p-5">
-        <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Aktivní (30 dní)</p>
-        <p class="mt-2 text-2xl font-semibold text-emerald-600">{{ active_clients }}</p>
-        <p class="text-xs text-slate-500 mt-1">nahráli dokumenty v posledním měsíci</p>
-      </div>
-      <div class="rounded-3xl bg-white/95 border border-slate-200/70 shadow-lg shadow-slate-900/5 p-5">
-        <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Dokumenty</p>
-        <p class="mt-2 text-2xl font-semibold text-sky-600">{{ statements_total }}</p>
-        <p class="text-xs text-slate-500 mt-1">celkový počet finančních výkazů</p>
-      </div>
-      <div class="rounded-3xl bg-white/95 border border-slate-200/70 shadow-lg shadow-slate-900/5 p-5">
-        <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Nové uploady</p>
-        <p class="mt-2 text-2xl font-semibold text-indigo-600">{{ recent_uploads }}</p>
-        <p class="text-xs text-slate-500 mt-1">dokumentů přibylo za posledních 30 dní</p>
-      </div>
-    </section>
-
-    <section class="dashboard-card bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-4">
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div>
-          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Seznam klientů</p>
-          <h2 class="mt-2 text-lg font-semibold text-slate-900">Firmy ve tvém portfoliu</h2>
-          <p class="text-xs text-slate-500">Kliknutím na řádek otevřeš detail klienta.</p>
-        </div>
-      </div>
       <div class="overflow-hidden border border-slate-200/70 rounded-2xl bg-white/90">
         {% if clients %}
         <table class="min-w-full divide-y divide-slate-200 text-sm">
@@ -80,9 +125,7 @@
             <tr>
               <th class="px-4 py-3 text-left">Firma</th>
               <th class="px-4 py-3 text-left">Kontakt</th>
-              <th class="px-4 py-3 text-center">Výkazy</th>
               <th class="px-4 py-3 text-left">Poslední aktivita</th>
-              <th class="px-4 py-3 text-left">Stav</th>
               <th class="px-4 py-3 text-right">Akce</th>
             </tr>
           </thead>
@@ -91,6 +134,7 @@
             <tr class="hover:bg-slate-50/70 transition">
               <td class="px-4 py-3">
                 <p class="text-sm font-semibold text-slate-900">{{ client.company_name|default:client.user.username }}</p>
+                <p class="text-xs text-slate-400">{{ client.statements_count }} dokumentů</p>
               </td>
               <td class="px-4 py-3 text-sm text-slate-600">
                 {% if client.contact_person %}
@@ -98,7 +142,6 @@
                 {% endif %}
                 <span class="text-xs text-slate-400">{{ client.user.email }}</span>
               </td>
-              <td class="px-4 py-3 text-center text-sm font-semibold text-slate-800">{{ client.statements_count }}</td>
               <td class="px-4 py-3 text-sm text-slate-600">
                 {% if client.last_activity %}
                   {{ client.last_activity|date:"d.m.Y H:i" }}
@@ -106,17 +149,10 @@
                   <span class="text-slate-400 text-xs uppercase tracking-wide">Bez aktivity</span>
                 {% endif %}
               </td>
-              <td class="px-4 py-3">
-                {% if client.last_activity %}
-                  <span class="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">Aktivní</span>
-                {% else %}
-                  <span class="inline-flex items-center rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-600">Začínáme</span>
-                {% endif %}
-              </td>
               <td class="px-4 py-3 text-right">
                 <a href="{% url 'coaching:client_dashboard' client.id %}"
-                   class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow shadow-sky-600/25 hover:bg-sky-700 transition">
-                  Detail
+                   class="inline-flex items-center gap-2 rounded-full bg-sky-600 px-4 py-1.5 text-xs font-semibold text-white shadow shadow-sky-600/25 hover:bg-sky-700 transition">
+                  Otevřít
                   <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
                   </svg>
@@ -128,34 +164,11 @@
         </table>
         {% else %}
         <div class="px-4 py-16 text-center text-sm text-slate-500">
-          Nemáš zatím žádné přiřazené klienty. Pošli přístup nebo vyber spektrum firem v administraci.
+          Žádní klienti zatím nejsou přiřazeni. Zadej jiný dotaz nebo počkej na přidělení firmy.
         </div>
         {% endif %}
       </div>
     </section>
-
-    {% if recent_activities %}
-    <section class="dashboard-card bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-4">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Aktivity</p>
-          <h2 class="mt-2 text-lg font-semibold text-slate-900">Poslední nahrané dokumenty</h2>
-        </div>
-      </div>
-      <ul class="space-y-3">
-        {% for activity in recent_activities %}
-        <li class="flex items-start gap-3 rounded-2xl border border-slate-200/60 bg-white/95 px-4 py-3">
-          <span class="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-sky-500"></span>
-          <div>
-            <p class="text-xs text-slate-400 uppercase tracking-wide">{{ activity.date|date:"d.m.Y H:i" }}</p>
-            <p class="text-sm font-semibold text-slate-800">{{ activity.client_name }}</p>
-            <p class="text-xs text-slate-500">{{ activity.description }}</p>
-          </div>
-        </li>
-        {% endfor %}
-      </ul>
-    </section>
-    {% endif %}
   </div>
 </div>
 {% endblock %}

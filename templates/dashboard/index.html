@@ -22,37 +22,6 @@
 
     let profitStoryChart, profitabilityTrendsChart, revCogsGrowthChart, revOverheadsGrowthChart, allMetricsChart;
 
-    function normalizeMetric(value) {
-      if (typeof value === 'number' && Number.isFinite(value)) {
-        return value;
-      }
-      if (value === null || value === undefined) {
-        return 0;
-      }
-      let cleaned = String(value).trim();
-      if (!cleaned) {
-        return 0;
-      }
-      cleaned = cleaned
-        .replace(/\s+/g, '')
-        .replace(/[^0-9.,-]/g, '');
-
-      const hasComma = cleaned.includes(',');
-      const hasDot = cleaned.includes('.');
-      if (hasComma && hasDot) {
-        if (cleaned.lastIndexOf(',') > cleaned.lastIndexOf('.')) {
-          cleaned = cleaned.replace(/\./g, '').replace(',', '.');
-        } else {
-          cleaned = cleaned.replace(/,/g, '');
-        }
-      } else if (hasComma) {
-        cleaned = cleaned.replace(',', '.');
-      }
-
-      const parsed = Number(cleaned);
-      return Number.isFinite(parsed) ? parsed : 0;
-    }
-
     function getSelectedYears() {
       const selected = Array.from(document.querySelectorAll('.year-filter:checked')).map((cb) => parseInt(cb.value, 10));
       if (!selected.length) {
@@ -84,7 +53,7 @@
           labels: ['Tržby', 'Náklady na prodané zboží', 'Hrubá marže', 'Provozní náklady', 'EBIT', 'Čistý zisk'],
           datasets: dataRows.map((row, idx) => ({
             label: row.year,
-            data: [normalizeMetric(row.revenue), normalizeMetric(row.cogs), normalizeMetric(row.gross_margin), normalizeMetric(row.overheads), normalizeMetric(row.ebit), normalizeMetric(row.net_profit)],
+            data: [row.revenue, row.cogs, row.gross_margin, row.overheads, row.ebit, row.net_profit],
             backgroundColor: `hsl(${(idx * 70) % 360}, 70%, 54%)`,
             borderRadius: 12,
             maxBarThickness: 40,
@@ -143,8 +112,8 @@
       window.profitabilityTrendsChart = profitabilityTrendsChart;
 
       // Revenue vs COGS growth
-      const revGrowth = dataRows.map((row) => normalizeMetric(row.growth ? row.growth.revenue : 0));
-      const cogsGrowth = dataRows.map((row) => normalizeMetric(row.growth ? row.growth.cogs : 0));
+      const revGrowth = dataRows.map((row) => row.growth.revenue);
+      const cogsGrowth = dataRows.map((row) => row.growth.cogs);
       destroyIfExists(revCogsGrowthChart);
       revCogsGrowthChart = new Chart(document.getElementById('revCogsGrowthChart'), {
         type: 'bar',
@@ -169,7 +138,7 @@
       window.revCogsGrowthChart = revCogsGrowthChart;
 
       // Revenue vs overheads growth
-      const overheadGrowth = dataRows.map((row) => normalizeMetric(row.growth ? row.growth.overheads : 0));
+      const overheadGrowth = dataRows.map((row) => row.growth.overheads);
       destroyIfExists(revOverheadsGrowthChart);
       revOverheadsGrowthChart = new Chart(document.getElementById('revOverheadsGrowthChart'), {
         type: 'bar',
@@ -200,12 +169,12 @@
         data: {
           labels,
           datasets: [
-            { label: 'Tržby', data: dataRows.map((r) => normalizeMetric(r.revenue)), borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
-            { label: 'COGS', data: dataRows.map((r) => normalizeMetric(r.cogs)), borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
-            { label: 'Hrubá marže', data: dataRows.map((r) => normalizeMetric(r.gross_margin)), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
-            { label: 'Provozní náklady', data: dataRows.map((r) => normalizeMetric(r.overheads)), borderColor: '#facc15', backgroundColor: 'rgba(250,204,21,0.18)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
-            { label: 'EBIT', data: dataRows.map((r) => normalizeMetric(r.ebit)), borderColor: '#a855f7', backgroundColor: 'rgba(168,85,247,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
-            { label: 'Čistý zisk', data: dataRows.map((r) => normalizeMetric(r.net_profit)), borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
+            { label: 'Tržby', data: dataRows.map((r) => r.revenue), borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
+            { label: 'COGS', data: dataRows.map((r) => r.cogs), borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
+            { label: 'Hrubá marže', data: dataRows.map((r) => r.gross_margin), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
+            { label: 'Provozní náklady', data: dataRows.map((r) => r.overheads), borderColor: '#facc15', backgroundColor: 'rgba(250,204,21,0.18)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
+            { label: 'EBIT', data: dataRows.map((r) => r.ebit), borderColor: '#a855f7', backgroundColor: 'rgba(168,85,247,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
+            { label: 'Čistý zisk', data: dataRows.map((r) => r.net_profit), borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.15)', tension: 0.35, borderWidth: 3, fill: true, pointRadius: 3 },
           ],
         },
         options: {
@@ -327,6 +296,16 @@
       if (!chart || typeof chart.toBase64Image !== 'function') {
         return;
       }
+      if (typeof chart.stop === 'function') {
+        chart.stop();
+      }
+      if (chart.options && chart.options.animation) {
+        chart.options.animation = false;
+      }
+      if (typeof chart.update === 'function') {
+        chart.update('none');
+      }
+      await new Promise((resolve) => requestAnimationFrame(resolve));
       const dataUrl = chart.toBase64Image('image/png', 1);
       if (!dataUrl || dataUrl.length < 100) {
         return;
@@ -364,178 +343,6 @@
       }
     }
 
-    function formatCoachRecommendation() {
-      const container = document.querySelector('[data-coach-recommendation]');
-      if (!container) {
-        return;
-      }
-      const rawText = container.textContent || '';
-      const trimmed = rawText.trim();
-      if (!trimmed) {
-        return;
-      }
-
-      const cleanupInline = (value) => {
-        if (!value) {
-          return '';
-        }
-        return value
-          .replace(/\*\*(.+?)\*\*/g, '$1')
-          .replace(/__(.+?)__/g, '$1')
-          .replace(/`(.+?)`/g, '$1')
-          .replace(/\[(.+?)\]\((.+?)\)/g, '$1')
-          .replace(/\s+/g, ' ')
-          .trim();
-      };
-
-      const humanize = (label) => {
-        if (!label) {
-          return '';
-        }
-        return label
-          .replace(/[\-_]+/g, ' ')
-          .replace(/\s+/g, ' ')
-          .replace(/\b\w/g, (match) => match.toUpperCase())
-          .trim();
-      };
-
-      const renderMarkdown = (markdown, target) => {
-        const lines = markdown.split(/\r?\n+/).map((line) => line.trim()).filter(Boolean);
-        if (!lines.length) {
-          return;
-        }
-        let activeList = null;
-        let listType = null;
-
-        const closeList = () => {
-          if (activeList) {
-            target.appendChild(activeList);
-            activeList = null;
-            listType = null;
-          }
-        };
-
-        const ensureList = (type) => {
-          if (activeList && listType !== type) {
-            closeList();
-          }
-          if (!activeList) {
-            activeList = document.createElement(type === 'ol' ? 'ol' : 'ul');
-            activeList.className = type === 'ol' ? 'list-decimal pl-5 space-y-2' : 'list-disc pl-5 space-y-2';
-            listType = type;
-          }
-          return activeList;
-        };
-
-        const createHeading = (text, level) => {
-          const heading = document.createElement(level <= 3 ? 'h4' : 'h5');
-          heading.className = 'font-semibold text-slate-800';
-          heading.textContent = cleanupInline(text);
-          target.appendChild(heading);
-        };
-
-        lines.forEach((line) => {
-          const headingMatch = line.match(/^#{1,6}\s+(.*)$/);
-          if (headingMatch) {
-            closeList();
-            createHeading(headingMatch[1], headingMatch[0].length);
-            return;
-          }
-
-          const orderedMatch = line.match(/^(\d+)[\.)]\s+(.*)$/);
-          if (orderedMatch) {
-            const list = ensureList('ol');
-            const li = document.createElement('li');
-            li.textContent = cleanupInline(orderedMatch[2]);
-            list.appendChild(li);
-            return;
-          }
-
-          const unorderedMatch = line.match(/^[-*\u2022]\s+(.*)$/);
-          if (unorderedMatch) {
-            const list = ensureList('ul');
-            const li = document.createElement('li');
-            li.textContent = cleanupInline(unorderedMatch[1]);
-            list.appendChild(li);
-            return;
-          }
-
-          closeList();
-          const paragraph = document.createElement('p');
-          paragraph.className = 'text-slate-600';
-          paragraph.textContent = cleanupInline(line);
-          target.appendChild(paragraph);
-        });
-
-        closeList();
-      };
-
-      const jsonToMarkdown = (value, depth = 0) => {
-        if (value === null || value === undefined) {
-          return '';
-        }
-        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-          const textValue = cleanupInline(String(value));
-          if (!textValue) {
-            return '';
-          }
-          if (depth === 0) {
-            return textValue;
-          }
-          const indent = '  '.repeat(Math.max(depth - 1, 0));
-          return `${indent}- ${textValue}`;
-        }
-        if (Array.isArray(value)) {
-          return value
-            .map((item) => jsonToMarkdown(item, depth + 1))
-            .filter(Boolean)
-            .join('\n');
-        }
-        if (typeof value === 'object') {
-          const sections = [];
-          Object.entries(value).forEach(([key, val]) => {
-            const headingLevel = Math.min(6, depth + 3);
-            const heading = `${'#'.repeat(headingLevel)} ${humanize(key)}`;
-            const body = jsonToMarkdown(val, depth + 1);
-            sections.push(body ? `${heading}\n${body}` : heading);
-          });
-          return sections.join('\n');
-        }
-        return '';
-      };
-
-      let structured = null;
-      if (/^[\[{]/.test(trimmed)) {
-        try {
-          structured = JSON.parse(trimmed);
-        } catch (error) {
-          structured = null;
-        }
-      }
-
-      const output = document.createElement('div');
-      output.className = 'space-y-3';
-      container.innerHTML = '';
-
-      if (structured !== null) {
-        const markdown = jsonToMarkdown(structured);
-        if (markdown && markdown.trim()) {
-          renderMarkdown(markdown, output);
-        }
-      }
-
-      if (!output.hasChildNodes()) {
-        renderMarkdown(trimmed, output);
-      }
-
-      if (!output.hasChildNodes()) {
-        const fallback = document.createElement('p');
-        fallback.textContent = cleanupInline(trimmed);
-        output.appendChild(fallback);
-      }
-
-      container.appendChild(output);
-    }
     async function loadCashflowForYear(year) {
       const container = document.getElementById('cashflow-content');
       if (!container || !year) {
@@ -572,8 +379,6 @@
         const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
         tooltipTriggerList.map((tooltipTriggerEl) => new bootstrap.Tooltip(tooltipTriggerEl));
       }
-
-      formatCoachRecommendation();
 
       const contactForm = document.getElementById('coachContactForm');
       if (contactForm) {
@@ -675,16 +480,93 @@
         <h1 class="text-3xl font-bold text-slate-900">Finanční cockpit</h1>
         <p class="text-sm text-slate-500 mt-2">Souhrn zdraví firmy, doporučení a nástroje pro rychlý kontakt s koučem.</p>
       </div>
-      {% if assigned_coach %}
-      <div class="bg-white/85 border border-slate-200/70 rounded-2xl px-4 py-3 shadow-sm">
-        <p class="text-xs uppercase tracking-wide text-slate-400">Tvůj kouč</p>
-        <p class="text-sm font-semibold text-slate-800">{{ assigned_coach.user.get_full_name|default:assigned_coach }}</p>
-        <p class="text-xs text-slate-500">Připraven reagovat na dotazy</p>
-      </div>
-      {% endif %}
     </header>
 
     <div class="grid grid-cols-1 xl:grid-cols-6 gap-6">
+      <section class="dashboard-card xl:col-span-4 bg-gradient-to-r from-sky-50 via-white to-indigo-50 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
+        {% if assigned_coach %}
+        {% with coach_user=assigned_coach.user %}
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div>
+            <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Váš kouč</p>
+            <h3 class="text-2xl font-semibold text-slate-900">
+              {{ coach_user.get_full_name|default:coach_user.username|default:assigned_coach }}
+            </h3>
+            {% if assigned_coach.specialization %}
+            <p class="text-sm text-slate-500 mt-1">{{ assigned_coach.specialization }}</p>
+            {% endif %}
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full md:w-auto">
+            <div>
+              <p class="text-[0.65rem] uppercase tracking-[0.25em] text-slate-400">E-mail</p>
+              <p class="text-sm font-medium text-slate-800">
+                {{ assigned_coach.email|default:coach_user.email|default:"-" }}
+              </p>
+            </div>
+            <div>
+              <p class="text-[0.65rem] uppercase tracking-[0.25em] text-slate-400">Telefon</p>
+              <p class="text-sm font-medium text-slate-800">
+                {{ assigned_coach.phone|default:"-" }}
+              </p>
+            </div>
+            <div>
+              <p class="text-[0.65rem] uppercase tracking-[0.25em] text-slate-400">Lokace</p>
+              <p class="text-sm font-medium text-slate-800">
+                {{ assigned_coach.city|default:"-" }}
+              </p>
+            </div>
+          </div>
+        </div>
+        {% if assigned_coach.bio %}
+          <p class="text-sm text-slate-600 leading-relaxed">{{ assigned_coach.bio }}</p>
+        {% else %}
+          <p class="text-sm text-slate-500">Kouč zatím nepřidal popis. Domluvte se společně na dalších krocích během nejbližší konzultace.</p>
+        {% endif %}
+        <div class="flex flex-wrap gap-3 text-sm">
+          {% if assigned_coach.linkedin %}
+            <a href="{{ assigned_coach.linkedin }}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-1.5 text-slate-700 hover:text-sky-600 hover:border-sky-200">
+              LinkedIn
+              <span aria-hidden="true">↗</span>
+            </a>
+          {% endif %}
+          {% if assigned_coach.website %}
+            <a href="{{ assigned_coach.website }}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-1.5 text-slate-700 hover:text-sky-600 hover:border-sky-200">
+              Web
+              <span aria-hidden="true">↗</span>
+            </a>
+          {% endif %}
+          {% if not assigned_coach.linkedin and not assigned_coach.website %}
+            <p class="text-xs text-slate-500">Kontaktuj kouče přes e‑mail nebo telefon uvedený výše.</p>
+          {% endif %}
+        </div>
+        {% endwith %}
+        {% else %}
+        <div class="flex flex-col gap-3">
+          <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Kouč</p>
+          <h3 class="text-2xl font-semibold text-slate-900">Ještě nemáte přiřazeného kouče</h3>
+          <p class="text-sm text-slate-600">Jakmile vám tým ScaleupBoard přiřadí kouče, uvidíte zde jeho kontakty a aktuální poznámky.</p>
+          <div>
+            <a href="{% url 'suropen:form' %}" class="inline-flex items-center gap-2 rounded-full bg-slate-900 text-white px-4 py-2 text-sm font-semibold shadow-sm hover:bg-slate-800">
+              Požádat o kouče
+              <span aria-hidden="true">→</span>
+            </a>
+          </div>
+        </div>
+        {% endif %}
+      </section>
+
+      <section class="dashboard-card xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
+        <div>
+          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Kontaktuj kouče</p>
+          <h2 class="mt-2 text-xl font-semibold text-slate-900">Potřebuješ revizi?</h2>
+        </div>
+        <form id="coachContactForm" class="space-y-4">
+          <textarea id="coachMessage" name="message" rows="4" class="block w-full rounded-2xl border-slate-200 bg-slate-50/70 text-sm text-slate-700 placeholder:text-slate-400 focus:border-sky-500 focus:ring-sky-500" placeholder="Zeptej se kouče na konkrétní problém nebo oblast."></textarea>
+          <button type="submit" class="scb-btn scb-btn-primary w-full justify-center">✉️ Odeslat koučovi</button>
+        </form>
+        <p id="coachContactStatus" class="text-xs text-slate-500" data-tone="info">Odpověď od AI vidíš hned, kouč ji dostane do revize.</p>
+      </section>
+
       <section class="dashboard-card xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-6">
         <div class="flex items-start justify-between">
           <div>
@@ -738,7 +620,7 @@
           {% endfor %}
         </ul>
         {% elif coach_recommendation %}
-        <div class="text-sm text-slate-600 leading-relaxed space-y-2" data-coach-recommendation>{{ coach_recommendation }}</div>
+        <p class="text-sm text-slate-600 leading-relaxed">{{ coach_recommendation }}</p>
         {% else %}
         <p class="text-sm text-slate-500">Až odešleš první dotazník nebo otevřenou analýzu, zobrazíme doporučení kouče.</p>
         {% endif %}
@@ -762,18 +644,6 @@
 
       <section class="dashboard-card xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
         <div>
-          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Kontaktuj kouče</p>
-          <h2 class="mt-2 text-xl font-semibold text-slate-900">Potřebuješ revizi?</h2>
-        </div>
-        <form id="coachContactForm" class="space-y-4">
-          <textarea id="coachMessage" name="message" rows="4" class="block w-full rounded-2xl border-slate-200 bg-slate-50/70 text-sm text-slate-700 placeholder:text-slate-400 focus:border-sky-500 focus:ring-sky-500" placeholder="Zeptej se kouče na konkrétní problém nebo oblast."></textarea>
-          <button type="submit" class="scb-btn scb-btn-primary w-full justify-center">✉️ Odeslat koučovi</button>
-        </form>
-        <p id="coachContactStatus" class="text-xs text-slate-500" data-tone="info">Odpověď od AI vidíš hned, kouč ji dostane do revize.</p>
-      </section>
-
-      <section class="dashboard-card xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
-        <div>
           <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Revize dashboardu</p>
           <h2 class="mt-2 text-xl font-semibold text-slate-900">Poznámky kouče</h2>
         </div>
@@ -787,8 +657,8 @@
       </section>
     </div>
 
-    <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <a href="{% url 'survey:questionnaire' %}" class="dashboard-card group bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4 text-slate-700 no-underline" aria-label="Spustit nový dotazník">
+    <section class="grid grid-cols-1 lg:grid-cols-6 gap-6">
+      <a href="{% url 'survey:questionnaire' %}" class="dashboard-card lg:col-span-1 group bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4 text-slate-700 no-underline" aria-label="Spustit nový dotazník">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Dotazníky</p>
@@ -802,7 +672,7 @@
           <span aria-hidden="true">→</span>
         </span>
       </a>
-      <a href="{% url 'suropen:form' %}" class="dashboard-card group bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4 text-slate-700 no-underline" aria-label="Nová analýza">
+      <a href="{% url 'suropen:form' %}" class="dashboard-card lg:col-span-1 group bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4 text-slate-700 no-underline" aria-label="Nová analýza">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Analýzy</p>
@@ -816,7 +686,7 @@
           <span aria-hidden="true">→</span>
         </span>
       </a>
-      <a href="{% url 'exports:export_form' %}" class="dashboard-card group bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4 text-slate-700 no-underline" aria-label="Export review">
+      <a href="{% url 'exports:export_form' %}" class="dashboard-card lg:col-span-1 group bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4 text-slate-700 no-underline" aria-label="Export review">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Exporty</p>
@@ -830,6 +700,58 @@
           <span aria-hidden="true">→</span>
         </span>
       </a>
+      <div class="dashboard-card lg:col-span-3 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-4">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Data z nahraných výkazů</p>
+            <h2 class="mt-2 text-lg font-semibold text-slate-900">Stav rozvahy a výsledovky</h2>
+            <p class="text-xs text-slate-500 mt-1">Rychlý přehled, jestli máme oba typy dokumentů pro jednotlivé roky.</p>
+          </div>
+        </div>
+        {% if document_upload_status %}
+        <div class="space-y-4">
+          {% for row in document_upload_status %}
+          <div class="rounded-2xl border border-slate-200/70 bg-white/85 px-4 py-4 shadow-sm shadow-slate-900/5">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Rok</p>
+                <p class="text-lg font-semibold text-slate-900">{{ row.year }}</p>
+              </div>
+              <p class="text-xs text-slate-500">Aktuální stav nahraných dokumentů</p>
+            </div>
+            <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div class="rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3">
+                <p class="text-xs uppercase tracking-[0.25em] text-slate-400 mb-2">Rozvaha</p>
+                {% if row.has_rozvaha %}
+                  {% if row.rozvaha_analyzed %}
+                    <span class="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-3 py-1 text-xs font-semibold">Analyzováno</span>
+                  {% else %}
+                    <span class="inline-flex items-center rounded-full bg-amber-100 text-amber-700 px-3 py-1 text-xs font-semibold">Čeká na analýzu</span>
+                  {% endif %}
+                {% else %}
+                  <span class="inline-flex items-center rounded-full bg-rose-100 text-rose-700 px-3 py-1 text-xs font-semibold">Chybí</span>
+                {% endif %}
+              </div>
+              <div class="rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3">
+                <p class="text-xs uppercase tracking-[0.25em] text-slate-400 mb-2">Výsledovka</p>
+                {% if row.has_vysledovka %}
+                  {% if row.vysledovka_analyzed %}
+                    <span class="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-3 py-1 text-xs font-semibold">Analyzováno</span>
+                  {% else %}
+                    <span class="inline-flex items-center rounded-full bg-amber-100 text-amber-700 px-3 py-1 text-xs font-semibold">Čeká na analýzu</span>
+                  {% endif %}
+                {% else %}
+                  <span class="inline-flex items-center rounded-full bg-rose-100 text-rose-700 px-3 py-1 text-xs font-semibold">Chybí</span>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-slate-500">Zatím nejsou nahrané žádné rozvahy ani výsledovky. Nahraj dokumenty v sekci Ingest, aby se přehled doplnil.</p>
+        {% endif %}
+      </div>
     </section>
 
     <section class="dashboard-card bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-4">
@@ -847,60 +769,6 @@
           {% endfor %}
         </div>
       </div>
-    </section>
-
-    <section class="dashboard-card bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-4">
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div>
-          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Data z nahraných výkazů</p>
-          <h2 class="mt-2 text-lg font-semibold text-slate-900">Stav rozvahy a výsledovky</h2>
-          <p class="text-xs text-slate-500 mt-1">Rychlý přehled, jestli máme oba typy dokumentů pro jednotlivé roky.</p>
-        </div>
-      </div>
-      {% if document_upload_status %}
-      <div class="overflow-hidden border border-slate-200/70 rounded-2xl">
-        <table class="min-w-full divide-y divide-slate-200 text-sm">
-          <thead class="bg-slate-50/80 text-slate-500 uppercase tracking-wide text-xs">
-            <tr>
-              <th scope="col" class="px-4 py-3 text-left">Rok</th>
-              <th scope="col" class="px-4 py-3 text-left">Rozvaha</th>
-              <th scope="col" class="px-4 py-3 text-left">Výsledovka</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-200/70 bg-white/80">
-            {% for row in document_upload_status %}
-            <tr>
-              <td class="px-4 py-3 font-medium text-slate-700">{{ row.year }}</td>
-              <td class="px-4 py-3">
-                {% if row.has_rozvaha %}
-                  {% if row.rozvaha_analyzed %}
-                    <span class="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-3 py-1 text-xs font-semibold">Ano</span>
-                  {% else %}
-                    <span class="inline-flex items-center rounded-full bg-amber-100 text-amber-700 px-3 py-1 text-xs font-semibold">Čeká na analýzu</span>
-                  {% endif %}
-                {% else %}
-                  <span class="inline-flex items-center rounded-full bg-rose-100 text-rose-700 px-3 py-1 text-xs font-semibold">Ne</span>
-                {% endif %}
-              </td>
-              <td class="px-4 py-3">
-                {% if row.has_vysledovka %}
-                  {% if row.vysledovka_analyzed %}
-                    <span class="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-3 py-1 text-xs font-semibold">Ano</span>
-                  {% else %}
-                    <span class="inline-flex items-center rounded-full bg-amber-100 text-amber-700 px-3 py-1 text-xs font-semibold">Čeká na analýzu</span>
-                  {% endif %}
-                {% else %}
-                  <span class="inline-flex items-center rounded-full bg-rose-100 text-rose-700 px-3 py-1 text-xs font-semibold">Ne</span>
-                {% endif %}
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% else %}
-      <p class="text-sm text-slate-500">Zatím nejsou nahrané žádné rozvahy ani výsledovky. Nahraj dokumenty v sekci Ingest, aby se přehled doplnil.</p>
-      {% endif %}
     </section>
 
     <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
