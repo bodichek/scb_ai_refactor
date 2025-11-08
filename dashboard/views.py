@@ -21,6 +21,7 @@ from accounts.models import CompanyProfile, CoachClientNotes
 from ingest.models import Document, FinancialStatement
 from survey.models import SurveySubmission
 from suropen.models import OpenAnswer
+from coaching.models import UserCoachAssignment
 
 from .cashflow import calculate_cashflow
 
@@ -360,8 +361,21 @@ def build_dashboard_context(target_user):
     coach_recommendation = open_answer_summary or coach_summary
     recommendation_points = _extract_recommendation_points(coach_recommendation) if coach_recommendation else []
 
-    profile = CompanyProfile.objects.filter(user=target_user).select_related("assigned_coach").first()
+    profile = (
+        CompanyProfile.objects.filter(user=target_user)
+        .select_related("assigned_coach__user")
+        .first()
+    )
     assigned_coach = getattr(profile, "assigned_coach", None)
+    if not assigned_coach:
+        assignment = (
+            UserCoachAssignment.objects.filter(client=target_user)
+            .select_related("coach__user")
+            .order_by("-assigned_at")
+            .first()
+        )
+        if assignment:
+            assigned_coach = assignment.coach
     coach_note_entry = None
     if profile:
         coach_note_entry = (

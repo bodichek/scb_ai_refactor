@@ -658,7 +658,7 @@
     </div>
 
     <section class="grid grid-cols-1 lg:grid-cols-6 gap-6">
-      <a href="{% url 'survey:questionnaire' %}" class="dashboard-card lg:col-span-1 group bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4 text-slate-700 no-underline" aria-label="Spustit nový dotazník">
+      <a href="{% url 'survey:questionnaire' %}" class="dashboard-card lg:col-span-1 group bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col justify-between gap-4 text-slate-700 no-underline lg:h-64" aria-label="Spustit nový dotazník">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Dotazníky</p>
@@ -672,7 +672,7 @@
           <span aria-hidden="true">→</span>
         </span>
       </a>
-      <a href="{% url 'suropen:form' %}" class="dashboard-card lg:col-span-1 group bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4 text-slate-700 no-underline" aria-label="Nová analýza">
+      <a href="{% url 'suropen:form' %}" class="dashboard-card lg:col-span-1 group bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col justify-between gap-4 text-slate-700 no-underline lg:h-64" aria-label="Nová analýza">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Analýzy</p>
@@ -686,7 +686,7 @@
           <span aria-hidden="true">→</span>
         </span>
       </a>
-      <a href="{% url 'exports:export_form' %}" class="dashboard-card lg:col-span-1 group bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4 text-slate-700 no-underline" aria-label="Export review">
+      <a href="{% url 'exports:export_form' %}" class="dashboard-card lg:col-span-1 group bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col justify-between gap-4 text-slate-700 no-underline lg:h-64" aria-label="Export review">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Exporty</p>
@@ -700,8 +700,8 @@
           <span aria-hidden="true">→</span>
         </span>
       </a>
-      <div class="dashboard-card lg:col-span-3 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-4">
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div class="dashboard-card lg:col-span-3 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4 lg:h-64">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 flex-none">
           <div>
             <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Data z nahraných výkazů</p>
             <h2 class="mt-2 text-lg font-semibold text-slate-900">Stav rozvahy a výsledovky</h2>
@@ -709,7 +709,7 @@
           </div>
         </div>
         {% if document_upload_status %}
-        <div class="space-y-4">
+        <div class="space-y-4 overflow-y-auto pr-1 flex-1">
           {% for row in document_upload_status %}
           <div class="rounded-2xl border border-slate-200/70 bg-white/85 px-4 py-4 shadow-sm shadow-slate-900/5">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -880,4 +880,5 @@
   </div>
 </div>
 {% endblock %}
+
 
