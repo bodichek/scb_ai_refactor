@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django import forms
 from django.urls import path
 from django.contrib.auth.models import User
 from .models import Coach, UserCoachAssignment
@@ -6,6 +7,33 @@ from accounts.models import UserRole, CompanyProfile
 from django.template.response import TemplateResponse
 from coaching.models import Coach
 from ingest.models import FinancialStatement
+
+
+class CoachAdminForm(forms.ModelForm):
+    first_name = forms.CharField(max_length=150, required=False, label="Jmeno uzivatele")
+    last_name = forms.CharField(max_length=150, required=False, label="Prijmeni uzivatele")
+
+    class Meta:
+        model = Coach
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.user_id:
+            self.fields["first_name"].initial = self.instance.user.first_name
+            self.fields["last_name"].initial = self.instance.user.last_name
+
+    def save(self, commit=True):
+        coach = super().save(commit=False)
+        user = coach.user
+        user.first_name = self.cleaned_data.get("first_name", "")
+        user.last_name = self.cleaned_data.get("last_name", "")
+
+        if commit:
+            user.save()
+            coach.save()
+            self.save_m2m()
+        return coach
 
 
 class UserCoachAssignmentInline(admin.TabularInline):
@@ -24,6 +52,7 @@ class UserCoachAssignmentInline(admin.TabularInline):
 
 @admin.register(Coach)
 class CoachAdmin(admin.ModelAdmin):
+    form = CoachAdminForm
     list_display = (
         "user",
         "specialization",
@@ -32,6 +61,26 @@ class CoachAdmin(admin.ModelAdmin):
         "city",
         "available",
         "clients_count",
+    )
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "user",
+                    "first_name",
+                    "last_name",
+                    "specialization",
+                    "bio",
+                    "phone",
+                    "email",
+                    "linkedin",
+                    "website",
+                    "city",
+                    "available",
+                )
+            },
+        ),
     )
     list_filter = ("available", "city", "specialization")
     search_fields = ("user__username", "email", "phone", "specialization")

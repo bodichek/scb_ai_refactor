@@ -106,7 +106,7 @@
       <select class="form-select" id="assigned_coach" name="assigned_coach">
         <option value="">-- bez kouče --</option>
         {% for coach in coaches %}
-          <option value="{{ coach.id }}">{{ coach.user.email }}</option>
+          <option value="{{ coach.id }}">{{ coach.user.get_full_name|default:coach.user.username|default:coach.user.email|default:"Nepojmenovany kouc" }}</option>
         {% endfor %}
       </select>
     </div>
