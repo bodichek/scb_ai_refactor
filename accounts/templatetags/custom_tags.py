@@ -1,4 +1,8 @@
+from decimal import Decimal, InvalidOperation
+
 from django import template
+from django.utils.formats import number_format
+
 from accounts.permissions import is_coach
 
 register = template.Library()
@@ -24,3 +28,17 @@ def user_role(user):
         return role.role
     except UserRole.DoesNotExist:
         return 'company'  # default role
+
+
+@register.filter
+def format_kc(value):
+    """Return whole-number crowns with locale thousands separators."""
+    if value in (None, ""):
+        return ""
+
+    try:
+        number = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return value
+
+    return number_format(number, decimal_pos=0, use_l10n=True, force_grouping=True)

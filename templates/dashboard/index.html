@@ -1,5 +1,6 @@
 ﻿{% extends "base.html" %}
 
+{% load custom_tags %}
 {% block extra_head %}
   <script>
     tailwind.config = {
@@ -821,12 +822,12 @@
           <thead class="bg-slate-50/80 text-slate-500 uppercase tracking-wide text-xs">
             <tr>
               <th class="px-4 py-3 text-left">Rok</th>
-              <th class="px-4 py-3 text-right">Tržby (Kč)</th>
-              <th class="px-4 py-3 text-right">Náklady na prodané zboží (Kč)</th>
-              <th class="px-4 py-3 text-right">Hrubá marže (Kč)</th>
-              <th class="px-4 py-3 text-right">Provozní náklady (Kč)</th>
-              <th class="px-4 py-3 text-right">EBIT (Kč)</th>
-              <th class="px-4 py-3 text-right">Čistý zisk (Kč)</th>
+              <th class="px-4 py-3 text-right">Tržby (v tis. Kč)</th>
+              <th class="px-4 py-3 text-right">Náklady na prodané zboží (v tis. Kč)</th>
+              <th class="px-4 py-3 text-right">Hrubá marže (v tis. Kč)</th>
+              <th class="px-4 py-3 text-right">Provozní náklady (v tis. Kč)</th>
+              <th class="px-4 py-3 text-right">EBIT (v tis. Kč)</th>
+              <th class="px-4 py-3 text-right">Čistý zisk (v tis. Kč)</th>
               <th class="px-4 py-3 text-right">Hrubá marže %</th>
               <th class="px-4 py-3 text-right">Provozní marže %</th>
               <th class="px-4 py-3 text-right">Čistá marže %</th>
@@ -839,12 +840,12 @@
             {% for r in table_rows %}
             <tr class="text-slate-700">
               <td class="px-4 py-3 font-medium text-slate-800">{{ r.year }}</td>
-              <td class="px-4 py-3 text-right">{{ r.revenue|default_if_none:"–" }}</td>
-              <td class="px-4 py-3 text-right">{{ r.cogs|default_if_none:"–" }}</td>
-              <td class="px-4 py-3 text-right">{{ r.gross_margin|default_if_none:"–" }}</td>
-              <td class="px-4 py-3 text-right">{{ r.overheads|default_if_none:"–" }}</td>
-              <td class="px-4 py-3 text-right">{{ r.ebit|default_if_none:"–" }}</td>
-              <td class="px-4 py-3 text-right">{{ r.net_profit|default_if_none:"–" }}</td>
+              <td class="px-4 py-3 text-right">{{ r.revenue|format_kc }}</td>
+              <td class="px-4 py-3 text-right">{{ r.cogs|format_kc }}</td>
+              <td class="px-4 py-3 text-right">{{ r.gross_margin|format_kc }}</td>
+              <td class="px-4 py-3 text-right">{{ r.overheads|format_kc }}</td>
+              <td class="px-4 py-3 text-right">{{ r.ebit|format_kc }}</td>
+              <td class="px-4 py-3 text-right">{{ r.net_profit|format_kc }}</td>
               <td class="px-4 py-3 text-right">{{ r.profitability.gm_pct|floatformat:2 }}%</td>
               <td class="px-4 py-3 text-right">{{ r.profitability.op_pct|floatformat:2 }}%</td>
               <td class="px-4 py-3 text-right">{{ r.profitability.np_pct|floatformat:2 }}%</td>
