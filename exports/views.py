@@ -1,4 +1,4 @@
-import os
+﻿import os
 import base64
 import json
 import re
@@ -22,6 +22,7 @@ from reportlab.platypus import (
     TableStyle,
     PageBreak,
     KeepTogether,
+    HRFlowable,
 )
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -160,6 +161,8 @@ def export_pdf(request):
         fontSize=10.5,
         leading=14,
         textColor=palette["text"],
+        wordWrap="LTR",
+        splitLongWords=True,
     )
     muted_style = ParagraphStyle(
         "ReportMuted",
@@ -204,8 +207,94 @@ def export_pdf(request):
         textColor=palette["primary"],
     )
 
+    def clean_text(value):
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value.strip()
+        return str(value).strip()
+
+    def extract_recommendation_points(text, max_points=5):
+        if not text:
+            return []
+
+        try:
+            parsed = json.loads(text)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            parsed = None
+
+        points = []
+        seen = set()
+        preferred_keys = [
+            "action_plan",
+            "actions",
+            "recommendations",
+            "next_steps",
+            "steps",
+            "key_actions",
+            "actionItems",
+        ]
+
+        def add_point(value):
+            if len(points) >= max_points:
+                return
+            cleaned_value = clean_text(value)
+            if not cleaned_value:
+                return
+            normalized = re.sub(r"\s+", " ", cleaned_value)
+            lowered = normalized.lower()
+            if lowered in seen:
+                return
+            seen.add(lowered)
+            points.append(normalized)
+
+        def collect_from_json(value):
+            if len(points) >= max_points:
+                return
+            if isinstance(value, str):
+                add_point(value)
+            elif isinstance(value, (int, float)):
+                add_point(value)
+            elif isinstance(value, list):
+                for item in value:
+                    collect_from_json(item)
+                    if len(points) >= max_points:
+                        break
+            elif isinstance(value, dict):
+                for key in preferred_keys:
+                    if key in value:
+                        collect_from_json(value[key])
+                if len(points) >= max_points:
+                    return
+                for key, val in value.items():
+                    if key not in preferred_keys:
+                        collect_from_json(val)
+
+        if parsed is not None:
+            collect_from_json(parsed)
+        else:
+            for raw_line in str(text).splitlines():
+                line = raw_line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                line = re.sub(r"^[-*\u2022]+\s*", "", line)
+                line = re.sub(r"^\d+[\.\)]\s*", "", line)
+                line = line.replace("**", "")
+                if not line:
+                    continue
+                add_point(line)
+                if len(points) >= max_points:
+                    break
+
+        if not points and text:
+            add_point(text)
+        return points[:max_points]
+
     def make_card(flowables, background=None, padding=14, width=None, keep_together=False):
-        """Render a bordered 'card' container; optionally keep all content together."""
+        """Render a bordered 'card' container; optionally keep all content together.
+
+        DŮLEŽITÉ: nepoužívej pro dlouhé texty. Table se dělí jen mezi řádky.
+        """
         card_width = width or doc.width
         if isinstance(flowables, (list, tuple)):
             cell_content = list(flowables)
@@ -228,7 +317,7 @@ def export_pdf(request):
 
     story = []
 
-    def load_chart_image(chart_id, title, card_width=None):
+    def load_chart_image(chart_id, title, max_width=None):
         chart_dir = os.path.join(settings.MEDIA_ROOT, "charts")
         filename = f"chart_{chart_id}.png"
         file_path = os.path.join(chart_dir, filename)
@@ -237,43 +326,74 @@ def export_pdf(request):
         try:
             chart_img = Image(file_path)
             chart_img.hAlign = "CENTER"
-            target_width = max((card_width or doc.width) - 24, 120)
+            target_width = max((max_width or doc.width) - 24, 120)
             chart_img._restrictSize(target_width, target_width * 0.75)
-            elements = [
+            return [
                 Paragraph(title, subsection_heading),
                 Spacer(1, 8),
                 chart_img,
+                Spacer(1, 18),
             ]
-            # ❗ necháme bez KeepTogether; řádek grafů už bude řídit zalomení
-            return make_card(
-                elements,
-                background=colors.white,
-                padding=12,
-                width=card_width,
-                keep_together=False,
-            )
         except Exception:
             return None
 
     def format_ai_paragraph(text, fallback="AI shrnutí není k dispozici."):
-        cleaned = (text or "").strip()
+        cleaned = clean_text(text)
         if not cleaned:
             cleaned = fallback
 
-        # vlož zero-width space po ~80 nezlomitelných znacích
         ZERO_WIDTH_SPACE = "\u200b"
 
         def _softbreak(s, n=80):
             pattern = r"(\S{" + str(n) + r"})"
             return re.sub(pattern, r"\1" + ZERO_WIDTH_SPACE, s)
 
-        lines = []
-        for raw in cleaned.splitlines():
-            line = raw.strip()
-            if not line:
-                continue
-            lines.append(Paragraph(_softbreak(line), body_style))
-        return lines
+        def _flatten_json(value):
+            lines = []
+            if isinstance(value, str):
+                lines.extend([frag.strip() for frag in value.splitlines() if frag.strip()])
+            elif isinstance(value, (int, float, bool)):
+                lines.append(str(value))
+            elif isinstance(value, list):
+                for item in value:
+                    lines.extend(_flatten_json(item))
+            elif isinstance(value, dict):
+                for key, val in value.items():
+                    nested = _flatten_json(val)
+                    if not nested:
+                        continue
+                    if len(nested) == 1:
+                        lines.append(f"{key}: {nested[0]}")
+                    else:
+                        lines.append(f"{key}:")
+                        lines.extend(nested)
+            return lines
+
+        parsed_lines = None
+        try:
+            parsed = json.loads(cleaned)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            parsed = None
+        else:
+            parsed_lines = _flatten_json(parsed)
+
+        def _normalize_line(line):
+            cleaned_line = re.sub(r"^\s*#{1,6}\s*", "", line)
+            cleaned_line = re.sub(r"^\s*[-*+]+\s*", "", cleaned_line)
+            cleaned_line = re.sub(r"^\s*\d+[\.\)]\s*", "", cleaned_line)
+            cleaned_line = cleaned_line.replace("**", "").replace("__", "")
+            cleaned_line = re.sub(r"\s+", " ", cleaned_line).strip()
+            return cleaned_line
+
+        source_lines = parsed_lines if parsed_lines else [
+            line.strip() for line in cleaned.splitlines() if line.strip()
+        ]
+        normalized_lines = [_normalize_line(line) for line in source_lines]
+        normalized_lines = [line for line in normalized_lines if line]
+        if not normalized_lines:
+            normalized_lines = [fallback]
+
+        return [Paragraph(_softbreak(line), body_style) for line in normalized_lines]
 
     def resolve_survey_answer(question_text, score):
         for item in QUESTIONS:
@@ -286,6 +406,72 @@ def export_pdf(request):
                     except Exception:
                         continue
         return f"Skore {score}/10"
+
+    latest_submission = (
+        SurveySubmission.objects.filter(user=user)
+        .prefetch_related("responses")
+        .order_by("-created_at")
+        .first()
+    )
+    latest_survey_responses = list(latest_submission.responses.all()) if latest_submission else []
+    score_values = [resp.score for resp in latest_survey_responses if resp.score is not None]
+    company_score = round(sum(score_values) / len(score_values), 1) if score_values else None
+
+    mood_label = "Bez dat"
+    mood_description = "Vypln dotaznik, aby slo sledovat naladu tymu."
+    if company_score is not None:
+        if company_score >= 8:
+            mood_label = "Pozitivni energie"
+            mood_description = "Odpovedi naznacuji vybornou motivaci."
+        elif company_score >= 6:
+            mood_label = "Stabilni nalada"
+            mood_description = "Vyvoj je vyrovnany, hledejte dalsi rust."
+        else:
+            mood_label = "Potrebuje podporu"
+            mood_description = "Tym hlasi napeti, zamerte se na blokatory."
+    latest_open_answer = (
+        OpenAnswer.objects.filter(user=user)
+        .order_by("-created_at")
+        .first()
+    )
+    open_answer_summary = clean_text(getattr(latest_open_answer, "ai_response", "")) if latest_open_answer else ""
+    coach_summary = clean_text(getattr(latest_submission, "ai_response", "")) if latest_submission else ""
+    coach_recommendation_text = open_answer_summary or coach_summary
+    recommendation_points = (
+        extract_recommendation_points(coach_recommendation_text)
+        if coach_recommendation_text
+        else []
+    )
+
+    def summarize_block(value, default, width=None):
+        cleaned_value = clean_text(value)
+        if not cleaned_value:
+            return default
+        flattened = cleaned_value.replace("\n", " ")
+        if width:
+            return textwrap.shorten(flattened, width=width, placeholder="...")
+        return flattened
+
+    score_summary_text = (
+        f"{company_score:.1f}/10 - prumer posledniho dotazniku"
+        if company_score is not None
+        else "Skore zatim neni dostupne. Vypln posledni dotaznik."
+    )
+    mood_summary_text = (
+        summarize_block(f"{mood_label}: {mood_description}", "Nalada tymu zatim nelze urcit bez dat.", width=200)
+        if company_score is not None
+        else "Nalada tymu zatim nelze urcit bez dat."
+    )
+    raw_tasks_summary = (
+        "; ".join(recommendation_points[:3])
+        if recommendation_points
+        else "Jakmile AI pripravi konkretni ukoly, zobrazime je zde."
+    )
+    tasks_summary_text = summarize_block(
+        raw_tasks_summary,
+        "Jakmile AI pripravi konkretni ukoly, zobrazime je zde.",
+        width=200,
+    )
 
     story.append(Paragraph("ScaleupBoard Export", title_style))
     story.append(Paragraph("Finanční snapshot", subtitle_style))
@@ -308,7 +494,7 @@ def export_pdf(request):
     contact_email = company.email if (company and company.email) else user.email
     info_lines.append(Paragraph(f"E-mail: {contact_email or '-'}", body_style))
     info_lines.append(Paragraph(f"Vybran\u00fd rok: {selected_year or 'v\u0161echna dostupn\u00e1 obdob\u00ed'}", body_style))
-    story.append(make_card(info_lines))
+    story.append(make_card(info_lines))  # plná šířka (už ne 200)
     story.append(Spacer(1, 12))
 
     assigned_coach = getattr(company, "assigned_coach", None) if company else None
@@ -345,18 +531,24 @@ def export_pdf(request):
         coach_lines.append(Paragraph("Ke spole\u010dnosti zat\u00edm nen\u00ed p\u0159i\u0159azen \u017e\u00e1dn\u00fd kou\u010d.", body_style))
 
     story.append(Paragraph("V\u00e1\u0161 kou\u010d", section_heading))
-    story.append(make_card(coach_lines))
+    story.append(make_card(coach_lines))  # plná šířka (už ne 200)
     story.append(Spacer(1, 18))
 
-    placeholder_rows = [
-        ("Skóre firmy", "Doplní se po automatické analýze dotazníků."),
-        ("Doporučení AI", "Zatím není dostupné – vyčkejte na další běh asistenta."),
-        ("Nálada týmu", "Poslední měření zatím neproběhlo."),
-        ("Úkoly do příště", "Domluvte s koučem během další konzultace."),
+    summary_rows = [
+        ("Skóre firmy", score_summary_text),
+        ("Nálada týmu", mood_summary_text),
+        ("Úkoly do příště", tasks_summary_text),
+    ]
+    summary_table = [
+        [
+            Paragraph(f"<b>{label}</b>", body_style),
+            Paragraph(text, body_style),
+        ]
+        for label, text in summary_rows
     ]
     story.append(Paragraph("Rychlý přehled", section_heading))
     story.append(Table(
-        placeholder_rows,
+        summary_table,
         colWidths=[doc.width * 0.32, doc.width * 0.68],
         style=TableStyle([
             ("ROWBACKGROUNDS", (0, 0), (-1, -1), [palette["card"], colors.white]),
@@ -371,6 +563,16 @@ def export_pdf(request):
             ("LINEBELOW", (0, 0), (-1, -1), 0.2, palette["border_subtle"]),
         ])
     ))
+    story.append(Spacer(1, 10))
+    story.append(Paragraph("Doporučení AI", subsection_heading))
+    ai_paragraphs = format_ai_paragraph(
+        coach_recommendation_text,
+        "AI doporuceni zatim neni k dispozici."
+    )
+    for para in ai_paragraphs:
+        story.append(para)
+        story.append(Spacer(1, 4))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=palette["border_subtle"]))
     story.append(Spacer(1, 18))
 
     def to_number(value):
@@ -434,62 +636,30 @@ def export_pdf(request):
         ("metrics_trend", "Finan\u010dn\u00ed trajektorie"),
     ]
     if include_charts:
-        chart_columns = 2
-        chart_gap = 16
-        chart_col_width = (doc.width - chart_gap) / chart_columns
-        chart_cards = []
+        chart_blocks = []
         for chart_id, chart_title in chart_specs:
-            card = load_chart_image(chart_id, chart_title, card_width=chart_col_width)
-            if card:
-                chart_cards.append(card)
-        if chart_cards:
+            block = load_chart_image(chart_id, chart_title)
+            if block:
+                chart_blocks.append(block)
+        if chart_blocks:
             story.append(PageBreak())
             story.append(Paragraph("Vizualizace", section_heading))
-            chart_rows = []
-            current_row = []
-            for card in chart_cards:
-                current_row.append(card)
-                if len(current_row) == chart_columns:
-                    chart_rows.append(current_row)
-                    current_row = []
-            if current_row:
-                while len(current_row) < chart_columns:
-                    current_row.append(Spacer(1, 1))
-                chart_rows.append(current_row)
+            for block in chart_blocks:
+                story.extend(block)
 
-            # ❗ NEBALIT řádek do KeepTogether – umožní přesunout řádek na další stranu
-            for row in chart_rows:
-                row_table = Table(
-                    [row],
-                    colWidths=[chart_col_width] * chart_columns,
-                    hAlign="CENTER",
-                    style=TableStyle([
-                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                        ("LEFTPADDING", (0, 0), (-1, -1), 8),
-                        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-                        ("TOPPADDING", (0, 0), (-1, -1), 8),
-                        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-                    ]),
-                )
-                story.append(row_table)
-                story.append(Spacer(1, 12))
-            story.append(Spacer(1, 6))
-
-    latest_submission = (
-        SurveySubmission.objects.filter(user=user)
-        .prefetch_related("responses")
-        .order_by("-created_at")
-        .first()
-    )
     if include_survey and latest_submission:
         story.append(PageBreak())
         story.append(Paragraph("AI shrnutí dotazníku", section_heading))
-        story.append(make_card(
-            format_ai_paragraph(latest_submission.ai_response, "AI shrnutí není k dispozici."),
-            keep_together=False,
-        ))
+        survey_paragraphs = format_ai_paragraph(
+            latest_submission.ai_response,
+            "AI shrnutí není k dispozici."
+        )
+        for para in survey_paragraphs:
+            story.append(para)
+            story.append(Spacer(1, 4))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=palette["border_subtle"]))
         story.append(Spacer(1, 12))
-        responses = list(latest_submission.responses.all())
+        responses = latest_survey_responses
         if responses:
             table_rows = [[
                 Paragraph("Ot\u00e1zka", table_head_style),
@@ -518,18 +688,15 @@ def export_pdf(request):
             ))
             story.append(Spacer(1, 12))
 
-    latest_open_answer = (
-        OpenAnswer.objects.filter(user=user)
-        .order_by("-created_at")
-        .first()
-    )
     if include_suropen and latest_open_answer and latest_open_answer.ai_response:
         story.append(PageBreak())
         story.append(Paragraph("AI shrnutí otevřených odpovědí", section_heading))
-        story.append(make_card(
-            format_ai_paragraph(latest_open_answer.ai_response),
-            keep_together=False,
-        ))
+        open_paragraphs = format_ai_paragraph(latest_open_answer.ai_response)
+        for para in open_paragraphs:
+            story.append(para)
+            story.append(Spacer(1, 4))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=palette["border_subtle"]))
+        story.append(Spacer(1, 12))
         entries = list(
             OpenAnswer.objects.filter(user=user, batch_id=latest_open_answer.batch_id)
             .order_by("created_at")
