@@ -54,9 +54,15 @@
   background: linear-gradient(135deg, #007bff, #0056b3);
   color: white;
   font-size: 24px;
-  cursor: pointer;
+  cursor: grab;
   box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
   transition: all 0.3s ease;
+  touch-action: none;
+}
+
+.chatbot-widget.dragging .chatbot-toggle,
+.chatbot-toggle:active {
+  cursor: grabbing;
 }
 
 .chatbot-toggle:hover {
@@ -203,6 +209,11 @@ document.addEventListener('DOMContentLoaded', function() {
   const loading = document.getElementById('chatbot-loading');
   
   let isOpen = false;
+  let dragActive = false;
+  let dragMoved = false;
+  let preventToggleClick = false;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
   
   // Get CSRF cookie helper
   function getCookie(name) {
@@ -232,8 +243,84 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
-  toggle.addEventListener('click', toggleChat);
+  toggle.addEventListener('click', function(e) {
+    if (preventToggleClick) {
+      e.preventDefault();
+      return;
+    }
+    toggleChat();
+  });
   close.addEventListener('click', toggleChat);
+
+  function getPointerPosition(event) {
+    if (event.touches && event.touches.length) {
+      return { x: event.touches[0].clientX, y: event.touches[0].clientY };
+    }
+    return { x: event.clientX, y: event.clientY };
+  }
+
+  function startDrag(event) {
+    if (!event.target.closest('#chatbot-toggle')) {
+      return;
+    }
+    dragActive = true;
+    dragMoved = false;
+    widget.classList.add('dragging');
+
+    const pos = getPointerPosition(event);
+    const rect = widget.getBoundingClientRect();
+    dragOffsetX = pos.x - rect.left;
+    dragOffsetY = pos.y - rect.top;
+
+    document.addEventListener('mousemove', handleDrag);
+    document.addEventListener('mouseup', endDrag);
+    document.addEventListener('touchmove', handleDrag, { passive: false });
+    document.addEventListener('touchend', endDrag);
+  }
+
+  function handleDrag(event) {
+    if (!dragActive) {
+      return;
+    }
+    event.preventDefault();
+    dragMoved = true;
+    const pos = getPointerPosition(event);
+    let left = pos.x - dragOffsetX;
+    let top = pos.y - dragOffsetY;
+
+    const maxLeft = window.innerWidth - widget.offsetWidth - 10;
+    const maxTop = window.innerHeight - widget.offsetHeight - 10;
+    left = Math.min(Math.max(10, left), maxLeft);
+    top = Math.min(Math.max(10, top), maxTop);
+
+    widget.style.left = `${left}px`;
+    widget.style.top = `${top}px`;
+    widget.style.right = 'auto';
+    widget.style.bottom = 'auto';
+  }
+
+  function endDrag() {
+    if (!dragActive) {
+      return;
+    }
+    dragActive = false;
+    widget.classList.remove('dragging');
+
+    document.removeEventListener('mousemove', handleDrag);
+    document.removeEventListener('mouseup', endDrag);
+    document.removeEventListener('touchmove', handleDrag);
+    document.removeEventListener('touchend', endDrag);
+
+    if (dragMoved) {
+      preventToggleClick = true;
+      setTimeout(() => {
+        preventToggleClick = false;
+      }, 150);
+    }
+  }
+
+  widget.addEventListener('mousedown', startDrag);
+  widget.addEventListener('touchstart', startDrag, { passive: false });
   
   // Povolení/zakázání tlačítka Odeslat
   input.addEventListener('input', function() {
