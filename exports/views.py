@@ -21,6 +21,7 @@ from reportlab.platypus import (
     Table,
     TableStyle,
     PageBreak,
+    KeepTogether,
 )
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -32,6 +33,7 @@ from ingest.models import FinancialStatement
 from survey.models import SurveySubmission, Response
 from suropen.models import OpenAnswer
 from accounts.models import CompanyProfile
+from coaching.models import UserCoachAssignment
 from survey.views import QUESTIONS
 
 # ✅ import výpočtu Cash Flow (nový modul)
@@ -202,10 +204,17 @@ def export_pdf(request):
         textColor=palette["primary"],
     )
 
-    def make_card(flowables, background=None, padding=14):
+    def make_card(flowables, background=None, padding=14, width=None, keep_together=False):
+        """Render a bordered 'card' container; optionally keep all content together."""
+        card_width = width or doc.width
+        if isinstance(flowables, (list, tuple)):
+            cell_content = list(flowables)
+        else:
+            cell_content = [flowables]
+        cell_value = KeepTogether(cell_content) if keep_together else cell_content
         return Table(
-            [[flowables]],
-            colWidths=[doc.width],
+            [[cell_value]],
+            colWidths=[card_width],
             style=TableStyle([
                 ("BACKGROUND", (0, 0), (-1, -1), background or palette["card"]),
                 ("BOX", (0, 0), (-1, -1), 0.6, palette["border"]),
@@ -219,7 +228,7 @@ def export_pdf(request):
 
     story = []
 
-    def load_chart_image(chart_id, title):
+    def load_chart_image(chart_id, title, card_width=None):
         chart_dir = os.path.join(settings.MEDIA_ROOT, "charts")
         filename = f"chart_{chart_id}.png"
         file_path = os.path.join(chart_dir, filename)
@@ -228,21 +237,43 @@ def export_pdf(request):
         try:
             chart_img = Image(file_path)
             chart_img.hAlign = "CENTER"
-            chart_img._restrictSize(doc.width - 20, doc.width * 0.65)
+            target_width = max((card_width or doc.width) - 24, 120)
+            chart_img._restrictSize(target_width, target_width * 0.75)
             elements = [
                 Paragraph(title, subsection_heading),
                 Spacer(1, 8),
                 chart_img,
             ]
-            return make_card(elements, background=colors.white, padding=12)
+            # ❗ necháme bez KeepTogether; řádek grafů už bude řídit zalomení
+            return make_card(
+                elements,
+                background=colors.white,
+                padding=12,
+                width=card_width,
+                keep_together=False,
+            )
         except Exception:
             return None
 
-    def format_ai_paragraph(text, fallback="AI shrnuti neni k dispozici."):
+    def format_ai_paragraph(text, fallback="AI shrnutí není k dispozici."):
         cleaned = (text or "").strip()
         if not cleaned:
             cleaned = fallback
-        return [Paragraph(line.strip(), body_style) for line in cleaned.splitlines() if line.strip()]
+
+        # vlož zero-width space po ~80 nezlomitelných znacích
+        ZERO_WIDTH_SPACE = "\u200b"
+
+        def _softbreak(s, n=80):
+            pattern = r"(\S{" + str(n) + r"})"
+            return re.sub(pattern, r"\1" + ZERO_WIDTH_SPACE, s)
+
+        lines = []
+        for raw in cleaned.splitlines():
+            line = raw.strip()
+            if not line:
+                continue
+            lines.append(Paragraph(_softbreak(line), body_style))
+        return lines
 
     def resolve_survey_answer(question_text, score):
         for item in QUESTIONS:
@@ -274,30 +305,41 @@ def export_pdf(request):
             info_lines.append(Paragraph(f"Kontaktn\u00ed osoba: {company.contact_person}", body_style))
     else:
         info_lines.append(Paragraph(f"U\u017eivatel: {user.get_full_name() or user.username}", body_style))
-    info_lines.append(Paragraph(f"E-mail: {user.email or '-'}", body_style))
+    contact_email = company.email if (company and company.email) else user.email
+    info_lines.append(Paragraph(f"E-mail: {contact_email or '-'}", body_style))
     info_lines.append(Paragraph(f"Vybran\u00fd rok: {selected_year or 'v\u0161echna dostupn\u00e1 obdob\u00ed'}", body_style))
     story.append(make_card(info_lines))
     story.append(Spacer(1, 12))
 
     assigned_coach = getattr(company, "assigned_coach", None) if company else None
+    if not assigned_coach:
+        assignment = (
+            UserCoachAssignment.objects.filter(client=user)
+            .select_related("coach__user")
+            .order_by("-assigned_at")
+            .first()
+        )
+        if assignment:
+            assigned_coach = assignment.coach
     coach_lines = []
     if assigned_coach:
         coach_user = getattr(assigned_coach, "user", None)
-        coach_name = None
-        if coach_user:
-            coach_name = coach_user.get_full_name() or coach_user.username
+        coach_name = (coach_user.get_full_name() or coach_user.username) if coach_user else None
         coach_lines.append(Paragraph(f"P\u0159i\u0159azen\u00fd kou\u010d: {coach_name or str(assigned_coach)}", body_style))
-        if assigned_coach.specialization:
+        if getattr(assigned_coach, "specialization", None):
             coach_lines.append(Paragraph(f"Specializace: {assigned_coach.specialization}", body_style))
-        coach_email = assigned_coach.email or (coach_user.email if coach_user else None)
-        coach_phone = assigned_coach.phone
-        coach_city = assigned_coach.city
-        coach_lines.append(Paragraph(f"E-mail: {coach_email or '-'}", body_style))
-        coach_lines.append(Paragraph(f"Telefon: {coach_phone or '-'}", body_style))
-        coach_lines.append(Paragraph(f"Lokace: {coach_city or '-'}", body_style))
-        if assigned_coach.linkedin:
+        coach_email = getattr(assigned_coach, "email", None) or (coach_user.email if coach_user else None)
+        coach_phone = getattr(assigned_coach, "phone", None)
+        coach_city = getattr(assigned_coach, "city", None)
+        if coach_email:
+            coach_lines.append(Paragraph(f"E-mail: {coach_email}", body_style))
+        if coach_phone:
+            coach_lines.append(Paragraph(f"Telefon: {coach_phone}", body_style))
+        if coach_city:
+            coach_lines.append(Paragraph(f"Lokace: {coach_city}", body_style))
+        if getattr(assigned_coach, "linkedin", None):
             coach_lines.append(Paragraph(f"LinkedIn: {assigned_coach.linkedin}", body_style))
-        if assigned_coach.website:
+        if getattr(assigned_coach, "website", None):
             coach_lines.append(Paragraph(f"Web: {assigned_coach.website}", body_style))
     else:
         coach_lines.append(Paragraph("Ke spole\u010dnosti zat\u00edm nen\u00ed p\u0159i\u0159azen \u017e\u00e1dn\u00fd kou\u010d.", body_style))
@@ -368,7 +410,7 @@ def export_pdf(request):
             style=TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), palette["card"]),
                 ("TEXTCOLOR", (0, 0), (-1, 0), palette["primary"]),
-            ("FONTNAME", (0, 0), (-1, 0), BASE_FONT),
+                ("FONTNAME", (0, 0), (-1, 0), BASE_FONT),
                 ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 10),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 10),
@@ -392,32 +434,46 @@ def export_pdf(request):
         ("metrics_trend", "Finan\u010dn\u00ed trajektorie"),
     ]
     if include_charts:
+        chart_columns = 2
+        chart_gap = 16
+        chart_col_width = (doc.width - chart_gap) / chart_columns
         chart_cards = []
         for chart_id, chart_title in chart_specs:
-            card = load_chart_image(chart_id, chart_title)
+            card = load_chart_image(chart_id, chart_title, card_width=chart_col_width)
             if card:
                 chart_cards.append(card)
         if chart_cards:
             story.append(PageBreak())
             story.append(Paragraph("Vizualizace", section_heading))
-            for idx in range(0, len(chart_cards), 4):
-                chunk = chart_cards[idx: idx + 4]
-                while len(chunk) < 4:
-                    chunk.append(Spacer(1, 1))
-                rows = [chunk[:2], chunk[2:]]
-                chart_table = Table(
-                    rows,
-                    colWidths=[(doc.width - 16) / 2, (doc.width - 16) / 2],
+            chart_rows = []
+            current_row = []
+            for card in chart_cards:
+                current_row.append(card)
+                if len(current_row) == chart_columns:
+                    chart_rows.append(current_row)
+                    current_row = []
+            if current_row:
+                while len(current_row) < chart_columns:
+                    current_row.append(Spacer(1, 1))
+                chart_rows.append(current_row)
+
+            # ❗ NEBALIT řádek do KeepTogether – umožní přesunout řádek na další stranu
+            for row in chart_rows:
+                row_table = Table(
+                    [row],
+                    colWidths=[chart_col_width] * chart_columns,
+                    hAlign="CENTER",
                     style=TableStyle([
                         ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                        ("LEFTPADDING", (0, 0), (-1, -1), 6),
-                        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-                        ("TOPPADDING", (0, 0), (-1, -1), 6),
-                        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                        ("TOPPADDING", (0, 0), (-1, -1), 8),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
                     ]),
                 )
-                story.append(chart_table)
-                story.append(Spacer(1, 18))
+                story.append(row_table)
+                story.append(Spacer(1, 12))
+            story.append(Spacer(1, 6))
 
     latest_submission = (
         SurveySubmission.objects.filter(user=user)
@@ -427,8 +483,11 @@ def export_pdf(request):
     )
     if include_survey and latest_submission:
         story.append(PageBreak())
-        story.append(Paragraph("AI shrnůtě dotazníku", section_heading))
-        story.append(make_card(format_ai_paragraph(latest_submission.ai_response, "AI shrnutí zatím není k dispozici.")))
+        story.append(Paragraph("AI shrnutí dotazníku", section_heading))
+        story.append(make_card(
+            format_ai_paragraph(latest_submission.ai_response, "AI shrnutí není k dispozici."),
+            keep_together=False,
+        ))
         story.append(Spacer(1, 12))
         responses = list(latest_submission.responses.all())
         if responses:
@@ -466,8 +525,11 @@ def export_pdf(request):
     )
     if include_suropen and latest_open_answer and latest_open_answer.ai_response:
         story.append(PageBreak())
-        story.append(Paragraph("AI shrnutí otevřených odpovedí", section_heading))
-        story.append(make_card(format_ai_paragraph(latest_open_answer.ai_response)))
+        story.append(Paragraph("AI shrnutí otevřených odpovědí", section_heading))
+        story.append(make_card(
+            format_ai_paragraph(latest_open_answer.ai_response),
+            keep_together=False,
+        ))
         entries = list(
             OpenAnswer.objects.filter(user=user, batch_id=latest_open_answer.batch_id)
             .order_by("created_at")
@@ -502,6 +564,7 @@ def export_pdf(request):
     buffer.seek(0)
     filename = f"scb_export_{timezone.localtime().strftime('%Y%m%d_%H%M')}.pdf"
     return FileResponse(buffer, as_attachment=True, filename=filename)
+
 
 @login_required
 def export_config_api(request):
