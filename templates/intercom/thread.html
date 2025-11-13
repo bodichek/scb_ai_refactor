@@ -1,0 +1,100 @@
+{% load static %}
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Intercom</title>
+    <script>
+      window.tailwind = window.tailwind || {};
+      window.tailwind.config = { darkMode: 'class' };
+    </script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  </head>
+  <body class="p-4 bg-slate-50 dark:bg-slate-900 min-h-screen text-slate-900 dark:text-slate-100">
+    <div class="flex justify-end max-w-3xl mx-auto mb-4">
+      <button type="button" id="theme-toggle" class="theme-toggle inline-flex items-center gap-2 rounded-full border border-slate-200/60 px-4 py-2 bg-white/80 text-slate-800 shadow dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100">
+        <span data-icon="sun">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 2.25v1.5m6.364.636-1.06 1.06M21.75 12h-1.5m-.636 6.364-1.06-1.06M12 20.25v1.5m-6.364-.636 1.06-1.06M3.75 12h1.5m.636-6.364 1.06 1.06" />
+            <circle cx="12" cy="12" r="4" />
+          </svg>
+        </span>
+        <span data-icon="moon" class="hidden">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+        </span>
+      </button>
+    </div>
+    <div class="max-w-3xl mx-auto">
+      <div class="bg-white dark:bg-slate-800 rounded-2xl shadow p-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xl font-semibold mb-3">Intercom: {{ thread.client }} ↔ {{ thread.coach }}</h2>
+          <form hx-post="{% url 'intercom:mark_read' %}" hx-swap="none">{% csrf_token %}</form>
+        </div>
+
+        <div id="messages" class="space-y-3 max-h-[60vh] overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-xl p-3 bg-slate-50 dark:bg-slate-900/40">
+          {% for m in messages %}
+            {% include "intercom/_message_item.html" with m=m %}
+          {% empty %}
+            <div class="text-sm text-gray-500">Zatím žádné zprávy…</div>
+          {% endfor %}
+        </div>
+
+        <form 
+          hx-post="{% url 'intercom:send' client_id=thread.client_id %}"
+          hx-target="#messages"
+          hx-swap="beforeend"
+          class="mt-4 flex gap-2"
+        >
+          {% csrf_token %}
+          <textarea name="body" rows="2" placeholder="Napiš zprávu…" class="flex-1 border border-slate-200 dark:border-slate-600 rounded-xl p-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"></textarea>
+          <button type="submit" class="px-4 py-2 rounded-xl bg-blue-600 text-white dark:bg-blue-500">Odeslat</button>
+        </form>
+      </div>
+    </div>
+
+    <script>
+      (function(){
+        const STORAGE_KEY = 'scb-theme';
+        const root = document.documentElement;
+        const toggleBtn = document.getElementById('theme-toggle');
+        const applyTheme = (mode) => {
+          if (mode === 'dark') {
+            root.classList.add('dark');
+          } else {
+            root.classList.remove('dark');
+          }
+          localStorage.setItem(STORAGE_KEY, mode);
+          const sun = toggleBtn?.querySelector('[data-icon="sun"]');
+          const moon = toggleBtn?.querySelector('[data-icon="moon"]');
+          if (sun && moon) {
+            if (mode === 'dark') {
+              sun.classList.add('hidden');
+              moon.classList.remove('hidden');
+            } else {
+              moon.classList.add('hidden');
+              sun.classList.remove('hidden');
+            }
+          }
+        };
+        const preferred = () => {
+          const stored = localStorage.getItem(STORAGE_KEY);
+          if (stored) return stored;
+          return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        };
+        applyTheme(preferred());
+        toggleBtn?.addEventListener('click', () => {
+          const next = root.classList.contains('dark') ? 'light' : 'dark';
+          applyTheme(next);
+        });
+      })();
+    </script>
+    <script>
+      // označ všechny notifikace jako přečtené po načtení stránky
+      const markForm = document.querySelector('form[hx-post][hx-swap="none"]');
+      if (markForm) { markForm.submit(); }
+    </script>
+  </body>
+  </html>

@@ -20,6 +20,7 @@ urlpatterns = [
     path("chatbot/", include("chatbot.urls")),
     path("api/chat/", chatbot_views.chat_api, name="chat_api"),
     path("onboarding/", include("onboarding.urls")),
+    path("intercom/", include("intercom.urls", namespace="intercom")),
 ]
 
 # Serve media files during development

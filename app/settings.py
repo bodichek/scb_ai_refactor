@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "exports",
     "chatbot",
     "onboarding.apps.OnboardingConfig",
+    "intercom",
 ]
 
 MIDDLEWARE = [

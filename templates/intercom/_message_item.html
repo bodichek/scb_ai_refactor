@@ -1,0 +1,7 @@
+{% load tz %}
+<div class="flex {% if request.user == m.sender %}justify-end{% else %}justify-start{% endif %}">
+  <div class="max-w-[70%] rounded-2xl px-3 py-2 shadow {% if request.user == m.sender %}bg-blue-600 text-white dark:bg-blue-500{% else %}bg-gray-100 text-slate-900 dark:bg-slate-700 dark:text-slate-100{% endif %}">
+    <div class="text-sm whitespace-pre-line">{{ m.body }}</div>
+    <div class="text-[11px] opacity-70 mt-1">{{ m.created_at|localtime }}</div>
+  </div>
+</div>

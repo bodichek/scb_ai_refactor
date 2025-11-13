@@ -6,6 +6,23 @@
   <meta charset="UTF-8">
   <meta name="csrf-token" content="{{ csrf_token }}">
   <title>SCB Fin assistant</title>
+  <script>
+    window.tailwind = window.tailwind || {};
+    window.tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              light: '#2f84ff',
+              dark: '#1f4cbf'
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -20,11 +37,11 @@
       --scb-neutral-200: #e7eeff;
     }
 
-    body {
-      font-family: "Inter", "Segoe UI", system-ui, sans-serif;
-      background-color: var(--scb-neutral-100);
-      color: var(--scb-navy);
-      background-image:
+body {
+  font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+  background-color: var(--scb-neutral-100);
+  color: var(--scb-navy);
+  background-image:
         radial-gradient(circle at 20% 20%, rgba(111, 177, 255, 0.22), transparent 55%),
         radial-gradient(circle at 80% 10%, rgba(81, 133, 255, 0.18), transparent 60%),
         radial-gradient(circle at 50% 80%, rgba(105, 162, 255, 0.2), transparent 60%);
@@ -159,6 +176,10 @@
       color: #fff;
       box-shadow: 0 12px 24px rgba(4, 20, 52, 0.22);
       transform: translateY(-1px);
+    }
+
+    .hidden {
+      display: none !important;
     }
 
 
@@ -800,6 +821,140 @@
       background: rgba(230, 239, 255, 0.45);
     }
 
+    html.dark body {
+      background-color: #0f172a;
+      color: #e2e8f0;
+      background-image:
+        radial-gradient(circle at 20% 20%, rgba(15, 118, 255, 0.15), transparent 55%),
+        radial-gradient(circle at 80% 10%, rgba(14, 165, 233, 0.18), transparent 60%),
+        radial-gradient(circle at 50% 80%, rgba(30, 64, 175, 0.25), transparent 60%);
+    }
+
+    html.dark .hero-section {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #312e81 100%);
+      color: #e0f2fe;
+    }
+
+    html.dark .hero-eyebrow,
+    html.dark .hero-badge,
+    html.dark .hero-buttons .btn-outline-light,
+    html.dark .hero-buttons .btn-primary {
+      background: rgba(15, 23, 42, 0.4);
+      color: #f8fafc;
+      border-color: rgba(148, 163, 184, 0.4);
+    }
+
+    html.dark .hero-buttons .btn-primary {
+      background: #f8fafc;
+      color: #0f172a;
+    }
+
+    html.dark .hero-card::after {
+      background: linear-gradient(180deg, rgba(2, 6, 23, 0.35) 0%, rgba(2, 6, 23, 0.6) 100%);
+    }
+
+    html.dark .scb-navbar {
+      background: linear-gradient(90deg, #0b1120 0%, #1e293b 50%, #334155 100%);
+      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
+    }
+
+    html.dark .scb-navbar .nav-link,
+    html.dark .scb-navbar .btn-ghost,
+    html.dark .scb-navbar .btn-cta {
+      color: #e2e8f0;
+    }
+
+    html.dark .scb-navbar .nav-link:hover,
+    html.dark .scb-navbar .nav-link:focus {
+      color: #1e1b4b;
+    }
+
+    html.dark .scb-panel,
+    html.dark .scb-list-item,
+    html.dark .chart-card,
+    html.dark .scb-table-scroll,
+    html.dark .scb-btn {
+      background: rgba(15, 23, 42, 0.9);
+      color: #f8fafc;
+      border-color: rgba(148, 163, 184, 0.25);
+    }
+
+    html.dark .scb-panel {
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+    }
+
+    html.dark .page-heading,
+    html.dark .scb-panel h2,
+    html.dark .scb-panel h3,
+    html.dark .page-title,
+    html.dark .page-eyebrow,
+    html.dark .panel-subtitle,
+    html.dark .scb-metric-bubble {
+      color: #e2e8f0;
+    }
+
+    html.dark .scb-metric-bubble,
+    html.dark .scb-panel .scb-list-item {
+      background: rgba(15, 23, 42, 0.6);
+    }
+
+    html.dark .scb-btn-primary {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    }
+
+    html.dark .scb-panel-header p,
+    html.dark .panel-subtitle,
+    html.dark .dashboard-actions__hint,
+    html.dark .scb-data-table tbody td {
+      color: rgba(226, 232, 240, 0.85);
+    }
+
+    html.dark .scb-data-table thead th {
+      background: rgba(71, 85, 105, 0.3);
+      color: #e2e8f0;
+    }
+
+    html.dark .page-main {
+      color: #f1f5f9;
+    }
+
+    html.dark .scb-list-item strong {
+      color: #f8fafc;
+    }
+
+    html.dark .scb-panel .text-muted,
+    html.dark .scb-panel small,
+    html.dark .scb-panel span {
+      color: rgba(226, 232, 240, 0.75);
+    }
+
+    #theme-toggle,
+    .theme-toggle {
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 999px;
+      padding: 0.35rem 0.8rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      cursor: pointer;
+      background: rgba(255,255,255,0.15);
+      color: #fff;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    html.dark #theme-toggle,
+    html.dark .theme-toggle {
+      background: rgba(15, 23, 42, 0.8);
+      color: #fefce8;
+      border-color: rgba(148, 163, 184, 0.4);
+    }
+
+    #theme-toggle svg,
+    .theme-toggle svg {
+      width: 1rem;
+      height: 1rem;
+    }
+
     .scb-data-table .text-truncate {
       max-width: 320px;
       display: inline-block;
@@ -1047,6 +1202,21 @@
   <nav class="navbar navbar-expand-lg navbar-dark scb-navbar">
     <div class="container-fluid px-4">
       <ul class="nav-links">
+          <li class="nav-item">
+            <button type="button" id="theme-toggle" class="scb-btn scb-btn-ghost theme-toggle">
+              <span class="theme-toggle__icon" data-icon="sun">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 2.25v1.5m6.364.636-1.06 1.06M21.75 12h-1.5m-.636 6.364-1.06-1.06M12 20.25v1.5m-6.364-.636 1.06-1.06M3.75 12h1.5m.636-6.364 1.06 1.06" />
+                  <circle cx="12" cy="12" r="4" />
+                </svg>
+              </span>
+              <span class="theme-toggle__icon hidden" data-icon="moon">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+              </span>
+            </button>
+          </li>
           {% if user.is_authenticated %}
             {% if not user|is_coach_user %}
             <li class="nav-item">
@@ -1072,6 +1242,17 @@
             {% endif %}
             <li class="nav-item">
               <a class="nav-link" href="{% url 'accounts:profile' %}">Profil</a>
+            </li>
+            <li class="nav-item">
+              {% if user|is_coach_user %}
+              <a class="nav-link" href="{% url 'intercom:inbox' %}">Intercom
+                <span id="notif-badge" class="badge rounded-pill bg-danger ms-1">0</span>
+              </a>
+              {% else %}
+              <a class="nav-link" href="{% url 'intercom:thread' client_id=user.id %}">Intercom
+                <span id="notif-badge" class="badge rounded-pill bg-danger ms-1">0</span>
+              </a>
+              {% endif %}
             </li>
             <li class="nav-item">
               <a class="nav-link" href="{% url 'accounts:logout' %}">Odhlásit</a>
@@ -1108,6 +1289,65 @@
 
   {% block extra_scripts %}{% endblock %}
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    (function () {
+      const STORAGE_KEY = 'scb-theme';
+      const root = document.documentElement;
+      const toggleBtn = document.getElementById('theme-toggle');
+      const applyTheme = (mode) => {
+        if (mode === 'dark') {
+          root.classList.add('dark');
+        } else {
+          root.classList.remove('dark');
+        }
+        localStorage.setItem(STORAGE_KEY, mode);
+        const sun = toggleBtn?.querySelector('[data-icon="sun"]');
+        const moon = toggleBtn?.querySelector('[data-icon="moon"]');
+        if (sun && moon) {
+          if (mode === 'dark') {
+            sun.classList.add('hidden');
+            moon.classList.remove('hidden');
+          } else {
+            moon.classList.add('hidden');
+            sun.classList.remove('hidden');
+          }
+        }
+      };
+
+      const preferred = () => {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) return stored;
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      };
+
+      const init = () => {
+        applyTheme(preferred());
+        toggleBtn?.addEventListener('click', () => {
+          const next = root.classList.contains('dark') ? 'light' : 'dark';
+          applyTheme(next);
+        });
+      };
+
+      init();
+    })();
+  </script>
+  <script>
+    // Jednoduchý polling na počet nepřečtených zpráv
+    (function(){
+      const el = document.getElementById('notif-badge');
+      if (!el) return;
+      async function refreshBadge(){
+        try {
+          const res = await fetch('{% url 'intercom:unread_count' %}', {headers: {'X-Requested-With': 'fetch'}});
+          if (!res.ok) return;
+          const data = await res.json();
+          el.textContent = data.unread || 0;
+        } catch(e) {}
+      }
+      refreshBadge();
+      setInterval(refreshBadge, 15000);
+    })();
+  </script>
   <script>
     (function () {
       const initTransitions = () => {
