@@ -1,79 +1,28 @@
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Intercom Inbox</title>
-    <script>
-      window.tailwind = window.tailwind || {};
-      window.tailwind.config = { darkMode: 'class' };
-    </script>
-    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
-  </head>
-  <body class="p-4 bg-slate-50 dark:bg-slate-900 min-h-screen text-slate-900 dark:text-slate-100">
-    <div class="max-w-4xl mx-auto">
-      <div class="flex justify-end mb-4">
-        <button type="button" id="theme-toggle" class="theme-toggle inline-flex items-center gap-2 rounded-full border border-slate-200/60 px-4 py-2 bg-white/80 text-slate-800 shadow dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100">
-          <span data-icon="sun">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 2.25v1.5m6.364.636-1.06 1.06M21.75 12h-1.5m-.636 6.364-1.06-1.06M12 20.25v1.5m-6.364-.636 1.06-1.06M3.75 12h1.5m.636-6.364 1.06 1.06" />
-              <circle cx="12" cy="12" r="4" />
-            </svg>
-          </span>
-          <span data-icon="moon" class="hidden">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-            </svg>
-          </span>
-        </button>
+{% extends "base.html" %}
+
+{% block content %}
+<div class="section-shell">
+  <section class="scb-panel">
+    <div class="scb-panel-header">
+      <div>
+        <span class="page-eyebrow">Intercom</span>
+        <h2>Inbox kouče</h2>
       </div>
-      <h1 class="text-2xl font-bold mb-4">Intercom – Klienti</h1>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {% for t in threads %}
-        <a href="{% url 'intercom:thread' client_id=t.client_id %}" class="block bg-white dark:bg-slate-800 rounded-2xl shadow p-4 hover:shadow-lg transition">
-          <div class="font-semibold">{{ t.client }}</div>
-          <div class="text-sm text-gray-500 dark:text-slate-300">Poslední aktivita: {{ t.last_message_at }}</div>
-          <div class="text-xs text-gray-400 dark:text-slate-400">Zpráv: {{ t.count_messages }}</div>
-        </a>
-        {% empty %}
-          <div class="text-sm text-gray-500 dark:text-slate-300">Zatím žádní klienti s konverzací.</div>
-        {% endfor %}
-      </div>
+      <p class="panel-subtitle">Přehled vláken se všemi klienty.</p>
     </div>
-    <script>
-      (function(){
-        const STORAGE_KEY = 'scb-theme';
-        const root = document.documentElement;
-        const toggleBtn = document.getElementById('theme-toggle');
-        const applyTheme = (mode) => {
-          if (mode === 'dark') {
-            root.classList.add('dark');
-          } else {
-            root.classList.remove('dark');
-          }
-          localStorage.setItem(STORAGE_KEY, mode);
-          const sun = toggleBtn?.querySelector('[data-icon="sun"]');
-          const moon = toggleBtn?.querySelector('[data-icon="moon"]');
-          if (sun && moon) {
-            if (mode === 'dark') {
-              sun.classList.add('hidden');
-              moon.classList.remove('hidden');
-            } else {
-              moon.classList.add('hidden');
-              sun.classList.remove('hidden');
-            }
-          }
-        };
-        const preferred = () => {
-          const stored = localStorage.getItem(STORAGE_KEY);
-          if (stored) return stored;
-          return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        };
-        applyTheme(preferred());
-        toggleBtn?.addEventListener('click', () => {
-          const next = root.classList.contains('dark') ? 'light' : 'dark';
-          applyTheme(next);
-        });
-      })();
-    </script>
-  </body>
-</html>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+      {% for t in threads %}
+      <a href="{% url 'intercom:thread' client_id=t.client_id %}" class="dashboard-card block rounded-3xl border border-slate-200/70 bg-white/95 p-4 text-slate-700 hover:text-slate-900">
+        <div class="font-semibold text-lg">{{ t.client }}</div>
+        <div class="text-sm text-slate-500">Poslední aktivita: {{ t.last_message_at|default:"—" }}</div>
+        <div class="text-xs text-slate-400">Zpráv: {{ t.count_messages }}</div>
+      </a>
+      {% empty %}
+      <div class="dashboard-card rounded-3xl border border-slate-200/70 bg-white/95 p-4 text-slate-600">
+        Zatím žádní klienti s konverzací.
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}
