@@ -385,6 +385,7 @@
       if (contactForm) {
         const messageInput = document.getElementById('coachMessage');
         const statusEl = document.getElementById('coachContactStatus');
+        const sendUrl = contactForm.dataset.sendUrl;
         const setContactStatus = (text, tone = 'info') => {
           statusEl.textContent = text;
           statusEl.classList.remove('text-slate-500', 'text-emerald-600', 'text-rose-600', 'text-amber-600');
@@ -400,6 +401,10 @@
         };
         contactForm.addEventListener('submit', async (event) => {
           event.preventDefault();
+          if (!sendUrl) {
+            setContactStatus('Chybí adresa pro odeslání. Zkus to znovu později.', 'error');
+            return;
+          }
           const message = (messageInput?.value || '').trim();
           if (!message) {
             setContactStatus('Napiš stručně, s čím potřebuješ pomoct.', 'warning');
@@ -407,19 +412,21 @@
           }
           setContactStatus('Posílám dotaz koučovi…', 'info');
           try {
-            const response = await fetch('{% url "dashboard:ask_coach" %}', {
+            const payload = new URLSearchParams();
+            payload.append('body', message);
+            const response = await fetch(sendUrl, {
               method: 'POST',
               headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
                 'X-CSRFToken': getCookie('csrftoken'),
+                'HX-Request': 'true',
               },
-              body: JSON.stringify({ message }),
+              body: payload.toString(),
             });
-            const data = await response.json();
-            if (!data.success) {
-              throw new Error(data.error || 'Chyba při odeslání');
+            if (!response.ok) {
+              throw new Error('Chyba při odeslání');
             }
-            setContactStatus(data.reply || 'Zpráva byla odeslána.', 'success');
+            setContactStatus('Zpráva byla odeslána do Intercomu.', 'success');
             messageInput.value = '';
           } catch (error) {
             setContactStatus('Nepodařilo se odeslat dotaz. Zkus to prosím znovu.', 'error');
@@ -556,17 +563,27 @@
         {% endif %}
       </section>
 
+      {% if assigned_coach %}
       <section class="dashboard-card xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
         <div>
           <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Kontaktuj kouče</p>
-          <h2 class="mt-2 text-xl font-semibold text-slate-900">Potřebuješ revizi?</h2>
+          <h2 class="mt-2 text-xl font-semibold text-slate-900">Potřebuješ poradit?</h2>
         </div>
-        <form id="coachContactForm" class="space-y-4">
+        <form id="coachContactForm" class="space-y-4" data-send-url="{% url 'intercom:send' client_id=request.user.id %}">
           <textarea id="coachMessage" name="message" rows="4" class="block w-full rounded-2xl border-slate-200 bg-slate-50/70 text-sm text-slate-700 placeholder:text-slate-400 focus:border-sky-500 focus:ring-sky-500" placeholder="Zeptej se kouče na konkrétní problém nebo oblast."></textarea>
           <button type="submit" class="scb-btn scb-btn-primary w-full justify-center">✉️ Odeslat koučovi</button>
         </form>
-        <p id="coachContactStatus" class="text-xs text-slate-500" data-tone="info">Odpověď od AI vidíš hned, kouč ji dostane do revize.</p>
+        <p id="coachContactStatus" class="text-xs text-slate-500" data-tone="info">Zpráva se odešle do Intercomu a kouč ji uvidí v konverzaci.</p>
       </section>
+      {% else %}
+      <section class="dashboard-card xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
+        <div>
+          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Kontaktuj kouče</p>
+          <h2 class="mt-2 text-xl font-semibold text-slate-900">Zatím nemáte kouče</h2>
+        </div>
+        <p class="text-sm text-slate-600">Po přiřazení kouče budete moci posílat dotazy přímo z dashboardu.</p>
+      </section>
+      {% endif %}
 
       <section class="dashboard-card xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-6">
         <div class="flex items-start justify-between">
