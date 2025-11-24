@@ -1,7 +1,7 @@
 import json
 import re
-from openai import OpenAI
 from django.conf import settings
+from openai import OpenAI
 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 MODEL = settings.OPENAI_MODEL or "gpt-4o-mini"
@@ -52,12 +52,51 @@ Your task:
 """
 
 
+def _extract_output_text(response) -> str:
+    """
+    Vrátí textový výstup z Responses API i v případech,
+    kdy není k dispozici pomocný atribut `output_text`.
+    """
+    # Nejprve využij rychlou zkratku
+    text = (getattr(response, "output_text", None) or "").strip()
+    if text:
+        return text
+
+    # Fallback na strukturovaný výstup
+    output = getattr(response, "output", None) or []
+    for item in output:
+        for content in getattr(item, "content", []):
+            # `text` může být přímo string nebo objekt s hodnotou ve `value`
+            value = getattr(content, "text", None)
+            if hasattr(value, "value"):
+                value = value.value
+            if value:
+                return str(value).strip()
+    return ""
+
+
+def _parse_json(content: str) -> dict:
+    """Bezpečně naparsuje JSON, i když model přidal text okolo."""
+    if not content:
+        return {}
+    try:
+        return json.loads(content)
+    except Exception:
+        match = re.search(r"\{.*\}", content, re.S)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except Exception:
+                return {}
+    return {}
+
+
 def _call_openai(prompt: str, pdf_path: str) -> dict:
     """Základní volání OpenAI pro analýzu PDF."""
     with open(pdf_path, "rb") as f:
         file_obj = client.files.create(file=f, purpose="assistants")
 
-    response = client.responses.create(
+    response = client.responses.create_and_poll(
         model=MODEL,
         input=[
             {"role": "system", "content": "You are a financial statement parser. Always return JSON."},
@@ -69,12 +108,8 @@ def _call_openai(prompt: str, pdf_path: str) -> dict:
         temperature=0,
     )
 
-    content = response.output_text.strip()
-    try:
-        return json.loads(content)
-    except Exception:
-        match = re.search(r"\{.*\}", content, re.S)
-        return json.loads(match.group(0)) if match else {}
+    content = _extract_output_text(response)
+    return _parse_json(content)
 
 
 def analyze_income(pdf_path: str) -> dict:
@@ -100,7 +135,7 @@ def detect_doc_type(pdf_path: str) -> str:
     with open(pdf_path, "rb") as f:
         file_obj = client.files.create(file=f, purpose="assistants")
 
-    resp = client.responses.create(
+    resp = client.responses.create_and_poll(
         model=MODEL,
         input=[
             {"role": "system", "content": "You are an expert in Czech accounting."},
@@ -112,7 +147,7 @@ def detect_doc_type(pdf_path: str) -> str:
         temperature=0,
     )
 
-    result = resp.output_text.strip().lower()
+    result = _extract_output_text(resp).lower()
     return "income" if "income" in result else "balance"
 
 
@@ -121,7 +156,7 @@ def detect_doc_type_and_year(pdf_path: str) -> dict:
     with open(pdf_path, "rb") as f:
         file_obj = client.files.create(file=f, purpose="assistants")
 
-    resp = client.responses.create(
+    resp = client.responses.create_and_poll(
         model=MODEL,
         input=[
             {"role": "system", "content": "You are a Czech accounting expert."},
@@ -133,12 +168,8 @@ def detect_doc_type_and_year(pdf_path: str) -> dict:
         temperature=0,
     )
 
-    result = resp.output_text.strip()
-    try:
-        data = json.loads(result)
-    except Exception:
-        match = re.search(r"\{.*\}", result, re.S)
-        data = json.loads(match.group(0)) if match else {}
+    result = _extract_output_text(resp)
+    data = _parse_json(result)
 
     return {
         "type": data.get("type", "income"),
