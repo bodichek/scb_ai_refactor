@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional, Tuple
 from django.db import transaction
 
 from ingest.models import FinancialStatement
+from finance.utils import compute_overheads, compute_profitability, first_number, growth
 
 from .models import Export
 
@@ -16,40 +17,23 @@ class ExportData:
     statement_year: Optional[int]
 
 
-def _to_number(value: Any) -> Optional[float]:
-    """
-    Normalizes numeric values that may arrive as strings with spaces or commas.
-    Returns None if parsing fails.
-    """
-
-    if value is None:
-        return None
-    if isinstance(value, (int, float)):
-        return float(value)
-    if isinstance(value, str):
-        cleaned = (
-            value.replace("\u00a0", "")
-            .replace(" ", "")
-            .replace("CZK", "")
-            .replace("Kc", "")
-            .replace("Kč", "")
-            .replace("eur", "")
-            .replace("EUR", "")
-            .strip()
-        )
-        cleaned = cleaned.replace(",", ".")
-        cleaned = cleaned.rstrip("%")
-        if not cleaned:
-            return None
-        try:
-            return float(cleaned)
-        except ValueError:
-            return None
-    return None
-
 
 def _prepare_metric(default_value: Optional[float], fallback: Optional[float] = None) -> Optional[float]:
     return default_value if default_value is not None else fallback
+
+
+def _metric(data: Dict[str, Any], keys) -> Optional[float]:
+    return first_number(data, keys)
+
+
+def _cogs_without_services(data: Dict[str, Any]) -> Optional[float]:
+    cogs = _metric(data, ("COGS", "cogs"))
+    services = _metric(data, ("services", "Services"))
+    if cogs is None:
+        return None
+    if services is not None and services > 0 and cogs > 0:
+        return max(cogs - services, 0.0)
+    return cogs
 
 
 def build_latest_export_payload(user) -> Optional[ExportData]:
@@ -67,54 +51,35 @@ def build_latest_export_payload(user) -> Optional[ExportData]:
     latest = statements[0]
     latest_data = latest.data or {}
 
-    revenue = _to_number(latest_data.get("Revenue"))
-    cogs = _to_number(latest_data.get("COGS"))
+    revenue = _metric(latest_data, ("Revenue", "revenue"))
+    cogs = _cogs_without_services(latest_data)
     gross_margin = _prepare_metric(
-        _to_number(latest_data.get("GrossMargin")),
+        _metric(latest_data, ("GrossMargin", "gross_margin")),
         (revenue - cogs) if revenue is not None and cogs is not None else None,
     )
-    overheads = _to_number(latest_data.get("Overheads"))
-    depreciation = _to_number(latest_data.get("Depreciation"))
+    overheads = compute_overheads(latest_data)
+    depreciation = _metric(latest_data, ("Depreciation", "depreciation"))
     ebit = _prepare_metric(
-        _to_number(latest_data.get("EBIT")),
-        (
-            (gross_margin or 0.0)
-            - (overheads or 0.0)
-            - (depreciation or 0.0)
-        )
+        _metric(latest_data, ("EBIT", "ebit")),
+        (gross_margin or 0.0) - (overheads or 0.0)
         if gross_margin is not None
         else None,
     )
-    net_profit = _to_number(latest_data.get("NetProfit"))
+    net_profit = _prepare_metric(
+        _metric(latest_data, ("NetProfit", "net_profit")),
+        (revenue - cogs - overheads) if revenue is not None and cogs is not None else None,
+    )
 
     prev_statement = statements[1] if len(statements) > 1 else None
     prev_data = prev_statement.data if prev_statement else None
-    prev_revenue = _to_number(prev_data.get("Revenue")) if prev_data else None
+    prev_revenue = _metric(prev_data, ("Revenue", "revenue")) if prev_data else None
 
-    revenue_growth_yoy = None
-    if revenue is not None and prev_revenue not in (None, 0):
-        try:
-            revenue_growth_yoy = (revenue - prev_revenue) / abs(prev_revenue)
-        except Exception:
-            revenue_growth_yoy = None
-
-    ebit_margin = None
-    if revenue not in (None, 0) and ebit is not None:
-        try:
-            ebit_margin = ebit / revenue
-        except Exception:
-            ebit_margin = None
-
-    net_profit_margin = None
-    if revenue not in (None, 0) and net_profit is not None:
-        try:
-            net_profit_margin = net_profit / revenue
-        except Exception:
-            net_profit_margin = None
+    revenue_growth_yoy = growth(revenue, prev_revenue)
+    profitability = compute_profitability(revenue, gross_margin, ebit, net_profit)
 
     revenue_history = []
     for stmt in sorted(statements, key=lambda s: s.year):
-        value = _to_number((stmt.data or {}).get("Revenue"))
+        value = _metric((stmt.data or {}), ("Revenue", "revenue"))
         if value is not None:
             revenue_history.append(
                 {
@@ -133,8 +98,8 @@ def build_latest_export_payload(user) -> Optional[ExportData]:
         "EBIT": ebit,
         "NetProfit": net_profit,
         "RevenueGrowthYoY": revenue_growth_yoy,
-        "EBITMargin": ebit_margin,
-        "NetProfitMargin": net_profit_margin,
+        "EBITMargin": profitability["op_pct"],
+        "NetProfitMargin": profitability["np_pct"],
     }
 
     if revenue_history:

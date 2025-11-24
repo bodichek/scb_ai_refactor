@@ -11,7 +11,7 @@ from accounts.permissions import coach_required, can_coach_access_client
 from ingest.models import Document, FinancialStatement
 from survey.models import SurveySubmission
 from dashboard.cashflow import calculate_cashflow
-from dashboard.views import build_dashboard_context
+from dashboard.views import build_dashboard_context, _compute_overheads
 from .models import Coach, UserCoachAssignment
 
 
@@ -269,9 +269,8 @@ def charts_data(request, client_id):
         d = fs.data or {}
         revenue = float(d.get('Revenue', 0))
         cogs = float(d.get('COGS', 0))
-        overheads = float(d.get('Overheads', 0))
-        depreciation = float(d.get('Depreciation', 0))
-        ebit = float(d.get('EBIT', revenue - cogs - overheads - depreciation))
+        overheads = _compute_overheads(d)
+        ebit = float(d.get('EBIT', revenue - cogs - overheads))
         rows.append({'year': fs.year, 'revenue': revenue, 'cogs': cogs, 'ebit': ebit})
     return JsonResponse({'success': True, 'series': rows})
 

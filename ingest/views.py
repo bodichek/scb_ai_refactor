@@ -8,16 +8,79 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_http_methods
 
 from .models import Document, FinancialStatement
-from .openai_parser import (
+from .ai_parser_refactored import (
     analyze_income,
     analyze_balance,
     detect_doc_type,
     detect_doc_type_and_year,
+    calculate_metrics,
 )
+
+INCOME_FIELDS = [
+    "revenue_products_services",
+    "revenue_goods",
+    "cogs_goods",
+    "cogs_materials",
+    "services",
+    "personnel_wages",
+    "personnel_insurance",
+    "taxes_fees",
+    "depreciation",
+    "other_operating_costs",
+    "other_operating_revenue",
+    "financial_revenue",
+    "financial_costs",
+    "income_tax",
+]
+
+BALANCE_FIELDS = [
+    "receivables",
+    "inventory",
+    "short_term_liabilities",
+    "cash",
+]
+
+
+def _persist_statement(doc, parsed_data):
+    with transaction.atomic():
+        fs, created = FinancialStatement.objects.get_or_create(
+            owner=doc.owner,
+            year=doc.year,
+            defaults={"document": doc, "data": {}},
+        )
+        existing = fs.data or {}
+        payload = dict(existing)
+
+        if doc.doc_type == "income":
+            balance_for_metrics = {
+                key: existing.get(key) for key in BALANCE_FIELDS if existing.get(key) is not None
+            }
+            balance_for_metrics = balance_for_metrics if any(balance_for_metrics.values()) else None
+            metrics = calculate_metrics(parsed_data, balance_for_metrics)
+            payload.update({k: v for k, v in metrics.items() if k != "overheads"})
+        else:
+            payload.update(parsed_data)
+            income_available = any(key in existing for key in INCOME_FIELDS)
+            if income_available:
+                income_data = {k: existing.get(k, 0) for k in INCOME_FIELDS}
+                balance_for_metrics = {k: payload.get(k, 0) for k in BALANCE_FIELDS}
+                metrics = calculate_metrics(income_data, balance_for_metrics)
+                payload.update({k: v for k, v in metrics.items() if k != "overheads"})
+
+        # Never persist stored overhead totals; compute from components on read
+        for legacy_key in ("Overheads", "overheads"):
+            payload.pop(legacy_key, None)
+
+        fs.document = doc
+        fs.data = payload
+        fs.save()
+
+    return fs
+
 
 
 def _process_uploaded_file(user, uploaded_file):
-    """Zpracuje jeden PDF soubor a uloží výsledky analýzy."""
+    """Process one PDF file and store parsed results."""
     # Dočasně nastavíme rok, aby se dokument uložil
     doc = Document.objects.create(owner=user, file=uploaded_file, year=2025)
     pdf_path = doc.file.path
@@ -28,25 +91,14 @@ def _process_uploaded_file(user, uploaded_file):
     doc.save(update_fields=["doc_type", "year"])
 
     if doc.doc_type == "income":
-        data = analyze_income(pdf_path)
+        parsed_data = analyze_income(pdf_path)
     else:
-        data = analyze_balance(pdf_path)
+        parsed_data = analyze_balance(pdf_path)
 
     doc.analyzed = True
     doc.save(update_fields=["analyzed"])
 
-    with transaction.atomic():
-        fs, created = FinancialStatement.objects.get_or_create(
-            owner=user,
-            year=doc.year,
-            defaults={"document": doc, "data": data},
-        )
-        if not created:
-            merged = fs.data or {}
-            merged.update(data)
-            fs.document = doc
-            fs.data = merged
-            fs.save()
+    _persist_statement(doc, parsed_data)
 
     return {
         "file": uploaded_file.name,
@@ -56,6 +108,7 @@ def _process_uploaded_file(user, uploaded_file):
         "success": True,
         "document": _serialize_document(doc),
     }
+
 
 
 def _serialize_document(doc: Document):
@@ -118,16 +171,7 @@ def upload_pdf(request):
         doc.analyzed = True
         doc.save(update_fields=["doc_type", "analyzed"])
 
-        with transaction.atomic():
-            fs, created = FinancialStatement.objects.get_or_create(
-                owner=request.user,
-                year=doc.year,
-                defaults={"document": doc, "data": new_data},
-            )
-            if not created:
-                fs.document = doc
-                fs.data = new_data
-                fs.save()
+        _persist_statement(doc, new_data)
 
         return redirect("dashboard:index")
 
@@ -242,11 +286,7 @@ def process_pdf(request, document_id: int):
     else:
         data = analyze_balance(pdf_path)
 
-    FinancialStatement.objects.update_or_create(
-        owner=request.user,
-        year=document.year,
-        defaults={"document": document, "data": data},
-    )
+    _persist_statement(document, data)
 
     return redirect("dashboard:index")
 

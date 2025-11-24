@@ -22,6 +22,13 @@ from ingest.models import Document, FinancialStatement
 from survey.models import SurveySubmission
 from suropen.models import OpenAnswer
 from coaching.models import UserCoachAssignment
+from finance.utils import (
+    compute_overheads,
+    compute_profitability,
+    first_number,
+    growth,
+    to_number,
+)
 
 from .cashflow import calculate_cashflow
 
@@ -33,44 +40,38 @@ def _clean_text(text):
         return text.strip()
     return str(text).strip()
 
-
+def _compute_overheads(data: dict) -> float:
+    """Prefer sums of components; fall back to stored overhead totals."""
+    return compute_overheads(data)
 
 
 def _to_number(value):
-    if value is None:
-        return None
-    if isinstance(value, (int, float)):
-        try:
-            return float(value)
-        except Exception:
-            return None
-    if isinstance(value, str):
-        cleaned = (
-            value.replace(' ', '')
-            .replace(' ', '')
-            .replace('CZK', '')
-            .replace('Kc', '')
-            .replace('Kč', '')
-            .replace('eur', '')
-            .replace('EUR', '')
-            .strip()
-        )
-        if not cleaned:
-            return None
-        has_comma = ',' in cleaned
-        has_dot = '.' in cleaned
-        if has_comma and has_dot:
-            if cleaned.rfind(',') > cleaned.rfind('.'):
-                cleaned = cleaned.replace('.', '').replace(',', '.')
-            else:
-                cleaned = cleaned.replace(',', '')
-        elif has_comma:
-            cleaned = cleaned.replace(',', '.')
-        try:
-            return float(cleaned)
-        except Exception:
-            return None
-    return None
+    return to_number(value)
+
+
+def _get_metric(data: dict, keys, default=None):
+    val = first_number(data, keys)
+    if val is None:
+        return default
+    return val
+
+
+def _get_cogs_value(data: dict) -> float:
+    """
+    Vrátí COGS očištěné o služby pouze u legacy dat, kde byly služby součástí COGS.
+    U nového schématu (snake_case) je `cogs` už bez služeb, takže ho necháváme beze změny.
+    """
+    services = _get_metric(data, ("services", "Services"))
+
+    # 1) Legacy: TitleCase COGS (služby byly součástí COGS)
+    legacy_cogs = _get_metric(data, ("COGS",), None)
+    if legacy_cogs is not None:
+        if services is not None and services > 0 and legacy_cogs > 0:
+            return max(legacy_cogs - services, 0.0)
+        return legacy_cogs
+
+    # 2) Nové schéma: snake_case `cogs` už NEOBSAHUJE services → neodečítáme
+    return _get_metric(data, ("cogs",), 0.0)
 
 def _extract_recommendation_points(text, max_points=5):
     if not text:
@@ -207,62 +208,30 @@ def _get_openai_client():
 def build_dashboard_context(target_user):
     statements = FinancialStatement.objects.filter(owner=target_user).order_by("year")
 
+
     rows = []
     for s in statements:
         d = s.data or {}
 
-        # ZÃ¡kladnÃ­ vÃ½poÄty
-        revenue = _to_number(d.get("Revenue")) or 0.0
-        cogs = _to_number(d.get("COGS")) or 0.0
-        gross_margin = _to_number(d.get("GrossMargin"))
+        # Base metrics with TitleCase/snake_case fallback
+        revenue = _get_metric(d, ("Revenue", "revenue"), 0.0)
+        cogs = _get_cogs_value(d)
+        gross_margin = _get_metric(d, ("GrossMargin", "gross_margin"))
         if gross_margin is None:
             gross_margin = revenue - cogs
 
-        overheads_raw = d.get("Overheads")
-        overheads = _to_number(overheads_raw)
-        depreciation = _to_number(d.get("Depreciation")) or 0.0
+        depreciation = _get_metric(d, ("depreciation", "Depreciation"), 0.0)
+        overheads = _compute_overheads(d)
 
-        ebit_raw = d.get("EBIT")
-        ebit = _to_number(ebit_raw)
-        if ebit is None and gross_margin is not None:
-            ebit = gross_margin - (overheads or 0.0) - depreciation
-
-        if (overheads is None or abs(overheads) < 1e-6) and gross_margin is not None and ebit is not None:
-            derived_overheads = gross_margin - ebit - depreciation
-            if derived_overheads is not None:
-                overheads = derived_overheads
-
-        if overheads is None:
-            overheads = 0.0
-
+        ebit = _get_metric(d, ("EBIT", "ebit"))
         if ebit is None:
-            ebit = gross_margin - overheads - depreciation
+            ebit = gross_margin - overheads
 
-        net_profit = _to_number(d.get("NetProfit"))
+        net_profit = _get_metric(d, ("NetProfit", "net_profit"))
         if net_profit is None:
-            net_profit = revenue - cogs - overheads - depreciation
+            net_profit = revenue - cogs - overheads
 
-        # Cashflow (jen zÃ¡kladnÃ­ bloky)
-        cash_from_customers = _to_number(d.get("CashFromCustomers"))
-        if cash_from_customers is None:
-            cash_from_customers = revenue
-        cash_to_suppliers = _to_number(d.get("CashToSuppliers"))
-        if cash_to_suppliers is None:
-            cash_to_suppliers = cogs
-        gross_cash_profit = cash_from_customers - cash_to_suppliers
-        cash_overheads = _to_number(d.get("Overheads"))
-        if cash_overheads is None:
-            cash_overheads = overheads
-        operating_cf = gross_cash_profit - cash_overheads
-
-        interest = _to_number(d.get("InterestPaid")) or 0.0
-        tax = _to_number(d.get("IncomeTaxPaid")) or 0.0
-        extraordinary = _to_number(d.get("ExtraordinaryItems")) or 0.0
-        dividends = _to_number(d.get("DividendsPaid")) or 0.0
-        capex = _to_number(d.get("Capex")) or 0.0
-        other_assets = _to_number(d.get("OtherAssets")) or 0.0
-
-        net_cf = operating_cf - interest - tax - extraordinary - dividends - capex + other_assets
+        profitability = compute_profitability(revenue, gross_margin, ebit, net_profit)
 
         rows.append({
             "year": s.year,
@@ -273,48 +242,26 @@ def build_dashboard_context(target_user):
             "depreciation": depreciation,
             "ebit": ebit,
             "net_profit": net_profit,
-
-            # Profitability % (pomÄ›rovÃ© ukazatele)
-            "profitability": {
-                "gm_pct": (gross_margin / revenue * 100) if revenue else 0,
-                "op_pct": (ebit / revenue * 100) if revenue else 0,
-                "np_pct": (net_profit / revenue * 100) if revenue else 0,
-            },
-
-            # Cashflow
-            "cash_from_customers": cash_from_customers,
-            "cash_to_suppliers": cash_to_suppliers,
-            "gross_cash_profit": gross_cash_profit,
-            "cash_overheads": cash_overheads,
-            "operating_cf": operating_cf,
-            "interest": interest,
-            "tax": tax,
-            "extraordinary": extraordinary,
-            "dividends": dividends,
-            "capex": capex,
-            "other_assets": other_assets,
-            "net_cf": net_cf,
-
-            "growth": {}  # doplnÃ­me nÃ­Å¾e
+            "profitability": profitability,
+            "growth": {},  # filled later
         })
 
-    # SeÅ™adit a pÅ™ipravit roky
     rows = sorted(rows, key=lambda r: r["year"])
     years = [r["year"] for r in rows]
 
-    # MeziroÄnÃ­ rÅ¯sty
+    # Year-over-year growth using shared helper
     for i, r in enumerate(rows):
         if i == 0:
-            r["growth"] = {"revenue": 0, "cogs": 0, "overheads": 0}
+            r["growth"] = {"revenue": None, "cogs": None, "overheads": None}
         else:
             prev = rows[i - 1]
             r["growth"] = {
-                "revenue": ((r["revenue"] - prev["revenue"]) / prev["revenue"] * 100) if prev["revenue"] else 0,
-                "cogs": ((r["cogs"] - prev["cogs"]) / prev["cogs"] * 100) if prev["cogs"] else 0,
-                "overheads": ((r["overheads"] - prev["overheads"]) / prev["overheads"] * 100) if prev["overheads"] else 0,
+                "revenue": growth(r["revenue"], prev["revenue"]),
+                "cogs": growth(r["cogs"], prev["cogs"]),
+                "overheads": growth(r["overheads"], prev["overheads"]),
             }
 
-    # 📈 Insights from survey responses
+# 📈 Insights from survey responses
     survey_history = []
     latest_submission = None
     submissions_qs = SurveySubmission.objects.filter(user=target_user).order_by("created_at")
@@ -636,12 +583,20 @@ def api_metrics_series(request):
     rows = []
     for s in statements:
         d = s.data or {}
-        revenue = float(d.get("Revenue", 0))
-        cogs = float(d.get("COGS", 0))
-        overheads = float(d.get("Overheads", 0))
-        depreciation = float(d.get("Depreciation", 0))
-        ebit = float(d.get("EBIT", (revenue - cogs - overheads - depreciation)))
-        net_profit = float(d.get("NetProfit", (revenue - cogs - overheads - depreciation)))
+        revenue = _get_metric(d, ("Revenue", "revenue"), 0.0)
+        cogs = _get_cogs_value(d)
+        overheads = _compute_overheads(d)
+        gross_margin = _get_metric(d, ("GrossMargin", "gross_margin"))
+        if gross_margin is None:
+            gross_margin = revenue - cogs
+
+        ebit = _get_metric(d, ("EBIT", "ebit"))
+        if ebit is None:
+            ebit = gross_margin - overheads
+
+        net_profit = _get_metric(d, ("NetProfit", "net_profit"))
+        if net_profit is None:
+            net_profit = revenue - cogs - overheads
         rows.append({
             "year": int(s.year),
             "revenue": revenue,
@@ -656,15 +611,15 @@ def api_metrics_series(request):
 
     margins = []
     for r in rows:
-        rev = r["revenue"]
-        gm = (r["revenue"] - r["cogs"]) if rev else 0
-        op = (r["revenue"] - r["cogs"] - r["overheads"]) if rev else 0
-        np = r["net_profit"]
+        profitability = compute_profitability(
+            r["revenue"],
+            r["revenue"] - r["cogs"],
+            r["ebit"],
+            r["net_profit"],
+        )
         margins.append({
             "year": r["year"],
-            "gm_pct": (gm / rev * 100) if rev else 0.0,
-            "op_pct": (op / rev * 100) if rev else 0.0,
-            "np_pct": (np / rev * 100) if rev else 0.0,
+            **profitability,
         })
 
     yoy = []
@@ -680,13 +635,6 @@ def api_metrics_series(request):
             })
         else:
             p = rows[i-1]
-            def growth(cur, prev):
-                try:
-                    if prev and prev != 0:
-                        return (cur - prev) / abs(prev) * 100.0
-                except Exception:
-                    pass
-                return None
             yoy.append({
                 "year": r["year"],
                 "revenue_yoy": growth(r["revenue"], p["revenue"]),
@@ -711,17 +659,20 @@ def api_profitability(request):
     rows = []
     for stmt in statements:
         data = stmt.data or {}
-        revenue = float(data.get("Revenue", 0))
-        cogs = float(data.get("COGS", 0))
-        overheads = float(data.get("Overheads", 0))
-        depreciation = float(data.get("Depreciation", 0))
-        gross_margin = float(data.get("GrossMargin", revenue - cogs))
-        ebit = float(data.get("EBIT", revenue - cogs - overheads - depreciation))
-        net_profit = float(data.get("NetProfit", revenue - cogs - overheads - depreciation))
+        revenue = _get_metric(data, ("Revenue", "revenue"), 0.0)
+        cogs = _get_cogs_value(data)
+        overheads = _compute_overheads(data)
+        gross_margin = _get_metric(data, ("GrossMargin", "gross_margin"))
+        if gross_margin is None:
+            gross_margin = revenue - cogs
+        ebit = _get_metric(data, ("EBIT", "ebit"))
+        if ebit is None:
+            ebit = gross_margin - overheads
+        net_profit = _get_metric(data, ("NetProfit", "net_profit"))
+        if net_profit is None:
+            net_profit = revenue - cogs - overheads
 
-        gm_pct = (gross_margin / revenue * 100) if revenue else 0.0
-        op_pct = (ebit / revenue * 100) if revenue else 0.0
-        np_pct = (net_profit / revenue * 100) if revenue else 0.0
+        profitability = compute_profitability(revenue, gross_margin, ebit, net_profit)
 
         rows.append({
             "year": stmt.year,
@@ -731,9 +682,9 @@ def api_profitability(request):
             "overheads": overheads,
             "ebit": ebit,
             "net_profit": net_profit,
-            "gm_pct": gm_pct,
-            "op_pct": op_pct,
-            "np_pct": np_pct,
+            "gm_pct": profitability["gm_pct"],
+            "op_pct": profitability["op_pct"],
+            "np_pct": profitability["np_pct"],
         })
 
     return JsonResponse({"success": True, "rows": rows})

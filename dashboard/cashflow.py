@@ -1,4 +1,6 @@
 from ingest.models import FinancialStatement
+from finance.utils import compute_overheads, first_number, to_number
+
 
 def calculate_cashflow(user, year):
     """
@@ -10,44 +12,48 @@ def calculate_cashflow(user, year):
 
     d = fs.data
 
-    # Mapování názvů podle dat z OpenAI (velká písmena)
-    revenue = float(d.get("Revenue", 0))
-    cogs = float(d.get("COGS", 0))
-    overheads = float(d.get("Overheads", 0))
-    depreciation = float(d.get("Depreciation", 0))
+    def _value(keys, default=0.0):
+        val = first_number(d, keys)
+        return val if val is not None else default
+
+    # Mapování názvů podle dat z OpenAI (velká písmena) i snake_case
+    revenue = _value(("Revenue", "revenue"), 0.0)
+    cogs = _value(("COGS", "cogs"), 0.0)
+    overheads = compute_overheads(d)
+    depreciation = _value(("depreciation", "Depreciation"), 0.0)
     
     # Použijeme data, která skutečně máme z parsingu
-    interest = float(d.get("InterestPaid", d.get("Interest", 0)))
-    taxation = float(d.get("IncomeTaxPaid", d.get("Tax", 0)))
-    dividends = float(d.get("DividendsPaid", d.get("Dividends", 0)))
-    extraordinary = float(d.get("ExtraordinaryItems", 0))
+    interest = _value(("InterestPaid", "Interest", "interest_paid"), 0.0)
+    taxation = _value(("IncomeTaxPaid", "Tax", "income_tax_paid"), 0.0)
+    dividends = _value(("DividendsPaid", "Dividends", "dividends_paid"), 0.0)
+    extraordinary = _value(("ExtraordinaryItems", "extraordinary_items"), 0.0)
     
     # Bilance data pro odhad cash flow
-    total_assets = float(d.get("TotalAssets", 0))
-    cash = float(d.get("Cash", 0))
-    receivables = float(d.get("Receivables", 0))
-    inventory = float(d.get("Inventory", 0))
-    tangible_assets = float(d.get("TangibleAssets", 0))
-    trade_payables = float(d.get("TradePayables", 0))
-    short_term_loans = float(d.get("ShortTermLoans", 0))
-    long_term_loans = float(d.get("LongTermLoans", 0))
+    total_assets = _value(("TotalAssets", "total_assets"), 0.0)
+    cash = _value(("Cash", "cash"), 0.0)
+    receivables = _value(("Receivables", "receivables"), 0.0)
+    inventory = _value(("Inventory", "inventory"), 0.0)
+    tangible_assets = _value(("TangibleAssets", "tangible_assets"), 0.0)
+    trade_payables = _value(("TradePayables", "trade_payables"), 0.0)
+    short_term_loans = _value(("ShortTermLoans", "short_term_loans"), 0.0)
+    long_term_loans = _value(("LongTermLoans", "long_term_loans"), 0.0)
     
     # Odhady pro chybějící data
-    loans_received = float(d.get("LoansReceived", 0))
-    loans_repaid = float(d.get("LoansRepaid", 0))
-    asset_sales = float(d.get("AssetSales", 0))
+    loans_received = _value(("LoansReceived", "loans_received"), 0.0)
+    loans_repaid = _value(("LoansRepaid", "loans_repaid"), 0.0)
+    asset_sales = _value(("AssetSales", "asset_sales"), 0.0)
     
     # Odhad změny pracovního kapitálu (pokud chybí, odhadneme z bilance)
-    working_capital_change = float(d.get("WorkingCapitalChange", 0))
+    working_capital_change = _value(("WorkingCapitalChange", "working_capital_change"), 0.0)
     if working_capital_change == 0 and receivables > 0:
         # Jednoduchý odhad: 5-10% z tržeb jako změna pracovního kapitálu
         working_capital_change = revenue * 0.05
     
     # Počáteční stav hotovosti (pokud chybí, použijeme aktuální cash)
-    cash_begin = float(d.get("CashBegin", cash * 0.8))  # odhad
+    cash_begin = to_number(d.get("CashBegin")) or cash * 0.8  # odhad
 
     # --- Základní výpočty ---
-    net_profit = float(d.get("NetProfit", revenue - cogs - overheads - depreciation - interest - taxation + extraordinary))
+    net_profit = _value(("NetProfit", "net_profit"), revenue - cogs - overheads - interest - taxation + extraordinary)
     
     # --- Cash Flow z provozní činnosti ---
     # Upravený výpočet: čistý zisk + odpisy - změna pracovního kapitálu
@@ -55,7 +61,7 @@ def calculate_cashflow(user, year):
     
     # --- Cash Flow z investiční činnosti ---
     # CapEx odhadneme z tangible assets nebo jako % z tržeb
-    capex = float(d.get("CapEx", d.get("FixedAssets", tangible_assets * 0.1)))
+    capex = _value(("CapEx", "FixedAssets", "capex"), tangible_assets * 0.1)
     if capex == 0 and revenue > 0:
         capex = revenue * 0.02  # 2% z tržeb jako průměrný CapEx
     

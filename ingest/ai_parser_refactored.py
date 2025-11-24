@@ -5,10 +5,58 @@ Parsuje pouze nezbytná data podle zadaných vzorců
 import json
 from django.conf import settings
 from openai import OpenAI
-from .openai_parser import _extract_output_text, _parse_json
+from finance.utils import compute_profitability, growth
 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 MODEL = settings.OPENAI_MODEL or "gpt-4o-mini"
+
+
+def _extract_output_text(response) -> str:
+    """
+    Vrátí textový výstup z Responses API i v případech,
+    kdy není k dispozici pomocný atribut `output_text`.
+    """
+    text = (getattr(response, "output_text", None) or "").strip()
+    if text:
+        return text
+
+    output = getattr(response, "output", None) or []
+    for item in output:
+        for content in getattr(item, "content", []):
+            value = getattr(content, "text", None)
+            if hasattr(value, "value"):
+                value = value.value
+            if value:
+                return str(value).strip()
+    return ""
+
+
+def _create_response(payload: dict):
+    """
+    Zavolá Responses API; pokud chybí create_and_poll (starší SDK), použije create.
+    """
+    try:
+        return client.responses.create_and_poll(**payload)
+    except AttributeError:
+        return client.responses.create(**payload)
+
+
+def _parse_json(content: str) -> dict:
+    """Bezpečně naparsuje JSON, i když model přidal text okolo."""
+    if not content:
+        return {}
+    try:
+        return json.loads(content)
+    except Exception:
+        import re
+
+        match = re.search(r"\{.*\}", content, re.S)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except Exception:
+                return {}
+    return {}
 
 # ============================================================================
 # PROMPTY PRO AI PARSOVÁNÍ
@@ -119,17 +167,17 @@ def _call_openai(prompt: str, pdf_path: str) -> dict:
     with open(pdf_path, "rb") as f:
         file_obj = client.files.create(file=f, purpose="assistants")
 
-    response = client.responses.create_and_poll(
-        model=MODEL,
-        input=[
+    response = _create_response({
+        "model": MODEL,
+        "input": [
             {"role": "system", "content": "Jsi parser finančních výkazů. Vždy vracíš JSON."},
             {"role": "user", "content": [
                 {"type": "input_text", "text": prompt},
                 {"type": "input_file", "file_id": file_obj.id}
             ]}
         ],
-        temperature=0,
-    )
+        "temperature": 0,
+    })
 
     content = _extract_output_text(response)
     return _parse_json(content)
@@ -197,17 +245,17 @@ def detect_doc_type(pdf_path: str) -> str:
     with open(pdf_path, "rb") as f:
         file_obj = client.files.create(file=f, purpose="assistants")
 
-    resp = client.responses.create_and_poll(
-        model=MODEL,
-        input=[
+    resp = _create_response({
+        "model": MODEL,
+        "input": [
             {"role": "system", "content": "You are an expert in Czech accounting."},
             {"role": "user", "content": [
                 {"type": "input_text", "text": PROMPT_DETECT},
                 {"type": "input_file", "file_id": file_obj.id}
             ]}
         ],
-        temperature=0,
-    )
+        "temperature": 0,
+    })
 
     result = _extract_output_text(resp).lower()
     return "income" if "income" in result else "balance"
@@ -218,17 +266,17 @@ def detect_doc_type_and_year(pdf_path: str) -> dict:
     with open(pdf_path, "rb") as f:
         file_obj = client.files.create(file=f, purpose="assistants")
 
-    response = client.responses.create_and_poll(
-        model=MODEL,
-        input=[
+    response = _create_response({
+        "model": MODEL,
+        "input": [
             {"role": "system", "content": "Jsi expert na české účetnictví."},
             {"role": "user", "content": [
                 {"type": "input_text", "text": PROMPT_DETECT_TYPE_YEAR},
                 {"type": "input_file", "file_id": file_obj.id}
             ]}
         ],
-        temperature=0,
-    )
+        "temperature": 0,
+    })
 
     result = _extract_output_text(response)
     data = _parse_json(result)
@@ -316,11 +364,7 @@ def calculate_metrics(income_data: dict, balance_data: dict = None) -> dict:
         "net_profit": net_profit,
         
         # Profitability pro template
-        "profitability": {
-            "gm_pct": gross_margin_pct,
-            "op_pct": (ebit / revenue * 100) if revenue > 0 else 0,
-            "np_pct": (net_profit / revenue * 100) if revenue > 0 else 0,
-        }
+        "profitability": compute_profitability(revenue, gross_margin, ebit, net_profit),
     }
     
     # Přidej rozvahová data, pokud jsou k dispozici
@@ -339,11 +383,6 @@ def calculate_yoy_growth(current_year_data: dict, previous_year_data: dict) -> d
     - COGS Growth % = (COGS_Y - COGS_Y-1) / COGS_Y-1 × 100
     - Overheads Growth % = (Overheads_Y - Overheads_Y-1) / Overheads_Y-1 × 100
     """
-    def growth(current, previous):
-        if previous and previous != 0:
-            return (current - previous) / abs(previous) * 100
-        return None
-    
     return {
         "revenue": growth(
             current_year_data.get("revenue", 0),
@@ -368,60 +407,3 @@ def calculate_yoy_growth(current_year_data: dict, previous_year_data: dict) -> d
     }
 
 
-def calculate_cash_flow(current_year: dict, previous_year: dict = None) -> dict:
-    """
-    Počítá cash flow metriky
-    
-    3.1 Cash from Customers ≈ Revenue ± Δ(Pohledávky)
-    3.2 Cash to Suppliers ≈ COGS ± Δ(Zásoby) + Δ(Závazky)
-    3.3 Gross Cash Profit = Cash from Customers - Cash to Suppliers
-    3.4 OCF = Net Profit + Odpisy ± ΔWorking Capital
-    """
-    revenue = current_year.get("revenue", 0)
-    cogs = current_year.get("cogs", 0)
-    services = current_year.get("services", 0)
-    net_profit = current_year.get("net_profit", 0)
-    depreciation = current_year.get("depreciation", 0)
-    
-    # Delta hodnoty (pokud máme předchozí rok)
-    delta_receivables = 0
-    delta_inventory = 0
-    delta_liabilities = 0
-    
-    if previous_year:
-        delta_receivables = (
-            current_year.get("receivables", 0) - 
-            previous_year.get("receivables", 0)
-        )
-        delta_inventory = (
-            current_year.get("inventory", 0) - 
-            previous_year.get("inventory", 0)
-        )
-        delta_liabilities = (
-            current_year.get("short_term_liabilities", 0) - 
-            previous_year.get("short_term_liabilities", 0)
-        )
-    
-    # 3.1 Cash from Customers
-    cash_from_customers = revenue - delta_receivables
-    
-    # 3.2 Cash to Suppliers
-    cash_to_suppliers = cogs + services - delta_inventory - delta_liabilities
-    
-    # 3.3 Gross Cash Profit
-    gross_cash_profit = cash_from_customers - cash_to_suppliers
-    
-    # 3.4 Operating Cash Flow
-    working_capital_change = delta_inventory + delta_receivables - delta_liabilities
-    operating_cf = net_profit + depreciation - working_capital_change
-    
-    return {
-        "cash_from_customers": cash_from_customers,
-        "cash_to_suppliers": cash_to_suppliers,
-        "gross_cash_profit": gross_cash_profit,
-        "operating_cf": operating_cf,
-        "working_capital_change": working_capital_change,
-        "delta_receivables": delta_receivables,
-        "delta_inventory": delta_inventory,
-        "delta_liabilities": delta_liabilities,
-    }
