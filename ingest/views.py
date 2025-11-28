@@ -53,14 +53,27 @@ def _process_uploaded_file(user, uploaded_file):
             analyzed=True,
         )
 
+        existing_fs = FinancialStatement.objects.filter(
+            owner=user, year=year, doc_type=doc_type_db
+        ).first()
+
+        merged_data = {}
+        if existing_fs and isinstance(existing_fs.data, dict):
+            merged_data.update(existing_fs.data)
+        for key, value in (data or {}).items():
+            if value not in (None, 0):
+                merged_data[key] = value
+
+        merged_scale = scale or (existing_fs.scale if existing_fs else "units")
+
         FinancialStatement.objects.update_or_create(
             owner=user,
             year=year,
             doc_type=doc_type_db,
             defaults={
-                "data": data,
+                "data": merged_data,
                 "document": doc,
-                "scale": scale,
+                "scale": merged_scale,
             },
         )
 
@@ -255,14 +268,29 @@ def process_pdf(request, document_id):
         parsed = parse_financial_pdf(doc.file.path)
         parsed = _ensure_parsed(parsed)
 
+        existing_fs = FinancialStatement.objects.filter(
+            owner=request.user,
+            year=parsed["year"],
+            doc_type=parsed["doc_type"],
+        ).first()
+
+        merged_data = {}
+        if existing_fs and isinstance(existing_fs.data, dict):
+            merged_data.update(existing_fs.data)
+        for key, value in (parsed.get("data") or {}).items():
+            if value not in (None, 0):
+                merged_data[key] = value
+
+        merged_scale = parsed.get("scale") or (existing_fs.scale if existing_fs else "units")
+
         FinancialStatement.objects.update_or_create(
             owner=request.user,
             year=parsed["year"],
             doc_type=parsed["doc_type"],
             defaults={
-                "data": parsed["data"],
+                "data": merged_data,
                 "document": doc,
-                **({"scale": parsed.get("scale")} if hasattr(FinancialStatement, "scale") else {}),
+                "scale": merged_scale,
             }
         )
 
