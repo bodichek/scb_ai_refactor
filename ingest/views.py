@@ -41,7 +41,7 @@ def _process_uploaded_file(user, uploaded_file):
             raise ValueError("Parser nevrátil typ nebo rok.")
 
         # Document – pouzivas sve stare hodnoty (napr. income/balance),
-        # pokud je treba, muzes tady namapovat:
+        # pokud je treba, muzes tady namapovat: 
         # doc_type_db = map_doc_type(doc_type)
         doc_type_db = doc_type  # pokud mas v DB uz nove nazvy
 
