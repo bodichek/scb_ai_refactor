@@ -1,409 +1,261 @@
+# ingest/ai_parser_refactored.py
+
 """
-Refaktorovaný AI parser pro finanční výkazy
-Parsuje pouze nezbytná data podle zadaných vzorců
+Universal AI parser for Czech financial PDF statements.
+
+- Sends full PDF (OCR + layout) to OpenAI Responses API
+- Detects doc_type, year, scale
+- Extracts only the "bezne obdobi" (current period) column
+- Returns unified dict: {"doc_type", "year", "scale", "data"}
 """
+
 import json
+import logging
+from typing import Any, Dict
+
 from django.conf import settings
 from openai import OpenAI
-from finance.utils import compute_profitability, growth
+
+logger = logging.getLogger(__name__)
 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
-MODEL = settings.OPENAI_MODEL or "gpt-4o-mini"
+MODEL = getattr(settings, "OPENAI_MODEL", None) or "gpt-4o-mini"
 
 
-def _extract_output_text(response) -> str:
-    """
-    Vrátí textový výstup z Responses API i v případech,
-    kdy není k dispozici pomocný atribut `output_text`.
-    """
-    text = (getattr(response, "output_text", None) or "").strip()
-    if text:
-        return text
+# --------------------------------------------------------------------
+# PROMPT – čistý text, bez diakritiky, aby nebyly potize s encodingem
+# --------------------------------------------------------------------
+PROMPT_UNIVERSAL = """
+You are an AI parser for Czech financial PDF documents
+("vykaz zisku a ztraty" = income statement, "rozvaha" = balance sheet).
 
-    output = getattr(response, "output", None) or []
-    for item in output:
-        for content in getattr(item, "content", []):
-            value = getattr(content, "text", None)
-            if hasattr(value, "value"):
-                value = value.value
-            if value:
-                return str(value).strip()
-    return ""
+Your task:
 
+1) Read the entire PDF (OCR + layout).
+2) Decide the document type:
 
-def _create_response(payload: dict):
-    """
-    Zavolá Responses API; pokud chybí create_and_poll (starší SDK), použije create.
-    """
-    try:
-        return client.responses.create_and_poll(**payload)
-    except AttributeError:
-        return client.responses.create(**payload)
+   - "income_statement"  for "vykaz zisku a ztraty"
+   - "balance_sheet"     for "rozvaha"
 
+3) Detect the report year (for example 2019..2025).
 
-def _parse_json(content: str) -> dict:
-    """Bezpečně naparsuje JSON, i když model přidal text okolo."""
-    if not content:
-        return {}
-    try:
-        return json.loads(content)
-    except Exception:
-        import re
+4) Detect the scale:
+   - If the document mentions "v tis. Kc", "v tisicich Kc"
+     or similar phrase meaning "in thousands CZK", then:
+       "scale": "thousands"
+   - Otherwise:
+       "scale": "units"
 
-        match = re.search(r"\{.*\}", content, re.S)
-        if match:
-            try:
-                return json.loads(match.group(0))
-            except Exception:
-                return {}
-    return {}
+5) Extract ONLY values from the column for the current period
+   ("bezne obdobi" or equivalent). Ignore any previous period columns.
 
-# ============================================================================
-# PROMPTY PRO AI PARSOVÁNÍ
-# ============================================================================
+6) Fill a JSON object with this structure:
 
-PROMPT_INCOME = """
-Jsi expert na české účetnictví.
-Dostáváš VÝKAZ ZISKU A ZTRÁTY (Income Statement).
-
-DŮLEŽITÉ - Normalizace částek:
-- Zjisti, zda dokument uvádí hodnoty v tisících Kč (fráze jako "v tis. Kč", "tisíce Kč" apod.)
-- Pokud ANO: všechny hodnoty vynásob 1000, aby JSON obsahoval absolutní částky v Kč
-- Pokud už dokument používá plné částky v Kč: ponech hodnoty beze změny
-
-KRITICKÉ - Služby (Services):
-- Služby NEJSOU součástí COGS
-- Služby patří do režijních nákladů (Overheads)
-- Vrať je samostatně v klíči "services"
-
-Extrahuj následující hodnoty a vrať POUZE validní JSON:
 {
-  "revenue_products_services": number,
-  "revenue_goods": number,
-  "cogs_goods": number,
-  "cogs_materials": number,
-  "services": number,
-  "personnel_wages": number,
-  "personnel_insurance": number,
-  "taxes_fees": number,
-  "depreciation": number,
-  "other_operating_costs": number,
-  "other_operating_revenue": number,
-  "financial_revenue": number,
-  "financial_costs": number,
-  "income_tax": number
+  "doc_type": "income_statement" or "balance_sheet",
+  "year": 2023,
+  "scale": "units" or "thousands",
+  "data": {
+    ... numeric fields or null ...
+  }
 }
 
-Mapování českých účetních položek:
-- revenue_products_services: "Tržby za prodej vlastních výrobků a služeb" (obvykle I.)
-- revenue_goods: "Tržby z prodeje zboží" (obvykle II.)
-- cogs_goods: "Náklady na prodané zboží" (v sekci A)
-- cogs_materials: "Spotřeba materiálu a energie" (v sekci A, Výkonová spotřeba)
-- services: "Služby" (v sekci A, Výkonová spotřeba) - SAMOSTATNĚ!
-- personnel_wages: "Mzdové náklady" (v sekci D, Osobní náklady)
-- personnel_insurance: "Zákonné sociální a zdravotní pojištění" (v sekci D)
-- taxes_fees: "Daně a poplatky" (obvykle před Odpisy)
-- depreciation: "Odpisy dlouhodobého nehmotného a hmotného majetku"
-- other_operating_costs: "Ostatní provozní náklady"
-- other_operating_revenue: "Ostatní provozní výnosy"
-- financial_revenue: "Finanční výnosy"
-- financial_costs: "Finanční náklady"
-- income_tax: "Daň z příjmů"
+Allowed fields inside "data":
 
-Vrať pouze čísla, ne stringy. Pokud položka chybí, vrať 0.
-"""
+If doc_type = "income_statement", you MAY include some or all of:
+- "revenue_products_services"
+- "revenue_goods"
+- "revenue"
 
-PROMPT_BALANCE = """
-Jsi expert na české účetnictví.
-Dostáváš ROZVAHU (Balance Sheet).
+- "cogs_goods"
+- "cogs_materials"
+- "cogs"
 
-DŮLEŽITÉ - Normalizace částek:
-- Zjisti, zda dokument uvádí hodnoty v tisících Kč (fráze jako "v tis. Kč", "tisíce Kč" apod.)
-- Pokud ANO: všechny hodnoty vynásob 1000, aby JSON obsahoval absolutní částky v Kč
-- Pokud už dokument používá plné částky v Kč: ponech hodnoty beze změny
+- "services"
 
-Extrahuj následující hodnoty a vrať POUZE validní JSON:
-{
-  "receivables": number,
-  "inventory": number,
-  "short_term_liabilities": number,
-  "cash": number
-}
+- "personnel_wages"
+- "personnel_insurance"
 
-Mapování:
-- receivables: "Krátkodobé pohledávky" nebo "Pohledávky z obchodních vztahů"
-- inventory: "Zásoby"
-- short_term_liabilities: "Krátkodobé závazky" (celkem)
-- cash: "Krátkodobý finanční majetek" nebo "Peníze"
+- "taxes_fees"
+- "depreciation"
+- "other_operating_costs"
+- "other_operating_revenue"
 
-Vrať pouze čísla, ne stringy. Pokud položka chybí, vrať 0.
-"""
+- "financial_revenue"
+- "financial_costs"
 
-PROMPT_DETECT = """
-You are an expert in Czech accounting.
-Decide if the uploaded PDF is an Income Statement (výkaz zisku a ztráty) or a Balance Sheet (rozvaha).
-Respond ONLY with one word: 'income' or 'balance'.
-"""
+- "income_tax"
+- "ebit"
+- "net_profit"
 
-PROMPT_DETECT_TYPE_YEAR = """
-Jsi expert na české účetnictví.
-Uživatel nahrává český finanční výkaz (PDF).
+If doc_type = "balance_sheet", you MAY include some or all of:
+- "receivables"
+- "inventory"
+- "short_term_liabilities"
+- "cash"
 
-Tvůj úkol:
-1. Urči, zda je dokument Výkaz zisku a ztráty (income) nebo Rozvaha (balance)
-2. Zjisti, kterého roku se dokument týká (obvykle "Rok 2023", "2022" apod.)
-3. Odpověz POUZE ve striktním JSON formátu:
+- "tangible_assets"
+- "total_assets"
+- "equity"
+- "total_liabilities"
 
-{ "type": "income" nebo "balance", "year": 2020-2025 (integer) }
+- "trade_payables"
+- "short_term_loans"
+- "long_term_loans"
+
+RULES:
+
+- Use ONLY numbers or null as values.
+- Do NOT compute any derived metrics.
+- Do NOT return percentages.
+- Do NOT normalize or scale the values, just copy numbers as printed in
+  the selected "current period" column.
+- If a field cannot be found, use null or simply omit the field.
+- The JSON must be syntactically valid.
+
+VERY IMPORTANT:
+
+- Return a SINGLE JSON object only.
+- Do NOT include any explanation, comments, Markdown, or code fences.
+- Do NOT wrap the JSON in ```json ... ``` or any other text.
 """
 
 
-# ============================================================================
-# ZÁKLADNÍ VOLÁNÍ OPENAI API
-# ============================================================================
-
-def _call_openai(prompt: str, pdf_path: str) -> dict:
-    """Základní volání OpenAI pro analýzu PDF."""
-    with open(pdf_path, "rb") as f:
-        file_obj = client.files.create(file=f, purpose="assistants")
-
-    response = _create_response({
-        "model": MODEL,
-        "input": [
-            {"role": "system", "content": "Jsi parser finančních výkazů. Vždy vracíš JSON."},
-            {"role": "user", "content": [
-                {"type": "input_text", "text": prompt},
-                {"type": "input_file", "file_id": file_obj.id}
-            ]}
-        ],
-        "temperature": 0,
-    })
-
-    content = _extract_output_text(response)
-    return _parse_json(content)
-
-
-# ============================================================================
-# PARSOVÁNÍ VÝSLEDOVKY
-# ============================================================================
-
-def analyze_income(pdf_path: str) -> dict:
+# --------------------------------------------------------------------
+# Helper: extract text from Responses API
+# --------------------------------------------------------------------
+def _extract_output_text(resp) -> str:
     """
-    Parsuje výsledovku a vrací surová data z PDF.
-    Výpočty se dělají později v kalkulačních funkcích.
+    Extract textual content from the Responses API result.
+
+    For current openai>=1.x the shape is usually:
+      resp.output[0].content[0].text.value
+    We keep this defensive so that small API changes do not crash parsing.
     """
-    data = _call_openai(PROMPT_INCOME, pdf_path)
-    
-    # Vrať pouze parsovaná pole (bez výpočtů)
-    fields = [
-        "revenue_products_services",
-        "revenue_goods", 
-        "cogs_goods",
-        "cogs_materials",
-        "services",
-        "personnel_wages",
-        "personnel_insurance",
-        "taxes_fees",
-        "depreciation",
-        "other_operating_costs",
-        "other_operating_revenue",
-        "financial_revenue",
-        "financial_costs",
-        "income_tax"
-    ]
-    
-    return {k: float(data.get(k, 0)) for k in fields}
+    out = getattr(resp, "output", None)
+    if out:
+        try:
+            content = out[0].content[0].text
+            return getattr(content, "value", content)
+        except Exception:
+            logger.warning("Failed to read resp.output[0].content[0].text", exc_info=True)
+
+    # Fallback if the client exposes output_text directly
+    if hasattr(resp, "output_text"):
+        return resp.output_text
+
+    raise ValueError("OpenAI response does not contain readable text.")
 
 
-# ============================================================================
-# PARSOVÁNÍ ROZVAHY
-# ============================================================================
-
-def analyze_balance(pdf_path: str) -> dict:
-    """Parsuje rozvahu a vrací základní položky pro cash flow výpočty"""
-    data = _call_openai(PROMPT_BALANCE, pdf_path)
-    
-    fields = [
-        "receivables",
-        "inventory", 
-        "short_term_liabilities",
-        "cash"
-    ]
-    
-    return {k: float(data.get(k, 0)) for k in fields}
 
 
-# ============================================================================
-# DETEKCE TYPU A ROKU
-# ============================================================================
-
-def detect_doc_type(pdf_path: str) -> str:
+# --------------------------------------------------------------------
+# Helper: clean JSON from Markdown / garbage
+# --------------------------------------------------------------------
+def _clean_json_text(raw: str) -> str:
     """
-    Původní detekce typu (fallback).
-    Vrací 'income' nebo 'balance'.
+    Strip code fences and extra text so that json.loads() can work.
+
+    - removes ```json ... ``` wrappers
+    - trims everything outside the outermost { ... }
     """
-    with open(pdf_path, "rb") as f:
-        file_obj = client.files.create(file=f, purpose="assistants")
+    if not raw:
+        return ""
 
-    resp = _create_response({
-        "model": MODEL,
-        "input": [
-            {"role": "system", "content": "You are an expert in Czech accounting."},
-            {"role": "user", "content": [
-                {"type": "input_text", "text": PROMPT_DETECT},
-                {"type": "input_file", "file_id": file_obj.id}
-            ]}
-        ],
-        "temperature": 0,
-    })
+    text = raw.strip()
 
-    result = _extract_output_text(resp).lower()
-    return "income" if "income" in result else "balance"
+    # remove ```json / ``` fences if present
+    if text.startswith("```"):
+        lines = text.splitlines()
+        # drop first line if it is a fence
+        if lines and lines[0].strip().startswith("```"):
+            lines = lines[1:]
+        # drop last line if it is a fence
+        if lines and lines[-1].strip().startswith("```"):
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+
+    # keep only from first '{' to last '}'
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        text = text[start : end + 1]
+
+    return text.strip()
 
 
-def detect_doc_type_and_year(pdf_path: str) -> dict:
-    """Rozpozná typ dokumentu a rok"""
-    with open(pdf_path, "rb") as f:
-        file_obj = client.files.create(file=f, purpose="assistants")
-
-    response = _create_response({
-        "model": MODEL,
-        "input": [
-            {"role": "system", "content": "Jsi expert na české účetnictví."},
-            {"role": "user", "content": [
-                {"type": "input_text", "text": PROMPT_DETECT_TYPE_YEAR},
-                {"type": "input_file", "file_id": file_obj.id}
-            ]}
-        ],
-        "temperature": 0,
-    })
-
-    result = _extract_output_text(response)
-    data = _parse_json(result)
-
-    return {
-        "type": data.get("type", "income"),
-        "year": int(data.get("year", 2025)),
+# --------------------------------------------------------------------
+# Main entry point for the rest of the app
+# --------------------------------------------------------------------
+def parse_financial_pdf(pdf_path: str) -> Dict[str, Any]:
+    """
+    Send the given PDF path to OpenAI and return a dict:
+    {
+      "doc_type": "income_statement" | "balance_sheet" | None,
+      "year": int | None,
+      "scale": "units" | "thousands",
+      "data": { ... }  # raw fields, no derived metrics
     }
-
-
-# ============================================================================
-# VÝPOČETNÍ FUNKCE (používají parsovaná data)
-# ============================================================================
-
-def calculate_metrics(income_data: dict, balance_data: dict = None) -> dict:
     """
-    Počítá všechny odvozené metriky podle zadaných vzorců.
-    
-    Vstupy:
-    - income_data: dict s parsovanými hodnotami z výsledovky
-    - balance_data: dict s parsovanými hodnotami z rozvahy (volitelné)
-    
-    Výstupy:
-    - dict se všemi metrikami (parsované + vypočítané)
-    """
-    
-    # Základní parsované hodnoty
-    rev_products = income_data.get("revenue_products_services", 0)
-    rev_goods = income_data.get("revenue_goods", 0)
-    cogs_goods = income_data.get("cogs_goods", 0)
-    cogs_materials = income_data.get("cogs_materials", 0)
-    services = income_data.get("services", 0)
-    personnel_wages = income_data.get("personnel_wages", 0)
-    personnel_insurance = income_data.get("personnel_insurance", 0)
-    taxes_fees = income_data.get("taxes_fees", 0)
-    depreciation = income_data.get("depreciation", 0)
-    other_op_costs = income_data.get("other_operating_costs", 0)
-    other_op_revenue = income_data.get("other_operating_revenue", 0)
-    fin_revenue = income_data.get("financial_revenue", 0)
-    fin_costs = income_data.get("financial_costs", 0)
-    income_tax = income_data.get("income_tax", 0)
-    
-    # 1.1 Revenue
-    revenue = rev_products + rev_goods
-    
-    # 1.2 COGS (BEZ služeb!)
-    cogs = cogs_goods + cogs_materials
-    
-    # 1.3 Gross Margin
-    gross_margin = revenue - cogs
-    
-    # 1.4 Gross Margin %
-    gross_margin_pct = (gross_margin / revenue * 100) if revenue > 0 else 0
-    
-    # 1.5 Overheads (včetně služeb!)
-    overheads = (
-        services +
-        personnel_wages + 
-        personnel_insurance +
-        taxes_fees +
-        depreciation +
-        other_op_costs
-    )
-    
-    # 1.6 Operating Profit (EBIT)
-    ebit = gross_margin - overheads + other_op_revenue
-    
-    # 1.7 Net Profit
-    ebt = ebit + fin_revenue - fin_costs
-    net_profit = ebt - income_tax
-    
-    # Vrať kompletní dataset
-    result = {
-        # Parsovaná data
-        **income_data,
-        
-        # Vypočítané metriky
-        "revenue": revenue,
-        "cogs": cogs,
-        "gross_margin": gross_margin,
-        "gross_margin_pct": gross_margin_pct,
-        "overheads": overheads,
-        "ebit": ebit,
-        "ebt": ebt,
-        "net_profit": net_profit,
-        
-        # Profitability pro template
-        "profitability": compute_profitability(revenue, gross_margin, ebit, net_profit),
-    }
-    
-    # Přidej rozvahová data, pokud jsou k dispozici
-    if balance_data:
-        result.update(balance_data)
-    
-    return result
+    try:
+        # 1) Upload the PDF
+        with open(pdf_path, "rb") as f:
+            file_obj = client.files.create(file=f, purpose="user_data")
 
+        # 2) Call Responses API synchronously (no poll, no wait)
+        resp = client.responses.create(
+            model=MODEL,
+            input=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": PROMPT_UNIVERSAL},
+                        {"type": "input_file", "file_id": file_obj.id},
+                    ],
+                }
+            ],
+            temperature=0,
+        )
 
-def calculate_yoy_growth(current_year_data: dict, previous_year_data: dict) -> dict:
-    """
-    Počítá meziroční růst (Year-over-Year)
-    
-    Vzorce:
-    - Revenue Growth % = (Revenue_Y - Revenue_Y-1) / Revenue_Y-1 × 100
-    - COGS Growth % = (COGS_Y - COGS_Y-1) / COGS_Y-1 × 100
-    - Overheads Growth % = (Overheads_Y - Overheads_Y-1) / Overheads_Y-1 × 100
-    """
-    return {
-        "revenue": growth(
-            current_year_data.get("revenue", 0),
-            previous_year_data.get("revenue", 0)
-        ),
-        "cogs": growth(
-            current_year_data.get("cogs", 0),
-            previous_year_data.get("cogs", 0)
-        ),
-        "overheads": growth(
-            current_year_data.get("overheads", 0),
-            previous_year_data.get("overheads", 0)
-        ),
-        "ebit": growth(
-            current_year_data.get("ebit", 0),
-            previous_year_data.get("ebit", 0)
-        ),
-        "net_profit": growth(
-            current_year_data.get("net_profit", 0),
-            previous_year_data.get("net_profit", 0)
-        ),
-    }
+        # 3) Extract raw text from the response
+        raw_text = _extract_output_text(resp)
 
+        # 4) Try to decode JSON (with cleaning)
+        cleaned = _clean_json_text(raw_text)
+        try:
+            data = json.loads(cleaned)
+        except json.JSONDecodeError as e:
+            logger.error(
+                "JSON decode error while parsing financial PDF: %s\nRAW OUTPUT:\n%s",
+                e,
+                raw_text,
+                exc_info=True,
+            )
+            # fall through to general exception handler below
+            raise
+        print("\n================ PARSED JSON FROM OPENAI ================")
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+        print("=========================================================\n")
 
+        doc_type = data.get("doc_type")
+        year = data.get("year")
+        scale = data.get("scale", "units")
+        payload = data.get("data", {}) or {}
+
+        # basic sanity check – at least doc_type + year must exist
+        if doc_type not in ("income_statement", "balance_sheet") or not isinstance(
+            year, int
+        ):
+            raise ValueError(f"Invalid doc_type/year in parsed data: {doc_type!r}/{year!r}")
+
+        return {
+            "doc_type": doc_type,
+            "year": year,
+            "scale": scale,
+            "data": payload,
+        }
+
+    except Exception as e:
+        # One central place, aby se neshazovala aplikace – jen log a fallback
+        logger.error(f"PDF parsing failed: {e}", exc_info=True)
+        return {"doc_type": None, "year": None, "scale": "units", "data": {}}

@@ -40,6 +40,7 @@ def _clean_text(text):
         return text.strip()
     return str(text).strip()
 
+
 def _compute_overheads(data: dict) -> float:
     """Prefer sums of components; fall back to stored overhead totals."""
     return compute_overheads(data)
@@ -58,20 +59,25 @@ def _get_metric(data: dict, keys, default=None):
 
 def _get_cogs_value(data: dict) -> float:
     """
-    Vrátí COGS očištěné o služby pouze u legacy dat, kde byly služby součástí COGS.
-    U nového schématu (snake_case) je `cogs` už bez služeb, takže ho necháváme beze změny.
+    Vrátí COGS:
+
+    - U legacy dat (TitleCase "COGS") očistí COGS o služby, protože byly součástí COGS.
+    - U nového schématu (snake_case `cogs`) služby už součástí nejsou → neodečítáme.
+
+    Tím zabráníme situaci, kdy se služby odečtou dvakrát a COGS spadne na 0.
     """
     services = _get_metric(data, ("services", "Services"))
 
-    # 1) Legacy: TitleCase COGS (služby byly součástí COGS)
+    # Legacy: uložené "COGS" (TitleCase) – historicky obsahovalo i služby
     legacy_cogs = _get_metric(data, ("COGS",), None)
     if legacy_cogs is not None:
         if services is not None and services > 0 and legacy_cogs > 0:
             return max(legacy_cogs - services, 0.0)
         return legacy_cogs
 
-    # 2) Nové schéma: snake_case `cogs` už NEOBSAHUJE services → neodečítáme
+    # Nové schéma: snake_case `cogs` je už BEZ služeb
     return _get_metric(data, ("cogs",), 0.0)
+
 
 def _extract_recommendation_points(text, max_points=5):
     if not text:
@@ -151,7 +157,6 @@ def _extract_recommendation_points(text, max_points=5):
     return points[:max_points]
 
 
-
 def _build_cashflow_table(cf):
     if not cf:
         return []
@@ -208,26 +213,25 @@ def _get_openai_client():
 def build_dashboard_context(target_user):
     statements = FinancialStatement.objects.filter(owner=target_user).order_by("year")
 
-
     rows = []
     for s in statements:
         d = s.data or {}
 
-        # Base metrics with TitleCase/snake_case fallback
-        revenue = _get_metric(d, ("Revenue", "revenue"), 0.0)
+        # Base metrics with snake_case/TitleCase fallback (prefer snake_case)
+        revenue = _get_metric(d, ("revenue", "Revenue"), 0.0)
         cogs = _get_cogs_value(d)
-        gross_margin = _get_metric(d, ("GrossMargin", "gross_margin"))
+        gross_margin = _get_metric(d, ("gross_margin", "GrossMargin"))
         if gross_margin is None:
             gross_margin = revenue - cogs
 
         depreciation = _get_metric(d, ("depreciation", "Depreciation"), 0.0)
         overheads = _compute_overheads(d)
 
-        ebit = _get_metric(d, ("EBIT", "ebit"))
+        ebit = _get_metric(d, ("ebit", "EBIT"))
         if ebit is None:
             ebit = gross_margin - overheads
 
-        net_profit = _get_metric(d, ("NetProfit", "net_profit"))
+        net_profit = _get_metric(d, ("net_profit", "NetProfit"))
         if net_profit is None:
             net_profit = revenue - cogs - overheads
 
@@ -261,7 +265,7 @@ def build_dashboard_context(target_user):
                 "overheads": growth(r["overheads"], prev["overheads"]),
             }
 
-# 📈 Insights from survey responses
+    # 📈 Insights from survey responses
     survey_history = []
     latest_submission = None
     submissions_qs = SurveySubmission.objects.filter(user=target_user).order_by("created_at")
@@ -391,7 +395,7 @@ def build_dashboard_context(target_user):
         "ebit": [r["ebit"] for r in rows],
     }
 
-    # ðŸ’° Výpočet cash flow pro poslední rok (póvodní logika)
+    # 💰 Výpočet cash flow pro poslední rok
     cf = None
     selected_year = years[-1] if years else None
     cashflow_table = []
@@ -413,7 +417,7 @@ def build_dashboard_context(target_user):
         "company_score": company_score,
         "score_trend": score_trend,
         "score_history": json.dumps([
-            {"label": (item["ts"].strftime("%d.%m.%Y") if item["ts"] else str(idx)), "value": item["value"]}
+            {"label": (item["ts"].strftime("%d.%m.%Y") if item["ts"] else str(idx)), "value": item["value"]}  # noqa: E501
             for idx, item in enumerate(survey_history)
         ]),
         "mood_label": mood_label,
@@ -456,10 +460,9 @@ def api_cashflow(request, year):
     return HttpResponse(html)
 
 
-
 @csrf_exempt
 def save_chart(request):
-    """UloÅ¾Ã­ pÅ™ijatÃ½ base64 PNG z frontendu do MEDIA_ROOT/charts/."""
+    """Uloží přijatý base64 PNG z frontendu do MEDIA_ROOT/charts/."""
     if request.method == "POST":
         data = json.loads(request.body)
         image_data = data.get("image")
@@ -476,7 +479,7 @@ def save_chart(request):
         except Exception as e:
             return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
-        # ðŸŸ¢ Ujisti se, Å¾e sloÅ¾ka charts existuje
+        # 🧱 Ujisti se, že složka charts existuje
         charts_dir = os.path.join(settings.MEDIA_ROOT, "charts")
         os.makedirs(charts_dir, exist_ok=True)
 
@@ -486,7 +489,7 @@ def save_chart(request):
         with open(file_path, "wb") as f:
             f.write(image_binary)
 
-        print(f"âœ… Graf uloÅ¾en: {file_path}")  # volitelnÃ½ log
+        print(f"✅ Graf uložen: {file_path}")  # volitelný log
         return JsonResponse({"status": "ok", "file": file_path})
 
     return JsonResponse({"status": "error", "message": "invalid method"}, status=405)
@@ -546,17 +549,17 @@ def ask_coach(request):
 
 def export_full_pdf(request):
     """
-    VytvoÅ™Ã­ PDF, do kterÃ©ho vloÅ¾Ã­ vÅ¡echny PNG grafy z MEDIA_ROOT
+    Vytvoří PDF, do kterého vloží všechny PNG grafy z MEDIA_ROOT
     """
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     elements = []
     styles = getSampleStyleSheet()
 
-    elements.append(Paragraph("ðŸ“Š Financial Dashboard", styles["Title"]))
+    elements.append(Paragraph("📊 Financial Dashboard", styles["Title"]))
     elements.append(Spacer(1, 12))
 
-    # projdi vÅ¡echny chart_*.png v MEDIA_ROOT
+    # projdi všechny chart_*.png v MEDIA_ROOT
     for fname in sorted(os.listdir(settings.MEDIA_ROOT)):
         if fname.startswith("chart_") and fname.endswith(".png"):
             chart_path = os.path.join(settings.MEDIA_ROOT, fname)
@@ -571,30 +574,30 @@ def export_full_pdf(request):
 
 def api_metrics_series(request):
     """
-    VrÃ¡tÃ­ ÄasovÃ© Å™ady klÃ­ÄovÃ½ch metrik a YoY rÅ¯sty pro pÅ™ihlÃ¡Å¡enÃ©ho uÅ¾ivatele.
+    Vrátí časové řady klíčových metrik a YoY růsty pro přihlášeného uživatele.
     """
     if not request.user.is_authenticated:
         return JsonResponse({
             "success": False,
-            "error": {"code": "UNAUTHORIZED", "message": "PÅ™ihlaste se."}
+            "error": {"code": "UNAUTHORIZED", "message": "Přihlaste se."}
         }, status=401)
 
     statements = FinancialStatement.objects.filter(owner=request.user).order_by("year")
     rows = []
     for s in statements:
         d = s.data or {}
-        revenue = _get_metric(d, ("Revenue", "revenue"), 0.0)
+        revenue = _get_metric(d, ("revenue", "Revenue"), 0.0)
         cogs = _get_cogs_value(d)
         overheads = _compute_overheads(d)
-        gross_margin = _get_metric(d, ("GrossMargin", "gross_margin"))
+        gross_margin = _get_metric(d, ("gross_margin", "GrossMargin"))
         if gross_margin is None:
             gross_margin = revenue - cogs
 
-        ebit = _get_metric(d, ("EBIT", "ebit"))
+        ebit = _get_metric(d, ("ebit", "EBIT"))
         if ebit is None:
             ebit = gross_margin - overheads
 
-        net_profit = _get_metric(d, ("NetProfit", "net_profit"))
+        net_profit = _get_metric(d, ("net_profit", "NetProfit"))
         if net_profit is None:
             net_profit = revenue - cogs - overheads
         rows.append({
@@ -652,6 +655,7 @@ def api_metrics_series(request):
         "yoy": yoy,
     })
 
+
 @login_required
 def api_profitability(request):
     """Vrací přehled ziskovosti (náhrada za templates/dashboard/profitability.html)."""
@@ -659,16 +663,16 @@ def api_profitability(request):
     rows = []
     for stmt in statements:
         data = stmt.data or {}
-        revenue = _get_metric(data, ("Revenue", "revenue"), 0.0)
+        revenue = _get_metric(data, ("revenue", "Revenue"), 0.0)
         cogs = _get_cogs_value(data)
         overheads = _compute_overheads(data)
-        gross_margin = _get_metric(data, ("GrossMargin", "gross_margin"))
+        gross_margin = _get_metric(data, ("gross_margin", "GrossMargin"))
         if gross_margin is None:
             gross_margin = revenue - cogs
-        ebit = _get_metric(data, ("EBIT", "ebit"))
+        ebit = _get_metric(data, ("ebit", "EBIT"))
         if ebit is None:
             ebit = gross_margin - overheads
-        net_profit = _get_metric(data, ("NetProfit", "net_profit"))
+        net_profit = _get_metric(data, ("net_profit", "NetProfit"))
         if net_profit is None:
             net_profit = revenue - cogs - overheads
 
@@ -721,5 +725,3 @@ def api_cashflow_summary(request):
         "current_year": selected_year,
         "cashflow": cf,
     })
-
-

@@ -19,6 +19,10 @@ from suropen.views import (
 from suropen.models import OpenAnswer
 
 
+# ============================================================
+# Wizard step definitions
+# ============================================================
+
 WIZARD_STEPS = [
     {"id": OnboardingProgress.Steps.UPLOAD, "label": "Nahrát PDF"},
     {"id": OnboardingProgress.Steps.SURVEY, "label": "Firemní dotazník"},
@@ -26,8 +30,12 @@ WIZARD_STEPS = [
     {"id": OnboardingProgress.Steps.DONE, "label": "Hotovo"},
 ]
 
-SURVEY_QUESTION_INDEX = {question["question"]: idx for idx, question in enumerate(SURVEY_QUESTIONS)}
+SURVEY_QUESTION_INDEX = {q["question"]: i for i, q in enumerate(SURVEY_QUESTIONS)}
 
+
+# ============================================================
+# Helper utilities
+# ============================================================
 
 def _get_progress(user):
     progress, _ = OnboardingProgress.objects.get_or_create(user=user)
@@ -39,73 +47,72 @@ def _wizard_context(request, step: OnboardingProgress.Steps, **extra):
 
     step_index_map = {item["id"]: idx for idx, item in enumerate(WIZARD_STEPS)}
     current_index = step_index_map.get(progress.current_step, 0)
-    if progress.is_completed or progress.current_step == OnboardingProgress.Steps.DONE:
+
+    if progress.current_step == OnboardingProgress.Steps.DONE:
         current_index = len(WIZARD_STEPS) - 1
 
     total_steps = len(WIZARD_STEPS)
-    if total_steps <= 1:
-        progress_percent = 100
-    else:
-        progress_percent = int(round((current_index / (total_steps - 1)) * 100))
+    progress_percent = int(round((current_index / (total_steps - 1)) * 100))
 
-    base_context = {
+    base = {
         "step": step,
         "progress": progress,
         "wizard_steps": WIZARD_STEPS,
         "current_index": current_index,
         "progress_percent": progress_percent,
+        "total_questions": len(SURVEY_QUESTIONS),
     }
-    base_context.update(extra)
-    base_context.setdefault("prefill_scores", {})
-    base_context.setdefault("prefill_open_answers", {})
-    base_context.setdefault("total_questions", len(SURVEY_QUESTIONS))
-    return base_context
+
+    base.update(extra)
+    return base
 
 
 def _build_survey_sections():
     sections = []
-    for idx, question in enumerate(SURVEY_QUESTIONS):
-        category = question.get("category") or f"Blok {idx + 1}"
-        if not sections or sections[-1]["title"] != category:
-            sections.append({"title": category, "questions": []})
-        sections[-1]["questions"].append(
-            {
-                "index": idx,
-                "question": question["question"],
-                "labels": question.get("labels", {}),
-            }
-        )
+    for idx, q in enumerate(SURVEY_QUESTIONS):
+        cat = q.get("category", f"Blok {idx+1}")
+        if not sections or sections[-1]["title"] != cat:
+            sections.append({"title": cat, "questions": []})
+
+        sections[-1]["questions"].append({
+            "index": idx,
+            "question": q["question"],
+            "labels": q.get("labels", {}),
+        })
     return sections
 
 
-def _build_survey_prefill(submission: SurveySubmission | None) -> dict[str, int]:
-    if not submission:
+def _build_survey_prefill(sub):
+    if not sub:
         return {}
     prefill = {}
-    responses = submission.responses.all()
-    for response in responses:
-        idx = SURVEY_QUESTION_INDEX.get(response.question)
+    for r in sub.responses.all():
+        idx = SURVEY_QUESTION_INDEX.get(r.question)
         if idx is not None:
-            prefill[f"q{idx}"] = response.score
+            prefill[f"q{idx}"] = r.score
     return prefill
 
 
-def _build_open_prefill(user, batch_id) -> dict[str, str]:
+def _build_open_prefill(user, batch_id):
     if not batch_id:
         return {}
     answers = OpenAnswer.objects.filter(user=user, batch_id=batch_id)
+
     answer_map = {(a.section, a.question): a.answer for a in answers}
     prefill = {}
-    for section_index, block in enumerate(SUROPEN_QUESTIONS):
-        for question_index, question_text in enumerate(block["items"]):
-            key = f"q-{section_index}-{question_index}"
-            prefill[key] = answer_map.get((block["section"], question_text), "")
+
+    for s_i, block in enumerate(SUROPEN_QUESTIONS):
+        for q_i, qtext in enumerate(block["items"]):
+            key = f"q-{s_i}-{q_i}"
+            prefill[key] = answer_map.get((block["section"], qtext), "")
+
     return prefill
 
 
-def _redirect_for_progress(progress: OnboardingProgress):
-    if progress.is_completed or progress.current_step == OnboardingProgress.Steps.DONE:
+def _redirect_for_progress(progress):
+    if progress.current_step == OnboardingProgress.Steps.DONE:
         return reverse("dashboard:index")
+
     return {
         OnboardingProgress.Steps.UPLOAD: reverse("onboarding:upload"),
         OnboardingProgress.Steps.SURVEY: reverse("onboarding:survey"),
@@ -113,11 +120,19 @@ def _redirect_for_progress(progress: OnboardingProgress):
     }.get(progress.current_step, reverse("onboarding:upload"))
 
 
+# ============================================================
+# Entry point
+# ============================================================
+
 @login_required
 def entrypoint(request):
     progress = _get_progress(request.user)
     return redirect(_redirect_for_progress(progress))
 
+
+# ============================================================
+# STEP 1: UPLOAD PDF
+# ============================================================
 
 @login_required
 def upload_step(request):
@@ -125,183 +140,152 @@ def upload_step(request):
     origin_step = progress.current_step
 
     if request.method == "POST":
-        uploaded_files = request.FILES.getlist("pdf_file")
-        if not uploaded_files:
-            messages.error(request, "Vyberte prosím alespoň jeden PDF soubor k nahrání.")
+        files = request.FILES.getlist("pdf_file")
+        if not files:
+            messages.error(request, "Vyberte prosím alespoň jeden PDF soubor.")
         else:
-            successful = 0
-            for uploaded in uploaded_files:
+            success = 0
+            for f in files:
                 try:
-                    _process_uploaded_file(request.user, uploaded)
-                    successful += 1
-                except Exception as exc:  # pragma: no cover - log only
-                    messages.error(
-                        request,
-                        f"Nahrání souboru {uploaded.name} se nezdařilo: {exc}",
-                    )
+                    _process_uploaded_file(request.user, f)
+                    success += 1
+                except Exception as exc:
+                    messages.error(request, f"Soubor {f.name} selhal: {exc}")
 
-            if successful:
+            if success:
+                # Move wizard forward
                 if origin_step == OnboardingProgress.Steps.UPLOAD:
                     progress.mark_step(OnboardingProgress.Steps.SURVEY)
-                    messages.success(
-                        request,
-                        f"Nahráno {successful} souborů. Pokračujme na dotazník.",
-                    )
+                    messages.success(request, f"Nahráno {success} souborů. Pokračujeme.")
                     return redirect("onboarding:survey")
-                elif progress.is_completed:
-                    progress.mark_step(OnboardingProgress.Steps.DONE, completed=True)
-                else:
-                    progress.mark_step(origin_step)
 
-                messages.success(
-                    request,
-                    f"Úspěšně zpracováno {successful} souborů.",
-                )
+                progress.mark_step(origin_step)
+                messages.success(request, f"Úspěšně zpracováno {success} souborů.")
 
-    context = _wizard_context(request, OnboardingProgress.Steps.UPLOAD)
-    return render(request, "onboarding/onboarding_wizard.html", context)
+    ctx = _wizard_context(request, OnboardingProgress.Steps.UPLOAD)
+    return render(request, "onboarding/onboarding_wizard.html", ctx)
 
+
+# ============================================================
+# STEP 2: SURVEY
+# ============================================================
 
 @login_required
 def survey_step(request):
     progress = _get_progress(request.user)
     origin_step = progress.current_step
-    origin_completed = progress.is_completed
 
     if origin_step == OnboardingProgress.Steps.UPLOAD:
         return redirect("onboarding:upload")
 
-    existing_submission = progress.survey_submission
-    if existing_submission is None:
-        existing_submission = (
-            SurveySubmission.objects.filter(user=request.user).order_by("-created_at").first()
-        )
-        if existing_submission:
-            progress.survey_submission = existing_submission
+    submission = progress.survey_submission or SurveySubmission.objects.filter(
+        user=request.user
+    ).order_by("-created_at").first()
+
+    if submission:
+        if not progress.survey_submission:
+            progress.survey_submission = submission
             progress.save(update_fields=["survey_submission", "updated_at"])
 
     if request.method == "POST":
-        try:
-            with transaction.atomic():
-                if existing_submission:
-                    submission = existing_submission
-                    submission.responses.all().delete()
-                else:
-                    submission = SurveySubmission.objects.create(user=request.user)
+        with transaction.atomic():
+            if submission:
+                submission.responses.all().delete()
+            else:
+                submission = SurveySubmission.objects.create(user=request.user)
 
-                for idx, question in enumerate(SURVEY_QUESTIONS):
-                    raw_value = request.POST.get(f"q{idx}", "5")
-                    try:
-                        score = max(1, min(10, int(raw_value)))
-                    except (TypeError, ValueError):
-                        score = 5
-                    Response.objects.create(
-                        user=request.user,
-                        submission=submission,
-                        question=question["question"],
-                        score=score,
-                    )
-            generate_ai_summary(submission)
-
-            if origin_completed:
-                progress.mark_step(
-                    OnboardingProgress.Steps.DONE,
-                    survey_submission=submission,
-                    completed=True,
+            for idx, q in enumerate(SURVEY_QUESTIONS):
+                raw = request.POST.get(f"q{idx}", "5")
+                try:
+                    score = max(1, min(10, int(raw)))
+                except:
+                    score = 5
+                Response.objects.create(
+                    user=request.user,
+                    submission=submission,
+                    question=q["question"],
+                    score=score,
                 )
-                messages.success(request, "Dotazník byl aktualizován.")
-                return redirect("onboarding:survey")
 
-            if origin_step == OnboardingProgress.Steps.SURVEY:
-                progress.mark_step(
-                    OnboardingProgress.Steps.OPEN_SURVEY,
-                    survey_submission=submission,
-                )
-                return redirect("onboarding:open_survey")
+        generate_ai_summary(submission)
 
-            progress.mark_step(origin_step, survey_submission=submission)
-            messages.success(request, "Dotazník byl aktualizován.")
-            return redirect("onboarding:survey")
-        except Exception as exc:  # pragma: no cover - log only
-            messages.error(request, f"Nepodařilo se uložit dotazník: {exc}")
+        if origin_step == OnboardingProgress.Steps.SURVEY:
+            progress.mark_step(OnboardingProgress.Steps.OPEN_SURVEY, survey_submission=submission)
+            return redirect("onboarding:open_survey")
 
-    context = _wizard_context(
+        progress.mark_step(origin_step, survey_submission=submission)
+        messages.success(request, "Dotazník uložen.")
+
+    ctx = _wizard_context(
         request,
         OnboardingProgress.Steps.SURVEY,
         survey_sections=_build_survey_sections(),
-        total_questions=len(SURVEY_QUESTIONS),
-        prefill_scores=_build_survey_prefill(existing_submission),
+        prefill_scores=_build_survey_prefill(submission),
     )
-    return render(request, "onboarding/onboarding_wizard.html", context)
+    return render(request, "onboarding/onboarding_wizard.html", ctx)
 
+
+# ============================================================
+# STEP 3: SUROPEN (OPEN QUESTIONS)
+# ============================================================
 
 @login_required
 def open_survey_step(request):
     progress = _get_progress(request.user)
     origin_step = progress.current_step
-    origin_completed = progress.is_completed
 
     if origin_step == OnboardingProgress.Steps.UPLOAD:
         return redirect("onboarding:upload")
     if origin_step == OnboardingProgress.Steps.SURVEY:
         return redirect("onboarding:survey")
 
-    existing_batch_id = progress.suropen_batch_id
-    if existing_batch_id is None:
-        last_answer = OpenAnswer.objects.filter(user=request.user).order_by("-created_at").first()
-        if last_answer:
-            existing_batch_id = last_answer.batch_id
-            progress.suropen_batch_id = existing_batch_id
+    batch_id = progress.suropen_batch_id
+    if batch_id is None:
+        last = OpenAnswer.objects.filter(user=request.user).order_by("-created_at").first()
+        if last:
+            batch_id = last.batch_id
+            progress.suropen_batch_id = batch_id
             progress.save(update_fields=["suropen_batch_id", "updated_at"])
-    prefill_open_answers = _build_open_prefill(request.user, existing_batch_id)
+
+    prefill = _build_open_prefill(request.user, batch_id)
 
     if request.method == "POST":
         answers = []
-        for section_index, block in enumerate(SUROPEN_QUESTIONS):
-            for question_index, question_text in enumerate(block["items"]):
-                key = f"q-{section_index}-{question_index}"
-                answers.append(
-                    {
-                        "section": block["section"],
-                        "question": question_text,
-                        "answer": (request.POST.get(key) or "").strip(),
-                    }
-                )
+        for s_i, block in enumerate(SUROPEN_QUESTIONS):
+            for q_i, qtext in enumerate(block["items"]):
+                key = f"q-{s_i}-{q_i}"
+                answers.append({
+                    "section": block["section"],
+                    "question": qtext,
+                    "answer": (request.POST.get(key) or "").strip(),
+                })
+
         try:
-            batch_id, _ = _create_submission(
+            new_batch, _ = _create_submission(
                 request.user,
                 answers,
-                existing_batch_id=existing_batch_id,
-                ignore_cooldown=existing_batch_id is not None,
+                existing_batch_id=batch_id,
+                ignore_cooldown=batch_id is not None,
             )
         except NoAnswerProvided:
-            messages.error(request, "Vyplň alespoň jednu odpověď, abychom mohli pokračovat.")
+            messages.error(request, "Vyplň alespoň jednu odpověď.")
         except DuplicateSubmissionError:
-            messages.warning(request, "Formulář byl odeslán příliš rychle po sobě. Zkus to prosím znovu.")
-        except Exception as exc:  # pragma: no cover - log only
-            messages.error(request, f"Nepodařilo se uložit odpovědi: {exc}")
+            messages.warning(request, "Formulář byl odeslán příliš rychle.")
+        except Exception as exc:
+            messages.error(request, f"Chyba: {exc}")
         else:
-            if origin_completed:
-                progress.mark_step(
-                    OnboardingProgress.Steps.DONE,
-                    suropen_batch_id=batch_id,
-                    completed=True,
-                )
-                messages.success(request, "Odpovědi byly aktualizovány.")
-                return redirect("onboarding:open_survey")
-
             progress.mark_step(
                 OnboardingProgress.Steps.DONE,
-                suropen_batch_id=batch_id,
+                suropen_batch_id=new_batch,
                 completed=True,
             )
-            messages.success(request, "Onboarding je dokončen. Vítej v SCB!")
+            messages.success(request, "Onboarding je dokončen.")
             return redirect("dashboard:index")
 
-    context = _wizard_context(
+    ctx = _wizard_context(
         request,
         OnboardingProgress.Steps.OPEN_SURVEY,
         suropen_questions=SUROPEN_QUESTIONS,
-        prefill_open_answers=prefill_open_answers,
+        prefill_open_answers=prefill,
     )
-    return render(request, "onboarding/onboarding_wizard.html", context)
+    return render(request, "onboarding/onboarding_wizard.html", ctx)
