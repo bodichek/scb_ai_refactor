@@ -1,12 +1,18 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block content %}
-<h3>Výsledek analýzy</h3>
+<h3>Vysledek analyzy</h3>
 <p><b>Soubor:</b> {{ document.file.name }} | <b>Rok:</b> {{ document.year }} | <b>Typ:</b> {{ document.doc_type }}</p>
 
-<pre class="p-3 bg-light border rounded">{{ statement.data|json_script:"result_json" }}</pre>
+<pre id="result-json" class="p-3 bg-light border rounded"></pre>
+{{ statement.income|default:{}|json_script:"income_json" }}
+{{ statement.balance|default:{}|json_script:"balance_json" }}
 <script>
-  const data = JSON.parse(document.getElementById('result_json').textContent);
-  console.log("Parsed data:", data);
+  const income = JSON.parse(document.getElementById('income_json').textContent || '{}');
+  const balance = JSON.parse(document.getElementById('balance_json').textContent || '{}');
+  const container = document.getElementById('result-json');
+  container.textContent = JSON.stringify({ income, balance }, null, 2);
+  console.log("Parsed income:", income);
+  console.log("Parsed balance:", balance);
 </script>
 
 <a class="btn btn-success mt-3" href="/dashboard/">Zobrazit v dashboardu</a>

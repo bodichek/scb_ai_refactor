@@ -11,7 +11,8 @@ from accounts.permissions import coach_required, can_coach_access_client
 from ingest.models import Document, FinancialStatement
 from survey.models import SurveySubmission
 from dashboard.cashflow import calculate_cashflow
-from dashboard.views import build_dashboard_context, _compute_overheads
+from dashboard.views import build_dashboard_context
+from finance.utils import compute_metrics
 from .models import Coach, UserCoachAssignment
 
 
@@ -250,7 +251,7 @@ def cashflow_data(request, client_id):
     client = get_object_or_404(CompanyProfile, id=client_id)
     if not can_coach_access_client(request.user, client):
         return JsonResponse({'success': False, 'error': 'Forbidden'}, status=403)
-    years = list(FinancialStatement.objects.filter(owner=client.user).values_list('year', flat=True).order_by('-year'))
+    years = list(FinancialStatement.objects.filter(user=client.user).values_list('year', flat=True).order_by('-year'))
     if not years:
         return JsonResponse({'success': True, 'available': False})
     year = years[0]
@@ -265,13 +266,14 @@ def charts_data(request, client_id):
     if not can_coach_access_client(request.user, client):
         return JsonResponse({'success': False, 'error': 'Forbidden'}, status=403)
     rows = []
-    for fs in FinancialStatement.objects.filter(owner=client.user).order_by('year'):
-        d = fs.data or {}
-        revenue = float(d.get('Revenue', 0))
-        cogs = float(d.get('COGS', 0))
-        overheads = _compute_overheads(d)
-        ebit = float(d.get('EBIT', revenue - cogs - overheads))
-        rows.append({'year': fs.year, 'revenue': revenue, 'cogs': cogs, 'ebit': ebit})
+    for fs in FinancialStatement.objects.filter(user=client.user).order_by('year'):
+        metrics = compute_metrics(fs)
+        rows.append({
+            'year': fs.year,
+            'revenue': float(metrics["revenue"] or 0),
+            'cogs': float(metrics["cogs"] or 0),
+            'ebit': float(metrics["ebit"] or 0),
+        })
     return JsonResponse({'success': True, 'series': rows})
 
 

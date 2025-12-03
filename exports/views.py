@@ -31,6 +31,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 from ingest.models import FinancialStatement
+from finance.utils import compute_metrics
 from survey.models import SurveySubmission, Response
 from suropen.models import OpenAnswer
 from accounts.models import CompanyProfile
@@ -88,7 +89,7 @@ def upload_chart(request):
 @login_required
 def export_form(request):
     """Formulář s volbou sekcí + nově i výběrem roku."""
-    statements = FinancialStatement.objects.filter(owner=request.user).order_by("year")
+    statements = FinancialStatement.objects.filter(user=request.user).order_by("year")
     available_years = [s.year for s in statements]
     return render(request, "exports/export_form.html", {"years": available_years})
 
@@ -107,7 +108,7 @@ def export_pdf(request):
     except (TypeError, ValueError):
         selected_year = None
 
-    statements_qs = FinancialStatement.objects.filter(owner=user).order_by("year")
+    statements_qs = FinancialStatement.objects.filter(user=user).order_by("year")
     if selected_year:
         statements_qs = statements_qs.filter(year=selected_year)
     statements = list(statements_qs)
@@ -575,35 +576,25 @@ def export_pdf(request):
     story.append(HRFlowable(width="100%", thickness=0.5, color=palette["border_subtle"]))
     story.append(Spacer(1, 18))
 
-    def to_number(value):
-        if value is None:
-            return None
-        if isinstance(value, (int, float)):
-            return float(value)
-        try:
-            cleaned = str(value).replace(" ", "").replace("Kč", "").replace("CZK", "").replace(",", ".")
-            return float(cleaned)
-        except (TypeError, ValueError):
-            return None
 
     if statements and include_tables:
         story.append(Paragraph("Finanční tabulka", section_heading))
         table_header = ["Rok", "Tržby", "Náklady", "Hrubá marže", "EBIT", "Čistý zisk"]
         table_data = [table_header]
         for stmt in statements:
-            data = stmt.data or {}
-            revenue = to_number(data.get("Revenue"))
-            cogs = to_number(data.get("COGS"))
-            gross_margin = revenue - cogs if revenue is not None and cogs is not None else to_number(data.get("GrossMargin"))
-            ebit = to_number(data.get("EBIT"))
-            net_profit = to_number(data.get("NetProfit"))
+            metrics = compute_metrics(stmt)
+            revenue = metrics["revenue"]
+            cogs = metrics["cogs"]
+            gross_margin = metrics["gross_margin"]
+            ebit = metrics["ebit"]
+            net_profit = metrics["net_profit"]
             table_data.append([
                 stmt.year,
-                f"{revenue:,.0f}" if revenue is not None else "—",
-                f"{cogs:,.0f}" if cogs is not None else "—",
-                f"{gross_margin:,.0f}" if gross_margin is not None else "—",
-                f"{ebit:,.0f}" if ebit is not None else "—",
-                f"{net_profit:,.0f}" if net_profit is not None else "—",
+                f"{revenue:,.0f}" if revenue is not None else "-",
+                f"{cogs:,.0f}" if cogs is not None else "-",
+                f"{gross_margin:,.0f}" if gross_margin is not None else "-",
+                f"{ebit:,.0f}" if ebit is not None else "-",
+                f"{net_profit:,.0f}" if net_profit is not None else "-",
             ])
 
         story.append(Table(
@@ -623,6 +614,7 @@ def export_pdf(request):
         ))
     elif not statements and include_tables:
         story.append(Paragraph("Pro zvolený rok nejsou dostupné finanční výkazy.", body_style))
+
 
     story.append(Spacer(1, 24))
     story.append(Paragraph("Poznámka: Všechna čísla jsou uvedena v českých korunách (Kč).", muted_style))
@@ -736,6 +728,6 @@ def export_pdf(request):
 @login_required
 def export_config_api(request):
     """Vraci data pro React export stranku."""
-    statements = FinancialStatement.objects.filter(owner=request.user).order_by("year")
+    statements = FinancialStatement.objects.filter(user=request.user).order_by("year")
     years = [s.year for s in statements]
     return JsonResponse({"years": years})

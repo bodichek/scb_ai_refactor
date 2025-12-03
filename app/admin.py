@@ -8,7 +8,6 @@ from coaching.models import Coach
 from ingest.models import Document, FinancialStatement
 
 
-# ✅ Custom index view – náš dashboard
 def custom_index(request):
     companies = CompanyProfile.objects.all()
     coaches_count = Coach.objects.count()
@@ -16,34 +15,32 @@ def custom_index(request):
     companies_without_coach = companies.filter(assigned_coach__isnull=True).count()
 
     rows = []
-    for c in companies:
-        statements_count = FinancialStatement.objects.filter(owner=c.user).count()
+    for company in companies:
+        statements_count = FinancialStatement.objects.filter(user=company.user).count()
 
-        # klikací odkaz na detail firmy v adminu
         company_link = format_html(
             '<a href="{}">{}</a>',
-            reverse("admin:accounts_companyprofile_change", args=[c.id]),
-            c.company_name,
+            reverse("admin:accounts_companyprofile_change", args=[company.id]),
+            company.company_name,
         )
 
-        coach_name = (
-            format_html(
+        if company.assigned_coach:
+            coach_name = format_html(
                 '<a href="{}">{}</a>',
-                reverse("admin:coaching_coach_change", args=[c.assigned_coach.id]),
-                c.assigned_coach.user.username,
+                reverse("admin:coaching_coach_change", args=[company.assigned_coach.id]),
+                company.assigned_coach.user.username,
             )
-            if c.assigned_coach else "❌ žádný"
-        )
+        else:
+            coach_name = "zadny"
 
-        # poslední dokument (pokud existuje)
-        last_doc = Document.objects.filter(owner=c.user).order_by("-year", "-uploaded_at").first()
-        last_doc_display = f"{last_doc.year} – {last_doc.doc_type}" if last_doc else "❌ žádný"
+        last_doc = Document.objects.filter(owner=company.user).order_by("-year", "-uploaded_at").first()
+        last_doc_display = f"{last_doc.year} - {last_doc.doc_type}" if last_doc else "zadny"
 
         rows.append({
             "company": company_link,
-            "ico": c.ico,
+            "ico": company.ico,
             "coach": coach_name,
-            "statements": f"{statements_count} výkaz(ů)" if statements_count > 0 else "❌ žádné",
+            "statements": f"{statements_count} vykaz(u)" if statements_count > 0 else "zadny",
             "last_doc": last_doc_display,
         })
 
@@ -52,10 +49,9 @@ def custom_index(request):
         coaches_count=coaches_count,
         companies_without_coach=companies_without_coach,
         rows=rows,
-        title="Přehled aplikace",
+        title="Prehled aplikace",
     )
     return TemplateResponse(request, "admin/dashboard.html", context)
 
 
-# ✅ přepíšeme defaultní index view adminu
 admin.site.index = custom_index

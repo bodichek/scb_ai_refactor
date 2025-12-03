@@ -1,6 +1,5 @@
 from django.db import models
 from django.conf import settings
-from django.utils import timezone
 from django.contrib.auth.models import User
 
 DOC_TYPES = [
@@ -40,16 +39,26 @@ class Document(models.Model):
 
 
 class FinancialStatement(models.Model):
-    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     year = models.IntegerField()
-    doc_type = models.CharField(max_length=40)
-    data = models.JSONField(default=dict)
-    scale = models.CharField(max_length=20, default="units")
+    income = models.JSONField(null=True, blank=True)
+    balance = models.JSONField(null=True, blank=True)
+    scale = models.CharField(max_length=20, default="thousands")
     document = models.OneToOneField('Document', on_delete=models.CASCADE)
+
+    # New fields for vision-based extraction
+    local_image_path = models.CharField(max_length=500, null=True, blank=True)
+    confidence = models.FloatField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ("owner", "year", "doc_type")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("user", "year"),
+                name="unique_statement_per_user_year",
+            )
+        ]
 
     def __str__(self):
-        return f"FS {self.year} - {self.owner} ({self.doc_type})"
+        return f"FS {self.year} - {self.user}"

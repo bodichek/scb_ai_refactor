@@ -1,7 +1,7 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block content %}
 <div class="container mt-4">
-  <h3>📊 Výsledek nahrávání</h3>
+  <h3>Vysledek nahravani</h3>
   <table class="table table-striped mt-3">
     <thead>
       <tr>
@@ -16,12 +16,18 @@
       <tr>
         <td>{{ r.file }}</td>
         <td>{{ r.year }}</td>
-        <td>{{ r.type }}</td>
-        <td>{{ r.status }}</td>
+        <td>{{ r.doc_type }}</td>
+        <td>
+          {% if r.success %}
+            Analyzovano
+          {% else %}
+            Chyba: {{ r.error|default:"Nepodarilo se analyzovat" }}
+          {% endif %}
+        </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
-  <a href="{% url 'ingest:documents' %}" class="btn btn-success mt-3">📂 Zpět na seznam dokumentů</a>
+  <a href="{% url 'ingest:documents' %}" class="btn btn-success mt-3">Zpet na seznam dokumentu</a>
 </div>
 {% endblock %}

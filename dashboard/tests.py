@@ -56,10 +56,10 @@ class CashflowTests(TestCase):
             "CapEx": 20,
         }
         FinancialStatement.objects.create(
-            owner=self.user,
+            user=self.user,
             document=self.document,
             year=2024,
-            data=statement_data,
+            income=statement_data,
         )
 
         cf = calculate_cashflow(self.user, 2024)

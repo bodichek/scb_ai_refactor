@@ -1,7 +1,8 @@
 """Shared finance helpers used across parsing and dashboards.
 
-All stored monetary values in ``FinancialStatement.data`` are expected to be
-absolute CZK amounts (no thousands scaling).
+All stored monetary values in ``FinancialStatement.income`` / ``balance`` are
+expected to be in THOUSANDS (tis. Kč).
+Vision parser automatically converts units to thousands.
 """
 from typing import Any, Dict, Iterable, Optional
 
@@ -89,6 +90,107 @@ def compute_overheads(data: Dict[str, Any]) -> float:
 
     stored = first_number(data, ("Overheads", "overheads"))
     return stored or 0.0
+
+
+def cogs_without_services(data: Dict[str, Any]) -> Optional[float]:
+    """Return COGS with services backed out when both are present."""
+    cogs = first_number(data or {}, ("COGS", "cogs"))
+    services = first_number(data or {}, ("services", "Services"))
+    if cogs is None:
+        return None
+    if services is not None and services > 0 and cogs > 0:
+        return max(cogs - services, 0.0)
+    return cogs
+
+
+def _metric(data: Dict[str, Any], keys: Iterable[str], default: Optional[float] = 0.0) -> Optional[float]:
+    val = first_number(data or {}, keys)
+    return val if val is not None else default
+
+
+def _normalize_period(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Prefer nested "current" datasets when present (some parsers may include
+    current/previous splits). Falls back to the provided mapping.
+    """
+    if not isinstance(data, dict):
+        return {}
+    for key in ("current_period", "current", "bezne_obdobi"):
+        nested = data.get(key)
+        if isinstance(nested, dict):
+            return nested
+    return data
+
+
+def compute_metrics(fs) -> Dict[str, Any]:
+    """
+    Derive core financial metrics from a unified FinancialStatement instance.
+    Supports both legacy format and new vision parser component format.
+    """
+    income_raw = getattr(fs, "income", None) or {}
+    balance_raw = getattr(fs, "balance", None) or {}
+    income = _normalize_period(income_raw)
+    balance = _normalize_period(balance_raw)
+
+    # Revenue: aggregated or from components
+    revenue = _metric(income, ("revenue", "Revenue"), None)
+    if revenue is None:
+        # Vision parser format: compute from components
+        rev_products = _metric(income, ("revenue_products_services",), None)
+        rev_goods = _metric(income, ("revenue_goods",), None)
+        if rev_products is not None or rev_goods is not None:
+            revenue = (rev_products or 0.0) + (rev_goods or 0.0)
+        else:
+            revenue = 0.0
+
+    raw_revenue = revenue
+
+    # COGS: aggregated or from components
+    cogs = _metric(income, ("cogs", "COGS"), None)
+    if cogs is None:
+        # Vision parser format: compute from components
+        cogs_g = _metric(income, ("cogs_goods",), None)
+        cogs_m = _metric(income, ("cogs_materials",), None)
+        if cogs_g is not None or cogs_m is not None:
+            cogs = (cogs_g or 0.0) + (cogs_m or 0.0)
+        else:
+            cogs = 0.0
+
+    # Legacy: remove services from COGS if needed
+    services = _metric(income, ("services", "Services"), None)
+    if services and cogs > 0:
+        cogs = max(cogs - services, 0.0)
+
+    gross_margin = _metric(income, ("gross_margin", "GrossMargin"), None)
+    if gross_margin is None:
+        gross_margin = revenue - cogs
+
+    overheads = compute_overheads(income)
+    depreciation = _metric(income, ("depreciation", "Depreciation"), 0.0) or 0.0
+
+    ebit = _metric(income, ("ebit", "EBIT"), None)
+    if ebit is None:
+        ebit = gross_margin - overheads
+
+    net_profit = _metric(income, ("net_profit", "NetProfit"), None)
+    if net_profit is None:
+        net_profit = revenue - cogs - overheads
+
+    profitability = compute_profitability(revenue, gross_margin, ebit, net_profit)
+
+    return {
+        "income": income,
+        "balance": balance,
+        "raw_revenue": raw_revenue,
+        "revenue": revenue,
+        "cogs": cogs,
+        "gross_margin": gross_margin,
+        "overheads": overheads,
+        "depreciation": depreciation,
+        "ebit": ebit,
+        "net_profit": net_profit,
+        "profitability": profitability,
+    }
 
 
 def compute_profitability(

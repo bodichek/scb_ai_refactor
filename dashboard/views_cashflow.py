@@ -9,7 +9,7 @@ def cashflow_view(request):
     Zobrazí tabulku Profit vs Cash Flow pro zvolený rok.
     """
     user = request.user
-    statements = FinancialStatement.objects.filter(owner=user).order_by("year")
+    statements = FinancialStatement.objects.filter(user=user).order_by("year")
     years = [s.year for s in statements]
 
     selected_year = request.GET.get("year")

@@ -146,7 +146,7 @@ class CustomAdminSite(admin.AdminSite):
         # tabulka: seznam firem + placeholder indikátor výkazů
         rows = []
         for c in companies:
-            statements_count = FinancialStatement.objects.filter(owner=c.user).count()
+            statements_count = FinancialStatement.objects.filter(user=c.user).count()
             rows.append({
                 "company": c.company_name,
                 "ico": c.ico,

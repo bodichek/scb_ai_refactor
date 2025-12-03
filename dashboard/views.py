@@ -18,17 +18,11 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 
 from accounts.models import CompanyProfile, CoachClientNotes
-from ingest.models import Document, FinancialStatement
+from ingest.models import FinancialStatement
 from survey.models import SurveySubmission
 from suropen.models import OpenAnswer
 from coaching.models import UserCoachAssignment
-from finance.utils import (
-    compute_overheads,
-    compute_profitability,
-    first_number,
-    growth,
-    to_number,
-)
+from finance.utils import compute_metrics, growth
 
 from .cashflow import calculate_cashflow
 
@@ -39,44 +33,6 @@ def _clean_text(text):
     if isinstance(text, str):
         return text.strip()
     return str(text).strip()
-
-
-def _compute_overheads(data: dict) -> float:
-    """Prefer sums of components; fall back to stored overhead totals."""
-    return compute_overheads(data)
-
-
-def _to_number(value):
-    return to_number(value)
-
-
-def _get_metric(data: dict, keys, default=None):
-    val = first_number(data, keys)
-    if val is None:
-        return default
-    return val
-
-
-def _get_cogs_value(data: dict) -> float:
-    """
-    Vrátí COGS:
-
-    - U legacy dat (TitleCase "COGS") očistí COGS o služby, protože byly součástí COGS.
-    - U nového schématu (snake_case `cogs`) služby už součástí nejsou → neodečítáme.
-
-    Tím zabráníme situaci, kdy se služby odečtou dvakrát a COGS spadne na 0.
-    """
-    services = _get_metric(data, ("services", "Services"))
-
-    # Legacy: uložené "COGS" (TitleCase) – historicky obsahovalo i služby
-    legacy_cogs = _get_metric(data, ("COGS",), None)
-    if legacy_cogs is not None:
-        if services is not None and services > 0 and legacy_cogs > 0:
-            return max(legacy_cogs - services, 0.0)
-        return legacy_cogs
-
-    # Nové schéma: snake_case `cogs` je už BEZ služeb
-    return _get_metric(data, ("cogs",), 0.0)
 
 
 def _extract_recommendation_points(text, max_points=5):
@@ -211,42 +167,32 @@ def _get_openai_client():
 
 
 def build_dashboard_context(target_user):
-    statements = FinancialStatement.objects.filter(owner=target_user).order_by("year")
+    statements = FinancialStatement.objects.filter(user=target_user).order_by("year")
 
     rows = []
-    for s in statements:
-        d = s.data or {}
-
-        # Base metrics with snake_case/TitleCase fallback (prefer snake_case)
-        revenue = _get_metric(d, ("revenue", "Revenue"), 0.0)
-        cogs = _get_cogs_value(d)
-        gross_margin = _get_metric(d, ("gross_margin", "GrossMargin"))
-        if gross_margin is None:
-            gross_margin = revenue - cogs
-
-        depreciation = _get_metric(d, ("depreciation", "Depreciation"), 0.0)
-        overheads = _compute_overheads(d)
-
-        ebit = _get_metric(d, ("ebit", "EBIT"))
-        if ebit is None:
-            ebit = gross_margin - overheads
-
-        net_profit = _get_metric(d, ("net_profit", "NetProfit"))
-        if net_profit is None:
-            net_profit = revenue - cogs - overheads
-
-        profitability = compute_profitability(revenue, gross_margin, ebit, net_profit)
-
+    parsed_headers = set()
+    parsed_rows = []
+    for stmt in statements:
+        metrics = compute_metrics(stmt)
+        income = metrics["income"] or {}
+        balance = metrics["balance"] or {}
+        combined_keys = set(income.keys()) | set(balance.keys())
+        parsed_headers.update(combined_keys)
+        values = {}
+        values.update(balance)
+        values.update(income)
+        parsed_rows.append({"year": stmt.year, "values": values})
         rows.append({
-            "year": s.year,
-            "revenue": revenue,
-            "cogs": cogs,
-            "gross_margin": gross_margin,
-            "overheads": overheads,
-            "depreciation": depreciation,
-            "ebit": ebit,
-            "net_profit": net_profit,
-            "profitability": profitability,
+            "year": stmt.year,
+            "raw_revenue": metrics["raw_revenue"],
+            "revenue": metrics["revenue"],
+            "cogs": metrics["cogs"],
+            "gross_margin": metrics["gross_margin"],
+            "overheads": metrics["overheads"],
+            "depreciation": metrics["depreciation"],
+            "ebit": metrics["ebit"],
+            "net_profit": metrics["net_profit"],
+            "profitability": metrics["profitability"],
             "growth": {},  # filled later
         })
 
@@ -336,57 +282,20 @@ def build_dashboard_context(target_user):
         )
     coach_note_text = _clean_text(coach_note_entry.notes) if coach_note_entry and coach_note_entry.notes else None
 
-    document_status_map = {}
-    doc_type_map = {
-        "rozvaha": "rozvaha",
-        "balance": "rozvaha",
-        "vysledovka": "vysledovka",
-        "income": "vysledovka",
-    }
-    document_qs = (
-        Document.objects.filter(owner=target_user, doc_type__in=list(doc_type_map.keys()))
-        .values("year", "doc_type", "analyzed")
-    )
-    for item in document_qs:
-        year = item.get("year")
-        doc_type = (item.get("doc_type") or "").lower()
-        mapped_type = doc_type_map.get(doc_type)
-        if year is None or mapped_type is None:
-            continue
-        try:
-            year_int = int(year)
-        except (TypeError, ValueError):
-            continue
-        entry = document_status_map.setdefault(
-            year_int,
-            {"year": year_int, "has_rozvaha": False, "has_vysledovka": False, "rozvaha_analyzed": False, "vysledovka_analyzed": False},
-        )
-        if mapped_type == "rozvaha":
-            entry["has_rozvaha"] = True
-            entry["rozvaha_analyzed"] = entry["rozvaha_analyzed"] or bool(item.get("analyzed"))
-        elif mapped_type == "vysledovka":
-            entry["has_vysledovka"] = True
-            entry["vysledovka_analyzed"] = entry["vysledovka_analyzed"] or bool(item.get("analyzed"))
-
-    statement_years = {
-        int(s.year)
-        for s in statements
-        if getattr(s, "year", None) is not None
-    }
-    upload_years = sorted(
-        set(document_status_map.keys()).union(statement_years),
+    document_upload_status = sorted(
+        [
+            {
+                "year": int(getattr(stmt, "year", 0)),
+                "has_rozvaha": bool(stmt.balance),
+                "has_vysledovka": bool(stmt.income),
+                "rozvaha_analyzed": bool(stmt.balance),
+                "vysledovka_analyzed": bool(stmt.income),
+            }
+            for stmt in statements
+        ],
+        key=lambda entry: entry["year"],
         reverse=True,
     )
-    document_upload_status = []
-    for year in upload_years:
-        entry = document_status_map.get(year, {})
-        document_upload_status.append({
-            "year": year,
-            "has_rozvaha": entry.get("has_rozvaha", False),
-            "has_vysledovka": entry.get("has_vysledovka", False),
-            "rozvaha_analyzed": entry.get("rozvaha_analyzed", False),
-            "vysledovka_analyzed": entry.get("vysledovka_analyzed", False),
-        })
 
     chart_series = {
         "labels": years,
@@ -431,6 +340,8 @@ def build_dashboard_context(target_user):
         "has_openai_client": bool(getattr(settings, "OPENAI_API_KEY", "")),
         "profile": profile,
         "document_upload_status": document_upload_status,
+        "parsed_headers": sorted(parsed_headers),
+        "parsed_rows": parsed_rows,
     }
 
 
@@ -572,9 +483,11 @@ def export_full_pdf(request):
     return FileResponse(buffer, as_attachment=True, filename="financial_dashboard.pdf")
 
 
+
+
 def api_metrics_series(request):
     """
-    Vrátí časové řady klíčových metrik a YoY růsty pro přihlášeného uživatele.
+    Vrací časové řady klíčových metrik a YoY růsty pro přihlášeného uživatele.
     """
     if not request.user.is_authenticated:
         return JsonResponse({
@@ -582,48 +495,27 @@ def api_metrics_series(request):
             "error": {"code": "UNAUTHORIZED", "message": "Přihlaste se."}
         }, status=401)
 
-    statements = FinancialStatement.objects.filter(owner=request.user).order_by("year")
+    statements = FinancialStatement.objects.filter(user=request.user).order_by("year")
     rows = []
-    for s in statements:
-        d = s.data or {}
-        revenue = _get_metric(d, ("revenue", "Revenue"), 0.0)
-        cogs = _get_cogs_value(d)
-        overheads = _compute_overheads(d)
-        gross_margin = _get_metric(d, ("gross_margin", "GrossMargin"))
-        if gross_margin is None:
-            gross_margin = revenue - cogs
-
-        ebit = _get_metric(d, ("ebit", "EBIT"))
-        if ebit is None:
-            ebit = gross_margin - overheads
-
-        net_profit = _get_metric(d, ("net_profit", "NetProfit"))
-        if net_profit is None:
-            net_profit = revenue - cogs - overheads
+    margins = []
+    for stmt in statements:
+        metrics = compute_metrics(stmt)
         rows.append({
-            "year": int(s.year),
-            "revenue": revenue,
-            "cogs": cogs,
-            "overheads": overheads,
-            "ebit": ebit,
-            "net_profit": net_profit,
+            "year": int(stmt.year),
+            "revenue": metrics["revenue"],
+            "cogs": metrics["cogs"],
+            "overheads": metrics["overheads"],
+            "ebit": metrics["ebit"],
+            "net_profit": metrics["net_profit"],
+        })
+        margins.append({
+            "year": int(stmt.year),
+            **metrics["profitability"],
         })
 
     rows = sorted(rows, key=lambda r: r["year"])
+    margins = sorted(margins, key=lambda r: r["year"])
     years = [r["year"] for r in rows]
-
-    margins = []
-    for r in rows:
-        profitability = compute_profitability(
-            r["revenue"],
-            r["revenue"] - r["cogs"],
-            r["ebit"],
-            r["net_profit"],
-        )
-        margins.append({
-            "year": r["year"],
-            **profitability,
-        })
 
     yoy = []
     for i, r in enumerate(rows):
@@ -637,7 +529,7 @@ def api_metrics_series(request):
                 "ebit_yoy": None,
             })
         else:
-            p = rows[i-1]
+            p = rows[i - 1]
             yoy.append({
                 "year": r["year"],
                 "revenue_yoy": growth(r["revenue"], p["revenue"]),
@@ -659,36 +551,21 @@ def api_metrics_series(request):
 @login_required
 def api_profitability(request):
     """Vrací přehled ziskovosti (náhrada za templates/dashboard/profitability.html)."""
-    statements = FinancialStatement.objects.filter(owner=request.user).order_by("year")
+    statements = FinancialStatement.objects.filter(user=request.user).order_by("year")
     rows = []
     for stmt in statements:
-        data = stmt.data or {}
-        revenue = _get_metric(data, ("revenue", "Revenue"), 0.0)
-        cogs = _get_cogs_value(data)
-        overheads = _compute_overheads(data)
-        gross_margin = _get_metric(data, ("gross_margin", "GrossMargin"))
-        if gross_margin is None:
-            gross_margin = revenue - cogs
-        ebit = _get_metric(data, ("ebit", "EBIT"))
-        if ebit is None:
-            ebit = gross_margin - overheads
-        net_profit = _get_metric(data, ("net_profit", "NetProfit"))
-        if net_profit is None:
-            net_profit = revenue - cogs - overheads
-
-        profitability = compute_profitability(revenue, gross_margin, ebit, net_profit)
-
+        metrics = compute_metrics(stmt)
         rows.append({
             "year": stmt.year,
-            "revenue": revenue,
-            "cogs": cogs,
-            "gross_margin": gross_margin,
-            "overheads": overheads,
-            "ebit": ebit,
-            "net_profit": net_profit,
-            "gm_pct": profitability["gm_pct"],
-            "op_pct": profitability["op_pct"],
-            "np_pct": profitability["np_pct"],
+            "revenue": metrics["revenue"],
+            "cogs": metrics["cogs"],
+            "gross_margin": metrics["gross_margin"],
+            "overheads": metrics["overheads"],
+            "ebit": metrics["ebit"],
+            "net_profit": metrics["net_profit"],
+            "gm_pct": metrics["profitability"]["gm_pct"],
+            "op_pct": metrics["profitability"]["op_pct"],
+            "np_pct": metrics["profitability"]["np_pct"],
         })
 
     return JsonResponse({"success": True, "rows": rows})
@@ -702,7 +579,7 @@ def api_cashflow_summary(request):
     - detailní výpočet pro vybraný rok (výchozí poslední dostupný nebo ?year=)
     """
     years = list(
-        FinancialStatement.objects.filter(owner=request.user)
+        FinancialStatement.objects.filter(user=request.user)
         .values_list("year", flat=True)
         .order_by("year")
     )

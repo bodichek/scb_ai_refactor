@@ -42,3 +42,11 @@ def format_kc(value):
         return value
 
     return number_format(number, decimal_pos=0, use_l10n=True, force_grouping=True)
+
+
+@register.filter
+def get_item(mapping, key):
+    """Safe dict access in templates."""
+    if isinstance(mapping, dict):
+        return mapping.get(key)
+    return None
