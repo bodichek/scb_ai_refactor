@@ -7,14 +7,19 @@ Vision parser automatically converts units to thousands.
 from typing import Any, Dict, Iterable, Optional
 
 OVERHEAD_COMPONENTS = [
-    # detailed components (lowercase)
+    # Vision parser components (new format)
+    "personnel_costs",           # Osobní náklady (agregát)
+    "personnel_costs_wages",     # Mzdové náklady
+    "personnel_costs_social",    # Náklady na sociální zabezpečení
+    "depreciation",              # Odpisy
+    "other_operating_expenses",  # Ostatní provozní náklady
+    # Legacy components (old parser)
     "services",
     "personnel_wages",
     "personnel_insurance",
     "taxes_fees",
-    "depreciation",
     "other_operating_costs",
-    # possible variants from other parsers (Title/uppercase)
+    # Title/uppercase variants
     "Services",
     "PersonnelWages",
     "PersonnelInsurance",
@@ -78,9 +83,35 @@ def compute_overheads(data: Dict[str, Any]) -> float:
     """
     Sum overheads from detailed components; fall back to stored total only
     when no components are available.
+
+    For vision parser format:
+    - If personnel_costs (aggregate) exists, use it instead of wages + social
+    - Include depreciation, other_operating_expenses
+    - Do NOT include cogs_services (already in COGS)
+
+    For legacy format:
+    - Sum all component keys from OVERHEAD_COMPONENTS
     """
+    # Check if vision parser format (has personnel_costs aggregate)
+    personnel_aggregate = to_number(data.get("personnel_costs"))
+
     components_sum = 0.0
+    counted_keys = set()
+
+    if personnel_aggregate is not None:
+        # Vision parser format: use aggregate for personnel
+        components_sum += personnel_aggregate
+        counted_keys.add("personnel_costs")
+        # Skip detailed personnel components to avoid double-counting
+        counted_keys.update(["personnel_costs_wages", "personnel_costs_social",
+                             "personnel_wages", "personnel_insurance"])
+
+    # Add other components (skip already counted + cogs_services)
+    exclude_keys = counted_keys | {"cogs_services", "cogs_goods", "cogs_materials"}
+
     for key in OVERHEAD_COMPONENTS:
+        if key in exclude_keys:
+            continue
         val = to_number(data.get(key))
         if val is not None:
             components_sum += val
@@ -88,6 +119,7 @@ def compute_overheads(data: Dict[str, Any]) -> float:
     if components_sum > 0:
         return components_sum
 
+    # Fallback to stored aggregate
     stored = first_number(data, ("Overheads", "overheads"))
     return stored or 0.0
 
@@ -147,19 +179,26 @@ def compute_metrics(fs) -> Dict[str, Any]:
 
     # COGS: aggregated or from components
     cogs = _metric(income, ("cogs", "COGS"), None)
+    is_vision_format = False
+
     if cogs is None:
         # Vision parser format: compute from components
         cogs_g = _metric(income, ("cogs_goods",), None)
         cogs_m = _metric(income, ("cogs_materials",), None)
-        if cogs_g is not None or cogs_m is not None:
-            cogs = (cogs_g or 0.0) + (cogs_m or 0.0)
+        cogs_s = _metric(income, ("cogs_services",), None)
+
+        if cogs_g is not None or cogs_m is not None or cogs_s is not None:
+            is_vision_format = True
+            cogs = (cogs_g or 0.0) + (cogs_m or 0.0) + (cogs_s or 0.0)
         else:
             cogs = 0.0
 
-    # Legacy: remove services from COGS if needed
-    services = _metric(income, ("services", "Services"), None)
-    if services and cogs > 0:
-        cogs = max(cogs - services, 0.0)
+    # Legacy format only: remove services from COGS if they're counted separately
+    # Vision format already includes cogs_services in components above
+    if not is_vision_format:
+        services = _metric(income, ("services", "Services"), None)
+        if services and cogs > 0:
+            cogs = max(cogs - services, 0.0)
 
     gross_margin = _metric(income, ("gross_margin", "GrossMargin"), None)
     if gross_margin is None:
@@ -172,7 +211,7 @@ def compute_metrics(fs) -> Dict[str, Any]:
     if ebit is None:
         ebit = gross_margin - overheads
 
-    net_profit = _metric(income, ("net_profit", "NetProfit"), None)
+    net_profit = _metric(income, ("net_profit", "NetProfit", "net_income"), None)
     if net_profit is None:
         net_profit = revenue - cogs - overheads
 
