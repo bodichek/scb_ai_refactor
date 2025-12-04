@@ -213,14 +213,25 @@ class FinancialExtractor:
    - NEPIŠ agregované hodnoty (revenue, cogs, ebit, net_profit)
    - Ty se spočítají automaticky z komponent
 
+6. **KRITICKÉ - Rozlišuj agregáty vs. detaily**:
+   - Když vidíš řádek s písmenem (A., D.), je to AGREGÁT - IGNORUJ ho
+   - Když vidíš řádek s číslem (A.1., A.2., 2., 3.), je to DETAIL - POUŽIJ ho
+   - Příklad: "Výkonová spotřeba (A.)" = IGNORUJ, "Náklady na zboží (A.1.)" = POUŽIJ
+   - Agregáty se spočítají z detailů automaticky
+
 **MAPOVÁNÍ ŘÁDKŮ → POLE:**
 
+**DŮLEŽITÉ - IGNORUJ AGREGOVANÉ ŘÁDKY:**
+- IGNORUJ "Výkonová spotřeba" (řádek A.) - je to agregát
+- IGNORUJ "Osobní náklady" (řádek D.) - je to agregát
+- POUŽIJ POUZE DETAILNÍ ŘÁDKY (A.1., A.2., atd.)
+
 **Income Statement (Výkaz zisku a ztráty):**
-- "Tržby za prodej zboží" → revenue_goods
-- "Tržby za prodej vlastních výrobků a služeb" → revenue_products_services
-- "Náklady vynaložené na prodané zboží" → cogs_goods
-- "Spotřeba materiálu a energie" → cogs_materials
-- "Služby" → cogs_services
+- "Tržby za prodej zboží" (řádek II.) → revenue_goods
+- "Tržby za prodej vlastních výrobků a služeb" (řádek I.) → revenue_products_services
+- "Náklady vynaložené na prodané zboží" (řádek A.1., NE A.!) → cogs_goods
+- "Spotřeba materiálu a energie" (řádek 2. nebo 05) → cogs_materials
+- "Služby" (řádek 3. nebo 06) → cogs_services
 - "Mzdové náklady" / "Osobní náklady" → personnel_wages
 - "Náklady na sociální zabezpečení" / "Zákonné sociální pojištění" → personnel_insurance
 - "Daně a poplatky" → taxes_fees

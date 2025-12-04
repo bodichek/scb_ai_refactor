@@ -189,22 +189,22 @@ def compute_metrics(fs) -> Dict[str, Any]:
 
     raw_revenue = revenue
 
-    # COGS: aggregated or from components
-    cogs = _metric(income, ("cogs", "COGS"), None)
+    # COGS: PREFER components over explicit value (to fix parser errors)
+    # CRITICAL: COGS = cogs_goods + cogs_materials ONLY (WITHOUT cogs_services!)
+    cogs_g = _metric(income, ("cogs_goods",), None)
+    cogs_m = _metric(income, ("cogs_materials",), None)
     is_vision_format = False
-    has_explicit_cogs = cogs is not None
+    has_explicit_cogs = False
 
-    if cogs is None:
-        # Vision parser format: compute from components
-        # CRITICAL: COGS = cogs_goods + cogs_materials ONLY (WITHOUT cogs_services!)
-        # cogs_services goes to overheads, not COGS
-        cogs_g = _metric(income, ("cogs_goods",), None)
-        cogs_m = _metric(income, ("cogs_materials",), None)
-
-        if cogs_g is not None or cogs_m is not None:
-            is_vision_format = True
-            cogs = (cogs_g or 0.0) + (cogs_m or 0.0)  # WITHOUT cogs_services!
-        else:
+    # If components exist, use them (they're more reliable)
+    if cogs_g is not None or cogs_m is not None:
+        is_vision_format = True
+        cogs = (cogs_g or 0.0) + (cogs_m or 0.0)  # WITHOUT cogs_services!
+    else:
+        # Fall back to explicit cogs value
+        cogs = _metric(income, ("cogs", "COGS"), None)
+        has_explicit_cogs = cogs is not None
+        if cogs is None:
             cogs = 0.0
 
     # Legacy format only: remove services from COGS if they're counted separately
