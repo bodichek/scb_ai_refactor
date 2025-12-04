@@ -232,12 +232,16 @@ def compute_metrics(fs) -> Dict[str, Any]:
 
     profitability = compute_profitability(revenue, gross_margin, ebit, net_profit)
 
+    # Extract cogs_materials for display
+    cogs_materials = _metric(income, ("cogs_materials",), None) or 0.0
+
     return {
         "income": income,
         "balance": balance,
         "raw_revenue": raw_revenue,
         "revenue": revenue,
         "cogs": cogs,
+        "cogs_materials": cogs_materials,
         "gross_margin": gross_margin,
         "overheads": overheads,
         "depreciation": depreciation,

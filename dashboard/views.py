@@ -176,6 +176,7 @@ def build_dashboard_context(target_user):
             "year": stmt.year,
             "revenue": metrics["revenue"],
             "cogs": metrics["cogs"],
+            "cogs_materials": metrics["cogs_materials"],
             "gross_margin": metrics["gross_margin"],
             "overheads": metrics["overheads"],
             "depreciation": metrics["depreciation"],
