@@ -192,6 +192,7 @@ def compute_metrics(fs) -> Dict[str, Any]:
     # COGS: aggregated or from components
     cogs = _metric(income, ("cogs", "COGS"), None)
     is_vision_format = False
+    has_explicit_cogs = cogs is not None
 
     if cogs is None:
         # Vision parser format: compute from components
@@ -208,7 +209,8 @@ def compute_metrics(fs) -> Dict[str, Any]:
 
     # Legacy format only: remove services from COGS if they're counted separately
     # Vision format already includes cogs_services in components above
-    if not is_vision_format:
+    # IMPORTANT: Only do this if COGS was NOT explicitly provided
+    if not is_vision_format and not has_explicit_cogs:
         services = _metric(income, ("services", "Services"), None)
         if services and cogs > 0:
             cogs = max(cogs - services, 0.0)
