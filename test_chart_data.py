@@ -26,9 +26,11 @@ def test_vision_parser_format():
                 "revenue_products_services": 18000.0,  # v tisících Kč
                 "revenue_goods": 2500.0,
 
-                # COGS components
+                # COGS components (pouze goods + materials!)
                 "cogs_goods": 1800.0,
                 "cogs_materials": 8000.0,
+
+                # Services - jdou do overheads, NE do COGS!
                 "cogs_services": 1200.0,
 
                 # Overhead components
@@ -37,6 +39,7 @@ def test_vision_parser_format():
                 "personnel_costs_social": 700.0,     # Detail (neměl by se počítat)
                 "depreciation": 500.0,
                 "other_operating_expenses": 1000.0,
+                "taxes_fees": 200.0,                 # NOVÝ klíč!
 
                 # Other
                 "interest_expense": 200.0,
@@ -56,14 +59,14 @@ def test_vision_parser_format():
     print("TEST: Vision Parser Format")
     print("=" * 80)
 
-    # Expected values
+    # Expected values - OPRAVENÉ VZORCE!
     expected = {
         "revenue": 20500.0,        # 18000 + 2500
-        "cogs": 11000.0,           # 1800 + 8000 + 1200
-        "gross_margin": 9500.0,    # 20500 - 11000
-        "overheads": 5000.0,       # 3500 (personnel) + 500 (depreciation) + 1000 (other)
-        "ebit": 4500.0,            # 9500 - 5000
-        "net_profit": 3900.0,      # net_income from vision parser (after tax, interest)
+        "cogs": 9800.0,            # 1800 + 8000 (BEZ services!)
+        "gross_margin": 10700.0,   # 20500 - 9800
+        "overheads": 6400.0,       # 3500 + 500 + 1000 + 1200 + 200
+        "ebit": 4300.0,            # 10700 - 6400
+        "net_profit": 3900.0,      # net_income from vision parser
     }
 
     print("\n[METRICS] CALCULATED METRICS:")

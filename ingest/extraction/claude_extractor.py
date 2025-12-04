@@ -220,7 +220,7 @@ class FinancialExtractor:
 - "Tržby za prodej vlastních výrobků a služeb" → revenue_products_services
 - "Náklady vynaložené na prodané zboží" → cogs_goods
 - "Spotřeba materiálu a energie" → cogs_materials
-- "Služby" → services
+- "Služby" → cogs_services
 - "Mzdové náklady" / "Osobní náklady" → personnel_wages
 - "Náklady na sociální zabezpečení" / "Zákonné sociální pojištění" → personnel_insurance
 - "Daně a poplatky" → taxes_fees
@@ -256,7 +256,7 @@ class FinancialExtractor:
     "revenue_goods": 330 | null,
     "cogs_goods": null,
     "cogs_materials": null,
-    "services": null,
+    "cogs_services": null,
     "personnel_wages": null,
     "personnel_insurance": null,
     "taxes_fees": null,

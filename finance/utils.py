@@ -86,8 +86,8 @@ def compute_overheads(data: Dict[str, Any]) -> float:
 
     For vision parser format:
     - If personnel_costs (aggregate) exists, use it instead of wages + social
-    - Include depreciation, other_operating_expenses
-    - Do NOT include cogs_services (already in COGS)
+    - Include depreciation, other_operating_expenses, cogs_services, taxes_fees
+    - CRITICAL: cogs_services goes to overheads (NOT to COGS!)
 
     For legacy format:
     - Sum all component keys from OVERHEAD_COMPONENTS
@@ -106,8 +106,20 @@ def compute_overheads(data: Dict[str, Any]) -> float:
         counted_keys.update(["personnel_costs_wages", "personnel_costs_social",
                              "personnel_wages", "personnel_insurance"])
 
-    # Add other components (skip already counted + cogs_services)
-    exclude_keys = counted_keys | {"cogs_services", "cogs_goods", "cogs_materials"}
+    # CRITICAL: Add cogs_services and taxes_fees to overheads!
+    # These are NOT in OVERHEAD_COMPONENTS list but must be included
+    cogs_services = to_number(data.get("cogs_services"))
+    if cogs_services is not None:
+        components_sum += cogs_services
+        counted_keys.add("cogs_services")
+
+    taxes_fees = to_number(data.get("taxes_fees"))
+    if taxes_fees is not None:
+        components_sum += taxes_fees
+        counted_keys.add("taxes_fees")
+
+    # Add other components (skip already counted + cogs goods/materials)
+    exclude_keys = counted_keys | {"cogs_goods", "cogs_materials"}
 
     for key in OVERHEAD_COMPONENTS:
         if key in exclude_keys:
@@ -183,13 +195,14 @@ def compute_metrics(fs) -> Dict[str, Any]:
 
     if cogs is None:
         # Vision parser format: compute from components
+        # CRITICAL: COGS = cogs_goods + cogs_materials ONLY (WITHOUT cogs_services!)
+        # cogs_services goes to overheads, not COGS
         cogs_g = _metric(income, ("cogs_goods",), None)
         cogs_m = _metric(income, ("cogs_materials",), None)
-        cogs_s = _metric(income, ("cogs_services",), None)
 
-        if cogs_g is not None or cogs_m is not None or cogs_s is not None:
+        if cogs_g is not None or cogs_m is not None:
             is_vision_format = True
-            cogs = (cogs_g or 0.0) + (cogs_m or 0.0) + (cogs_s or 0.0)
+            cogs = (cogs_g or 0.0) + (cogs_m or 0.0)  # WITHOUT cogs_services!
         else:
             cogs = 0.0
 
