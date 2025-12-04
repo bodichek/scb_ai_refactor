@@ -170,18 +170,8 @@ def build_dashboard_context(target_user):
     statements = FinancialStatement.objects.filter(user=target_user).order_by("year")
 
     rows = []
-    parsed_headers = set()
-    parsed_rows = []
     for stmt in statements:
         metrics = compute_metrics(stmt)
-        income = metrics["income"] or {}
-        balance = metrics["balance"] or {}
-        combined_keys = set(income.keys()) | set(balance.keys())
-        parsed_headers.update(combined_keys)
-        values = {}
-        values.update(balance)
-        values.update(income)
-        parsed_rows.append({"year": stmt.year, "values": values})
         rows.append({
             "year": stmt.year,
             "revenue": metrics["revenue"],
@@ -339,8 +329,6 @@ def build_dashboard_context(target_user):
         "has_openai_client": bool(getattr(settings, "OPENAI_API_KEY", "")),
         "profile": profile,
         "document_upload_status": document_upload_status,
-        "parsed_headers": sorted(parsed_headers),
-        "parsed_rows": parsed_rows,
     }
 
 
