@@ -855,8 +855,8 @@
           <thead class="bg-slate-50/80 text-slate-500 uppercase tracking-wide text-xs">
             <tr>
               <th class="px-4 py-3 text-left">Rok</th>
-              <th class="px-4 py-3 text-right">Tržby (uložené hodnoty)</th>
-              <th class="px-4 py-3 text-right">Náklady na prodané zboží</th>
+              <th class="px-4 py-3 text-right">Tržby</th>
+              <th class="px-4 py-3 text-right">Náklady na prodané zboží (COGS)</th>
               <th class="px-4 py-3 text-right">Hrubá marže</th>
               <th class="px-4 py-3 text-right">Provozní náklady</th>
               <th class="px-4 py-3 text-right">EBIT</th>
@@ -865,21 +865,15 @@
               <th class="px-4 py-3 text-right">Provozní marže %</th>
               <th class="px-4 py-3 text-right">Čistá marže %</th>
               <th class="px-4 py-3 text-right">Růst tržeb %</th>
-              <th class="px-4 py-3 text-right">Růst nákladů na prodané zboží %</th>
-              <th class="px-4 py-3 text-right">Růst provozních nákladů %</th>
+              <th class="px-4 py-3 text-right">Růst COGS %</th>
+              <th class="px-4 py-3 text-right">Růst prov. nákladů %</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-200/70 bg-white/90">
             {% for r in table_rows %}
             <tr class="text-slate-700">
               <td class="px-4 py-3 font-medium text-slate-800">{{ r.year }}</td>
-              <td class="px-4 py-3 text-right">
-                {% if r.raw_revenue is not None %}
-                  {{ r.raw_revenue }}
-                {% else %}
-                  {{ r.revenue|format_kc }}
-                {% endif %}
-              </td>
+              <td class="px-4 py-3 text-right">{{ r.revenue|format_kc }}</td>
               <td class="px-4 py-3 text-right">{{ r.cogs|format_kc }}</td>
               <td class="px-4 py-3 text-right">{{ r.gross_margin|format_kc }}</td>
               <td class="px-4 py-3 text-right">{{ r.overheads|format_kc }}</td>
@@ -888,9 +882,27 @@
               <td class="px-4 py-3 text-right">{{ r.profitability.gm_pct|floatformat:2 }}%</td>
               <td class="px-4 py-3 text-right">{{ r.profitability.op_pct|floatformat:2 }}%</td>
               <td class="px-4 py-3 text-right">{{ r.profitability.np_pct|floatformat:2 }}%</td>
-              <td class="px-4 py-3 text-right">{{ r.growth.revenue|floatformat:2 }}%</td>
-              <td class="px-4 py-3 text-right">{{ r.growth.cogs|floatformat:2 }}%</td>
-              <td class="px-4 py-3 text-right">{{ r.growth.overheads|floatformat:2 }}%</td>
+              <td class="px-4 py-3 text-right">
+                {% if r.growth.revenue is not None %}
+                  {{ r.growth.revenue|floatformat:2 }}%
+                {% else %}
+                  <span class="text-slate-400">–</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-3 text-right">
+                {% if r.growth.cogs is not None %}
+                  {{ r.growth.cogs|floatformat:2 }}%
+                {% else %}
+                  <span class="text-slate-400">–</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-3 text-right">
+                {% if r.growth.overheads is not None %}
+                  {{ r.growth.overheads|floatformat:2 }}%
+                {% else %}
+                  <span class="text-slate-400">–</span>
+                {% endif %}
+              </td>
             </tr>
             {% endfor %}
           </tbody>

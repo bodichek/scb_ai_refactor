@@ -184,7 +184,6 @@ def build_dashboard_context(target_user):
         parsed_rows.append({"year": stmt.year, "values": values})
         rows.append({
             "year": stmt.year,
-            "raw_revenue": metrics["raw_revenue"],
             "revenue": metrics["revenue"],
             "cogs": metrics["cogs"],
             "gross_margin": metrics["gross_margin"],
