@@ -24,8 +24,20 @@
         <h1 class="mt-2 text-3xl font-bold text-slate-900">Moje klientské firmy</h1>
         <p class="mt-2 text-sm text-slate-500">Stejný vzhled jako hlavní cockpit – jen s nástroji, které kouč opravdu potřebuje.</p>
       </div>
-      <div class="text-sm text-slate-500">
-        Přihlášený kouč: <span class="font-semibold text-slate-900">{{ request.user.get_full_name|default:request.user.username }}</span>
+      <div class="flex items-center gap-4">
+        <!-- Tlačítko pro nepřiřazené uživatele -->
+        {% if unassigned_count > 0 %}
+        <a href="{% url 'coaching:unassigned_users' %}"
+           class="inline-flex items-center gap-2 rounded-full bg-amber-500 text-white px-4 py-2 text-sm font-semibold shadow-sm hover:bg-amber-600 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+          </svg>
+          Nepřiřazení ({{ unassigned_count }})
+        </a>
+        {% endif %}
+        <div class="text-sm text-slate-500">
+          Přihlášený kouč: <span class="font-semibold text-slate-900">{{ request.user.get_full_name|default:request.user.username }}</span>
+        </div>
       </div>
     </header>
 

@@ -7,6 +7,11 @@ app_name = 'coaching'
 urlpatterns = [
     path("my-clients/", views.my_clients, name="my_clients"),
     path("api/clients/", views.my_clients_api, name="my_clients_api"),
+
+    # Unassigned users management
+    path("unassigned-users/", views.unassigned_users, name="unassigned_users"),
+    path("assign-client/<int:client_id>/", views.assign_client_to_self, name="assign_client"),
+
     path("client/<int:client_id>/", views.client_dashboard, name="client_dashboard"),
     path("client/<int:client_id>/documents/", views.client_documents, name="client_documents"),
     path("client/<int:client_id>/notes/", views.save_client_notes, name="save_client_notes"),
