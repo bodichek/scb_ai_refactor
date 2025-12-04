@@ -8,7 +8,7 @@ from dashboard.cashflow import calculate_cashflow
 def debug_cashflow(request):
     """Debug view pro kontrolu cashflow dat"""
     user = request.user
-    statements = FinancialStatement.objects.filter(owner=user).order_by("year")
+    statements = FinancialStatement.objects.filter(user=user).order_by("year")
     
     debug_info = {
         'user': str(user),
@@ -20,7 +20,8 @@ def debug_cashflow(request):
         cf_data = calculate_cashflow(user, statement.year)
         debug_info['statements'].append({
             'year': statement.year,
-            'raw_data': statement.data,
+            'income': statement.income,
+            'balance': statement.balance,
             'cashflow_calculated': cf_data is not None,
             'cashflow_data': cf_data
         })

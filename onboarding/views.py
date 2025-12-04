@@ -7,7 +7,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 
 from accounts.models import OnboardingProgress
-from ingest.views import _process_uploaded_file
+from ingest.views import _process_uploaded_file_vision
 from survey.models import Response, SurveySubmission
 from survey.views import QUESTIONS as SURVEY_QUESTIONS, generate_ai_summary
 from suropen.views import (
@@ -147,7 +147,7 @@ def upload_step(request):
             success = 0
             for f in files:
                 try:
-                    _process_uploaded_file(request.user, f)
+                    _process_uploaded_file_vision(request.user, f)
                     success += 1
                 except Exception as exc:
                     messages.error(request, f"Soubor {f.name} selhal: {exc}")

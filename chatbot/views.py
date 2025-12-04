@@ -12,6 +12,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from exports.services import get_latest_export
+from finance.utils import compute_metrics
 from ingest.models import Document, FinancialStatement
 from survey.models import Response, SurveySubmission
 from suropen.models import OpenAnswer
@@ -132,19 +133,6 @@ def _build_messages(
     ]
 
 
-FINANCIAL_METRIC_KEYS: List[str] = [
-    "Revenue",
-    "COGS",
-    "GrossMargin",
-    "Overheads",
-    "Depreciation",
-    "EBIT",
-    "NetProfit",
-    "CashFromCustomers",
-    "CashToSuppliers",
-]
-
-
 def _collect_user_context(user) -> Dict[str, Any]:
     # Build a snapshot of user-specific data that the assistant can leverage.
     # Returns an empty dict if nothing useful is available.
@@ -171,7 +159,7 @@ def _collect_user_context(user) -> Dict[str, Any]:
     # Financial statements overview
     try:
         statements = list(
-            FinancialStatement.objects.filter(owner=user)
+            FinancialStatement.objects.filter(user=user)
             .select_related("document")
             .order_by("-year")[:3]
         )
@@ -182,13 +170,21 @@ def _collect_user_context(user) -> Dict[str, Any]:
     if statements:
         snapshot: List[Dict[str, Any]] = []
         for stmt in statements:
-            data = stmt.data or {}
-            metrics = {key: data.get(key) for key in FINANCIAL_METRIC_KEYS if key in data}
+            metrics = compute_metrics(stmt)
             entry: Dict[str, Any] = {
                 "year": stmt.year,
                 "created_at": stmt.created_at.isoformat(),
-                "metrics": metrics,
-                "data": data,
+                "metrics": {
+                    "Revenue": metrics["revenue"],
+                    "COGS": metrics["cogs"],
+                    "GrossMargin": metrics["gross_margin"],
+                    "Overheads": metrics["overheads"],
+                    "EBIT": metrics["ebit"],
+                    "NetProfit": metrics["net_profit"],
+                },
+                "income": stmt.income,
+                "balance": stmt.balance,
+                "scale": stmt.scale,
             }
             document = getattr(stmt, "document", None)
             if document:

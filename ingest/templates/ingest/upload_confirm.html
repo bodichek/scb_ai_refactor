@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+  <script>
+    window.tailwind = window.tailwind || {};
+    window.tailwind.config = {
+      corePlugins: {
+        preflight: false,
+      },
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-[calc(100vh-140px)] bg-gradient-to-b from-sky-50/60 via-white to-slate-100 py-10">
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+    <section class="dashboard-card bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-6">
+      <div class="space-y-2">
+        <div class="flex items-center gap-3">
+          <svg class="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+          </svg>
+          <h1 class="text-2xl font-semibold text-slate-900">Varování - Data již existují</h1>
+        </div>
+        <p class="text-sm text-slate-600">Pro rok {{ year }} již máte nahraný dokument typu "{{ doc_type_name }}". Chcete stávající data přepsat?</p>
+      </div>
+
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+        <h3 class="text-sm font-semibold text-amber-900">Informace o souboru</h3>
+        <div class="space-y-2 text-sm text-amber-800">
+          <div class="flex justify-between">
+            <span class="font-medium">Nový soubor:</span>
+            <span>{{ file_name }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="font-medium">Rok:</span>
+            <span>{{ year }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="font-medium">Typ dokumentu:</span>
+            <span>{{ doc_type_name }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="font-medium">Confidence nového souboru:</span>
+            <span class="font-mono">{{ new_confidence }}%</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="font-medium">Confidence stávajícího:</span>
+            <span class="font-mono">{{ existing_confidence }}%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-red-50 border border-red-200 rounded-xl p-4">
+        <h3 class="text-sm font-semibold text-red-900 mb-2">⚠️ Co se stane při potvrzení?</h3>
+        <ul class="text-sm text-red-800 space-y-1 list-disc list-inside">
+          <li><strong>Stávající data budou PŘEPSÁNA</strong> novými hodnotami</li>
+          <li>Původní hodnoty z dokumentu typu "{{ doc_type_name }}" budou ztraceny</li>
+          <li>Starý PDF zůstane uložen, ale nebude na něj odkaz</li>
+          <li>Dashboard bude zobrazovat nová data</li>
+        </ul>
+      </div>
+
+      <form method="post" action="{% url 'upload_pdf' %}" class="space-y-6">
+        {% csrf_token %}
+        <input type="hidden" name="confirm_overwrite" value="yes">
+
+        <div class="flex gap-3 justify-end">
+          <a href="{% url 'upload_pdf' %}" class="inline-flex items-center gap-2 rounded-xl bg-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-300 transition">
+            Zrušit
+          </a>
+          <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-red-600/30 hover:bg-red-700 transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            Potvrdit a přepsat data
+          </button>
+        </div>
+      </form>
+    </section>
+  </div>
+</div>
+{% endblock %}

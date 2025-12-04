@@ -11,9 +11,9 @@ class DocumentAdmin(admin.ModelAdmin):
 
 @admin.register(FinancialStatement)
 class FinancialStatementAdmin(admin.ModelAdmin):
-    list_display = ("owner", "year", "doc_type", "scale", "document", "uploaded_at")
+    list_display = ("user", "year", "scale", "document", "uploaded_at")
 
     def uploaded_at(self, obj):
-        return obj.document.uploaded_at
+        return obj.document.uploaded_at if obj.document else None
     uploaded_at.admin_order_field = "document__uploaded_at"
     uploaded_at.short_description = "Uploaded at"

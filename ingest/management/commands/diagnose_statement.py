@@ -4,7 +4,7 @@ from typing import Any, Dict, Iterable, Optional
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 
-from finance.utils import compute_overheads, first_number, to_number
+from finance.utils import compute_metrics, compute_overheads, first_number
 from ingest.models import FinancialStatement
 
 
@@ -24,8 +24,8 @@ def _cogs_without_services(data: Dict[str, Any]) -> Optional[float]:
 
 class Command(BaseCommand):
     help = (
-        "Diagnostika uloženého výkazu: vypíše surová pole a odvozené hodnoty "
-        "(COGS, services, overheads) pro vybraného uživatele a rok."
+        "Diagnostika uloženého výkazu: vypíše základní hodnoty a odvozené metriky "
+        "pro vybraného uživatele a rok."
     )
 
     def add_arguments(self, parser):
@@ -39,41 +39,39 @@ class Command(BaseCommand):
         year = options["year"]
 
         fs = (
-            FinancialStatement.objects.filter(owner=user, year=year)
+            FinancialStatement.objects.filter(user=user, year=year)
             .order_by("-created_at")
             .first()
         )
         if not fs:
             raise CommandError(f"Nenalezen FinancialStatement pro uživatele {user} a rok {year}.")
 
-        data = fs.data or {}
+        income = fs.income or {}
+        balance = fs.balance or {}
+        metrics = compute_metrics(fs)
 
-        revenue = _get_metric(data, ("Revenue", "revenue"))
-        cogs_raw = _get_metric(data, ("COGS", "cogs"))
-        services = _get_metric(data, ("services", "Services"))
-        cogs_adjusted = _cogs_without_services(data)
-        cogs_goods = _get_metric(data, ("cogs_goods",))
-        cogs_materials = _get_metric(data, ("cogs_materials",))
+        services = _get_metric(income, ("services", "Services"))
+        cogs_adjusted = _cogs_without_services(income)
+        cogs_goods = _get_metric(income, ("cogs_goods",))
+        cogs_materials = _get_metric(income, ("cogs_materials",))
 
-        overheads = compute_overheads(data)
+        overheads = compute_overheads(income)
         overhead_components = {
             "services": services,
-            "personnel_wages": _get_metric(data, ("personnel_wages", "PersonnelWages")),
-            "personnel_insurance": _get_metric(data, ("personnel_insurance", "PersonnelInsurance")),
-            "taxes_fees": _get_metric(data, ("taxes_fees", "TaxesFees")),
-            "depreciation": _get_metric(data, ("depreciation", "Depreciation")),
-            "other_operating_costs": _get_metric(
-                data, ("other_operating_costs", "OtherOperatingCosts")
-            ),
-            "stored_overheads": _get_metric(data, ("Overheads", "overheads")),
+            "personnel_wages": _get_metric(income, ("personnel_wages", "PersonnelWages")),
+            "personnel_insurance": _get_metric(income, ("personnel_insurance", "PersonnelInsurance")),
+            "taxes_fees": _get_metric(income, ("taxes_fees", "TaxesFees")),
+            "depreciation": _get_metric(income, ("depreciation", "Depreciation")),
+            "other_operating_costs": _get_metric(income, ("other_operating_costs", "OtherOperatingCosts")),
+            "stored_overheads": _get_metric(income, ("Overheads", "overheads")),
         }
 
         payload = {
             "user": str(user),
             "year": year,
             "raw_fields": {
-                "Revenue": revenue,
-                "COGS": cogs_raw,
+                "Revenue": metrics["revenue"],
+                "COGS": _get_metric(income, ("COGS", "cogs")),
                 "services": services,
                 "cogs_goods": cogs_goods,
                 "cogs_materials": cogs_materials,
@@ -83,7 +81,11 @@ class Command(BaseCommand):
                 "cogs_without_services": cogs_adjusted,
                 "overheads_total": overheads,
                 "overhead_components": overhead_components,
-                "gross_margin": (revenue - cogs_adjusted) if (revenue is not None and cogs_adjusted is not None) else None,
+                "gross_margin": metrics["gross_margin"],
+            },
+            "datasets": {
+                "income": income,
+                "balance": balance,
             },
         }
 

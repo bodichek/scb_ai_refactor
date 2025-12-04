@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block extra_head %}
   <script>
@@ -18,8 +18,8 @@
     <section class="dashboard-card bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-6">
       <div class="space-y-2">
         <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Ingest</p>
-        <h1 class="text-2xl font-semibold text-slate-900">Nahrát více výkazů</h1>
-        <p class="text-sm text-slate-500">Vyber více PDF najednou. Každý soubor analyzujeme samostatně.</p>
+        <h1 class="text-2xl font-semibold text-slate-900">Nahrat vice vykazu</h1>
+        <p class="text-sm text-slate-500">Vyber vice PDF najednou. Kazdy soubor analyzujeme samostatne.</p>
       </div>
 
       <form method="post" enctype="multipart/form-data" class="space-y-6">
@@ -27,12 +27,12 @@
         <div class="flex flex-col gap-2">
           <label for="pdf_files" class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">PDF soubory</label>
           <input type="file" name="pdf_files" id="pdf_files" accept="application/pdf" multiple class="block w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-sky-500 focus:ring-sky-500" required>
-          <p class="text-xs text-slate-400">Podporujeme PDF do 10 MB. Pojmenuj soubory podle roku (např. 2023_vysledovka.pdf).</p>
+          <p class="text-xs text-slate-400">Podporujeme PDF do 10 MB. Pojmenuj soubory podle roku (napr. 2023_vysledovka.pdf).</p>
         </div>
 
         <div class="flex justify-end">
           <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-600/30 hover:bg-sky-700 transition">
-            📚 Nahrát soubory
+            Nahrat soubory
           </button>
         </div>
       </form>
