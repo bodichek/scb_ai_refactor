@@ -1,59 +1,84 @@
 {% load custom_tags %}
-{% if cashflow_table %}
+{% if cashflow %}
 <table class="min-w-full divide-y divide-slate-200 text-sm">
   <thead class="bg-slate-50/80 text-slate-500 uppercase tracking-wide text-xs">
     <tr>
-      <th class="px-4 py-3 text-left">Položka</th>
+      <th class="px-4 py-3 text-left">Kategorie</th>
       <th class="px-4 py-3 text-right">Hodnota (v tis. Kč)</th>
     </tr>
   </thead>
   <tbody class="divide-y divide-slate-200/70 bg-white/90">
-    {% for block in cashflow_table %}
-    <tr class="bg-slate-50/90 text-slate-900 font-semibold">
-      <td class="px-4 py-3" colspan="2">{{ block.title }}</td>
+    <!-- Provozní činnost -->
+    <tr class="bg-slate-100/95 text-slate-900 font-semibold">
+      <td class="px-4 py-3" colspan="2">Cash Flow z provozní činnosti</td>
     </tr>
-    {% for row in block.rows %}
     <tr>
-      <td class="px-4 py-3 text-slate-600">{{ row.label }}</td>
-      <td class="px-4 py-3 text-right {% if row.highlight %}font-semibold text-slate-900{% else %}text-slate-700{% endif %}">
-        {% if row.value is not None %}
-          {{ row.value|format_kc }}
-        {% else %}
-          <span class="text-slate-400">–</span>
-        {% endif %}
-      </td>
+      <td class="px-4 py-3 text-slate-600 pl-8">Čistý zisk</td>
+      <td class="px-4 py-3 text-right text-slate-700">{{ cashflow.net_profit|format_kc }}</td>
     </tr>
-    {% endfor %}
-    {% endfor %}
-    <tr class="bg-slate-100/90 font-semibold text-slate-900">
-      <td class="px-4 py-3">Čistý peněžní tok</td>
-      <td class="px-4 py-3 text-right">
-        {% if cashflow %}
-          {{ cashflow.net_cash_flow|format_kc }}
-        {% else %}
-          <span class="text-slate-400">–</span>
-        {% endif %}
-      </td>
+    <tr>
+      <td class="px-4 py-3 text-slate-600 pl-8">+ Odpisy</td>
+      <td class="px-4 py-3 text-right text-slate-700">{{ cashflow.depreciation|format_kc }}</td>
     </tr>
-    <tr class="bg-slate-50/90 text-slate-700">
-      <td class="px-4 py-3">Počáteční hotovost</td>
-      <td class="px-4 py-3 text-right">
-        {% if cashflow %}
-          {{ cashflow.cash_begin|format_kc }}
-        {% else %}
-          <span class="text-slate-400">–</span>
-        {% endif %}
-      </td>
+    <tr>
+      <td class="px-4 py-3 text-slate-600 pl-8">± Změna pracovního kapitálu</td>
+      <td class="px-4 py-3 text-right text-slate-700">{{ cashflow.working_capital_change|format_kc }}</td>
     </tr>
-    <tr class="bg-slate-50/90 text-slate-700">
-      <td class="px-4 py-3">Konečná hotovost</td>
-      <td class="px-4 py-3 text-right">
-        {% if cashflow %}
-          {{ cashflow.cash_end|format_kc }}
-        {% else %}
-          <span class="text-slate-400">–</span>
-        {% endif %}
-      </td>
+    <tr class="bg-slate-50/80">
+      <td class="px-4 py-3 font-semibold text-slate-800 pl-6">= Provozní cash flow</td>
+      <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ cashflow.operating_cf|format_kc }}</td>
+    </tr>
+
+    <!-- Investiční činnost -->
+    <tr class="bg-slate-100/95 text-slate-900 font-semibold">
+      <td class="px-4 py-3" colspan="2">Cash Flow z investiční činnosti</td>
+    </tr>
+    <tr>
+      <td class="px-4 py-3 text-slate-600 pl-8">Investice do majetku (CapEx)</td>
+      <td class="px-4 py-3 text-right text-slate-700">-{{ cashflow.capex|format_kc }}</td>
+    </tr>
+    <tr>
+      <td class="px-4 py-3 text-slate-600 pl-8">Prodej majetku</td>
+      <td class="px-4 py-3 text-right text-slate-700">{{ cashflow.asset_sales|format_kc }}</td>
+    </tr>
+    <tr class="bg-slate-50/80">
+      <td class="px-4 py-3 font-semibold text-slate-800 pl-6">= Investiční cash flow</td>
+      <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ cashflow.investing_cf|format_kc }}</td>
+    </tr>
+
+    <!-- Finanční činnost -->
+    <tr class="bg-slate-100/95 text-slate-900 font-semibold">
+      <td class="px-4 py-3" colspan="2">Cash Flow z finanční činnosti</td>
+    </tr>
+    <tr>
+      <td class="px-4 py-3 text-slate-600 pl-8">Přijaté úvěry</td>
+      <td class="px-4 py-3 text-right text-slate-700">{{ cashflow.loans_received|format_kc }}</td>
+    </tr>
+    <tr>
+      <td class="px-4 py-3 text-slate-600 pl-8">Splacené úvěry</td>
+      <td class="px-4 py-3 text-right text-slate-700">-{{ cashflow.loans_repaid|format_kc }}</td>
+    </tr>
+    <tr>
+      <td class="px-4 py-3 text-slate-600 pl-8">Vyplacené dividendy</td>
+      <td class="px-4 py-3 text-right text-slate-700">-{{ cashflow.dividends_paid|format_kc }}</td>
+    </tr>
+    <tr class="bg-slate-50/80">
+      <td class="px-4 py-3 font-semibold text-slate-800 pl-6">= Finanční cash flow</td>
+      <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ cashflow.financing_cf|format_kc }}</td>
+    </tr>
+
+    <!-- Celkový součet -->
+    <tr class="bg-sky-50/90 border-t-2 border-sky-200">
+      <td class="px-4 py-3 font-bold text-slate-900">Čistý peněžní tok</td>
+      <td class="px-4 py-3 text-right font-bold text-slate-900">{{ cashflow.net_cash_flow|format_kc }}</td>
+    </tr>
+    <tr class="bg-slate-50/90">
+      <td class="px-4 py-3 text-slate-700">Počáteční hotovost</td>
+      <td class="px-4 py-3 text-right text-slate-700">{{ cashflow.cash_begin|format_kc }}</td>
+    </tr>
+    <tr class="bg-sky-100/90 border-t border-sky-200">
+      <td class="px-4 py-3 font-bold text-slate-900">Konečná hotovost</td>
+      <td class="px-4 py-3 text-right font-bold text-slate-900">{{ cashflow.cash_end|format_kc }}</td>
     </tr>
   </tbody>
 </table>
