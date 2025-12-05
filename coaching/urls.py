@@ -1,10 +1,12 @@
 # coaching/urls.py
 from django.urls import path
+from django.views.generic import RedirectView
 from . import views
 
 app_name = 'coaching'
 
 urlpatterns = [
+    path("", RedirectView.as_view(pattern_name="coaching:my_clients"), name="coaching_home"),
     path("my-clients/", views.my_clients, name="my_clients"),
     path("api/clients/", views.my_clients_api, name="my_clients_api"),
 

@@ -88,10 +88,15 @@ def my_clients(request):
             })
         
         # Počet nepřiřazených uživatelů (pro badge)
+        from accounts.models import UserRole
+        coach_user_ids = UserRole.objects.filter(role='coach').values_list('user_id', flat=True)
+
         unassigned_count = CompanyProfile.objects.filter(
             assigned_coach__isnull=True
         ).exclude(
             user__usercoachassignment__isnull=False
+        ).exclude(
+            user_id__in=coach_user_ids  # Vyfiltruj kouče
         ).count()
 
         context = {
@@ -416,13 +421,20 @@ def unassigned_users(request):
     Zobrazí nepřiřazené uživatele (bez kouče)
     Všichni kouči vidí stejný seznam nepřiřazených uživatelů
     """
+    from accounts.models import UserRole
+
     coach = get_object_or_404(Coach, user=request.user)
 
-    # Najdi uživatele bez kouče (v obou systémech)
+    # Získej ID všech koučů (nesmí se zobrazit jako nepřiřazení)
+    coach_user_ids = UserRole.objects.filter(role='coach').values_list('user_id', flat=True)
+
+    # Najdi uživatele bez kouče (v obou systémech) + vyfiltruj kouče
     unassigned = CompanyProfile.objects.filter(
         assigned_coach__isnull=True  # Legacy system
     ).exclude(
         user__usercoachassignment__isnull=False  # New system
+    ).exclude(
+        user_id__in=coach_user_ids  # Vyfiltruj kouče
     ).select_related('user').order_by('-created_at')
 
     # Přidej statistiky pro každého
