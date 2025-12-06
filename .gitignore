@@ -21,9 +21,15 @@ poetry.lock
 
 # Django
 db.sqlite3
+db.sqlite3.*
 media/
 staticfiles/
 *.log
+
+# Database backups
+backup_*.json
+backup_*.sql
+*.backup_*
 
 # Environment
 .env
