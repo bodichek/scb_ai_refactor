@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% load static %}
+{% load custom_tags %}
+
+{% block title %}Nepřiřazení uživatelé{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h2><i class="fas fa-user-plus"></i> Nepřiřazení uživatelé</h2>
+          <p class="text-muted">
+            Uživatelé bez přiřazeného kouče. Můžete si je přiřadit k sobě kliknutím na tlačítko "Přiřadit".
+          </p>
+        </div>
+        <div>
+          <a href="{% url 'coaching:my_clients' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Zpět na moje klienty
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Statistics Card -->
+  <div class="row mb-4">
+    <div class="col-md-3">
+      <div class="card border-warning">
+        <div class="card-body text-center">
+          <h3 class="text-warning mb-0">{{ total_count }}</h3>
+          <p class="text-muted mb-0">Nepřiřazených uživatelů</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Unassigned Users Table -->
+  {% if unassigned_users %}
+  <div class="card shadow-sm">
+    <div class="card-header bg-light">
+      <h5 class="mb-0">Seznam nepřiřazených uživatelů</h5>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Firma</th>
+              <th>IČO</th>
+              <th>Kontakt</th>
+              <th>Email</th>
+              <th>Registrace</th>
+              <th>Dokumenty</th>
+              <th>Onboarding</th>
+              <th>Akce</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in unassigned_users %}
+            <tr id="user-row-{{ item.profile.id }}">
+              <td>
+                <strong>{{ item.profile.company_name }}</strong>
+                {% if item.profile.industry %}
+                  <br><small class="text-muted">{{ item.profile.industry }}</small>
+                {% endif %}
+              </td>
+              <td>{{ item.profile.ico|default:"—" }}</td>
+              <td>{{ item.profile.contact_person|default:"—" }}</td>
+              <td>
+                <a href="mailto:{{ item.profile.user.email }}">{{ item.profile.user.email }}</a>
+              </td>
+              <td>
+                <span class="badge
+                  {% if item.days_since_registration <= 7 %}bg-success
+                  {% elif item.days_since_registration <= 30 %}bg-info
+                  {% else %}bg-secondary{% endif %}">
+                  před {{ item.days_since_registration }} dny
+                </span>
+              </td>
+              <td>
+                <span class="badge
+                  {% if item.docs_count == 0 %}bg-danger
+                  {% elif item.docs_count <= 3 %}bg-warning
+                  {% else %}bg-success{% endif %}">
+                  {{ item.docs_count }}
+                </span>
+              </td>
+              <td>
+                {% if item.has_completed_onboarding %}
+                  <span class="badge bg-success"><i class="fas fa-check"></i> Dokončeno</span>
+                {% else %}
+                  <span class="badge bg-warning"><i class="fas fa-clock"></i> Nedokončeno</span>
+                {% endif %}
+              </td>
+              <td>
+                <button
+                  class="btn btn-sm btn-primary assign-btn"
+                  data-client-id="{{ item.profile.id }}"
+                  data-client-name="{{ item.profile.company_name }}"
+                  onclick="assignClient({{ item.profile.id }}, '{{ item.profile.company_name|escapejs }}')">
+                  <i class="fas fa-user-plus"></i> Přiřadit
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="card shadow-sm">
+    <div class="card-body text-center py-5">
+      <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+      <h4>Skvělé!</h4>
+      <p class="text-muted mb-0">Všichni uživatelé mají přiřazeného kouče.</p>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<style>
+.card {
+  border-radius: 12px;
+  border: none;
+}
+
+.card-header {
+  border-radius: 12px 12px 0 0 !important;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.table th {
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6c757d;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.table tbody tr:hover {
+  background-color: rgba(0, 123, 255, 0.05);
+}
+
+.assign-btn:disabled {
+  cursor: not-allowed;
+}
+</style>
+
+<script>
+function assignClient(clientId, clientName) {
+  if (!confirm(`Opravdu chcete přiřadit klienta "${clientName}" k sobě?`)) {
+    return;
+  }
+
+  const btn = document.querySelector(`button[data-client-id="${clientId}"]`);
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Přiřazuji...';
+
+  fetch(`/coaching/assign-client/${clientId}/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken'),
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json',
+    },
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Remove row with animation
+      const row = document.getElementById(`user-row-${clientId}`);
+      row.style.transition = 'opacity 0.3s ease';
+      row.style.opacity = '0';
+
+      setTimeout(() => {
+        row.remove();
+
+        // Update count
+        const remaining = document.querySelectorAll('tbody tr').length;
+        if (remaining === 0) {
+          location.reload(); // Reload to show success message
+        }
+      }, 300);
+
+      // Show success toast (if you have toast system)
+      showToast('success', `Klient ${clientName} byl přiřazen.`);
+    } else {
+      alert('Chyba: ' + (data.error || 'Neznámá chyba'));
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Došlo k chybě při přiřazování klienta.');
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+  });
+}
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+function showToast(type, message) {
+  // Simple toast implementation (you can replace with Bootstrap toast or custom)
+  const toast = document.createElement('div');
+  toast.className = `alert alert-${type === 'success' ? 'success' : 'danger'} position-fixed top-0 end-0 m-3`;
+  toast.style.zIndex = '9999';
+  toast.innerHTML = `
+    <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+    ${message}
+  `;
+  document.body.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.transition = 'opacity 0.3s ease';
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+</script>
+{% endblock %}

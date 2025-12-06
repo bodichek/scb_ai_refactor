@@ -1,4 +1,4 @@
-﻿from django.shortcuts import render, get_object_or_404, redirect
+from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
@@ -87,6 +87,18 @@ def my_clients(request):
                 'description': f'NahrÃ¡l dokument: {doc.get_doc_type_display()}'
             })
         
+        # Počet nepřiřazených uživatelů (pro badge)
+        from accounts.models import UserRole
+        coach_user_ids = UserRole.objects.filter(role='coach').values_list('user_id', flat=True)
+
+        unassigned_count = CompanyProfile.objects.filter(
+            assigned_coach__isnull=True
+        ).exclude(
+            user__usercoachassignment__isnull=False
+        ).exclude(
+            user_id__in=coach_user_ids  # Vyfiltruj kouče
+        ).count()
+
         context = {
             'clients': clients_data,
             'clients_count': clients_count,
@@ -96,6 +108,7 @@ def my_clients(request):
             'recent_activities': recent_activities,
             'search_query': search_query,
             'coach_profile': coach,
+            'unassigned_count': unassigned_count,
         }
         
         return render(request, 'coaching/modern_dashboard.html', context)
@@ -397,3 +410,100 @@ def my_clients_api(request):
     })
 
 
+
+
+# === Unassigned Users Management ===
+
+@login_required
+@coach_required
+def unassigned_users(request):
+    """
+    Zobrazí nepřiřazené uživatele (bez kouče)
+    Všichni kouči vidí stejný seznam nepřiřazených uživatelů
+    """
+    from accounts.models import UserRole
+
+    coach = get_object_or_404(Coach, user=request.user)
+
+    # Získej ID všech koučů (nesmí se zobrazit jako nepřiřazení)
+    coach_user_ids = UserRole.objects.filter(role='coach').values_list('user_id', flat=True)
+
+    # Najdi uživatele bez kouče (v obou systémech) + vyfiltruj kouče
+    unassigned = CompanyProfile.objects.filter(
+        assigned_coach__isnull=True  # Legacy system
+    ).exclude(
+        user__usercoachassignment__isnull=False  # New system
+    ).exclude(
+        user_id__in=coach_user_ids  # Vyfiltruj kouče
+    ).select_related('user').order_by('-created_at')
+
+    # Přidej statistiky pro každého
+    unassigned_data = []
+    for profile in unassigned:
+        docs_count = Document.objects.filter(owner=profile.user).count()
+        days_since_reg = (timezone.now() - profile.user.date_joined).days
+
+        unassigned_data.append({
+            'profile': profile,
+            'docs_count': docs_count,
+            'days_since_registration': days_since_reg,
+            'has_completed_onboarding': hasattr(profile.user, 'onboarding_progress') and
+                                       profile.user.onboarding_progress.is_completed
+        })
+
+    context = {
+        'unassigned_users': unassigned_data,
+        'total_count': len(unassigned_data),
+        'coach': coach,
+    }
+
+    return render(request, 'coaching/unassigned_users.html', context)
+
+
+@login_required
+@coach_required
+def assign_client_to_self(request, client_id):
+    """
+    Kouč si přiřadí klienta k sobě
+    POST endpoint
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+
+    coach = get_object_or_404(Coach, user=request.user)
+    client_profile = get_object_or_404(CompanyProfile, id=client_id)
+
+    # Zkontroluj, že klient ještě nemá kouče
+    if client_profile.assigned_coach or UserCoachAssignment.objects.filter(client=client_profile.user).exists():
+        return JsonResponse({
+            'success': False,
+            'error': 'Tento klient již má přiřazeného kouče'
+        }, status=400)
+
+    # Přiřaď v obou systémech
+    try:
+        # Nový systém
+        UserCoachAssignment.objects.create(
+            coach=coach,
+            client=client_profile.user,
+            notes='Kouč si přiřadil klienta sám'
+        )
+
+        # Legacy systém (backward compatibility)
+        client_profile.assigned_coach = coach
+        client_profile.save(update_fields=['assigned_coach'])
+
+        messages.success(request, f'Klient {client_profile.company_name} byl úspěšně přiřazen.')
+
+        # Return JSON or redirect based on request type
+        if request.headers.get('Accept') == 'application/json' or            request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'client_name': client_profile.company_name,
+                'redirect_url': '/coaching/my-clients/'
+            })
+        else:
+            return redirect('coaching:my_clients')
+
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
