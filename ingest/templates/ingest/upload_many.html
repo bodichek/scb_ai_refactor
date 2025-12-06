@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 
 {% block extra_head %}
   <script>
@@ -10,6 +10,64 @@
     };
   </script>
   <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <style>
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 1; }
+      50% { transform: scale(1.05); opacity: 0.7; }
+      100% { transform: scale(0.95); opacity: 1; }
+    }
+
+    @keyframes slide-up {
+      from { transform: translateY(10px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    @keyframes spin-slow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes fade-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .pulse-ring {
+      animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    .slide-up {
+      animation: slide-up 0.4s ease-out;
+    }
+
+    .spin-slow {
+      animation: spin-slow 2s linear infinite;
+    }
+
+    .fade-in {
+      animation: fade-in 0.3s ease-in;
+    }
+
+    .progress-bar-animated {
+      transition: width 0.5s ease-out;
+    }
+
+    /* File drop zone hover effect */
+    .file-drop-zone {
+      transition: all 0.3s ease;
+    }
+
+    .file-drop-zone:hover {
+      border-color: rgb(14 165 233);
+      background-color: rgb(240 249 255);
+    }
+
+    .file-drop-zone.drag-over {
+      border-color: rgb(2 132 199);
+      background-color: rgb(224 242 254);
+      transform: scale(1.02);
+    }
+  </style>
 {% endblock %}
 
 {% block content %}
@@ -22,21 +80,389 @@
         <p class="text-sm text-slate-500">Vyber vice PDF najednou. Kazdy soubor analyzujeme samostatne.</p>
       </div>
 
-      <form method="post" enctype="multipart/form-data" class="space-y-6">
+      <!-- Upload Form -->
+      <form method="post" enctype="multipart/form-data" class="space-y-6" id="uploadForm">
         {% csrf_token %}
+
+        <!-- File Drop Zone -->
         <div class="flex flex-col gap-2">
           <label for="pdf_files" class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">PDF soubory</label>
-          <input type="file" name="pdf_files" id="pdf_files" accept="application/pdf" multiple class="block w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-sky-500 focus:ring-sky-500" required>
-          <p class="text-xs text-slate-400">Podporujeme PDF do 10 MB. Pojmenuj soubory podle roku (napr. 2023_vysledovka.pdf).</p>
+          <div class="file-drop-zone rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/50 p-8 text-center cursor-pointer" id="dropZone">
+            <input type="file" name="pdf_files" id="pdf_files" accept="application/pdf" multiple class="hidden" required>
+            <div id="dropZoneContent">
+              <svg class="mx-auto h-12 w-12 text-slate-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <p class="text-sm font-medium text-slate-700 mb-1">Klikni nebo pretahni PDF soubory</p>
+              <p class="text-xs text-slate-500">Podporujeme PDF do 10 MB. Pojmenuj soubory podle roku (napr. 2023_vysledovka.pdf).</p>
+            </div>
+            <div id="selectedFiles" class="hidden mt-4 space-y-2">
+              <!-- Selected files will be listed here -->
+            </div>
+          </div>
         </div>
 
         <div class="flex justify-end">
-          <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-600/30 hover:bg-sky-700 transition">
-            Nahrat soubory
+          <button type="submit" id="submitBtn" class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-600/30 hover:bg-sky-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+            <span id="submitBtnText">Nahrat soubory</span>
           </button>
         </div>
       </form>
+
+      <!-- Overall Progress Section (Hidden by default) -->
+      <div id="overallProgress" class="hidden space-y-4 pt-4 border-t border-slate-200">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-slate-700">Celkovy pokrok</h3>
+          <span id="overallPercent" class="text-sm font-medium text-sky-600">0%</span>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+          <div id="overallBar" class="bg-gradient-to-r from-sky-500 to-blue-600 h-2 progress-bar-animated" style="width: 0%"></div>
+        </div>
+
+        <!-- Summary Stats -->
+        <div class="grid grid-cols-3 gap-4 text-center">
+          <div class="p-3 bg-blue-50 rounded-lg">
+            <div class="text-2xl font-bold text-blue-600" id="countTotal">0</div>
+            <div class="text-xs text-blue-700">Celkem</div>
+          </div>
+          <div class="p-3 bg-green-50 rounded-lg">
+            <div class="text-2xl font-bold text-green-600" id="countSuccess">0</div>
+            <div class="text-xs text-green-700">Uspesne</div>
+          </div>
+          <div class="p-3 bg-amber-50 rounded-lg">
+            <div class="text-2xl font-bold text-amber-600" id="countProcessing">0</div>
+            <div class="text-xs text-amber-700">Zpracovavam</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Upload Queue Table -->
+    <section id="uploadQueueSection" class="hidden dashboard-card bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6">
+      <h2 class="text-lg font-semibold text-slate-900 mb-4">Nahravane soubory</h2>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-200">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Soubor</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Velikost</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Status</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Progress</th>
+            </tr>
+          </thead>
+          <tbody id="uploadQueueBody" class="bg-white divide-y divide-slate-100">
+            <!-- Rows will be added dynamically -->
+          </tbody>
+        </table>
+      </div>
     </section>
   </div>
 </div>
+
+<script>
+(function() {
+  const form = document.getElementById('uploadForm');
+  const fileInput = document.getElementById('pdf_files');
+  const dropZone = document.getElementById('dropZone');
+  const dropZoneContent = document.getElementById('dropZoneContent');
+  const selectedFiles = document.getElementById('selectedFiles');
+  const submitBtn = document.getElementById('submitBtn');
+  const submitBtnText = document.getElementById('submitBtnText');
+  const overallProgress = document.getElementById('overallProgress');
+  const overallBar = document.getElementById('overallBar');
+  const overallPercent = document.getElementById('overallPercent');
+  const countTotal = document.getElementById('countTotal');
+  const countSuccess = document.getElementById('countSuccess');
+  const countProcessing = document.getElementById('countProcessing');
+  const uploadQueueSection = document.getElementById('uploadQueueSection');
+  const uploadQueueBody = document.getElementById('uploadQueueBody');
+
+  let uploadedFiles = [];
+  let completedCount = 0;
+
+  // File drop zone click handler
+  dropZone.addEventListener('click', function() {
+    fileInput.click();
+  });
+
+  // File selection handler
+  fileInput.addEventListener('change', function() {
+    if (this.files && this.files.length > 0) {
+      uploadedFiles = Array.from(this.files);
+      displaySelectedFiles();
+    }
+  });
+
+  // Display selected files
+  function displaySelectedFiles() {
+    selectedFiles.innerHTML = '';
+    selectedFiles.classList.remove('hidden');
+    dropZoneContent.classList.add('opacity-50');
+
+    uploadedFiles.forEach((file, index) => {
+      const fileDiv = document.createElement('div');
+      fileDiv.className = 'flex items-center justify-between p-2 bg-white rounded border border-slate-200 text-xs fade-in';
+      fileDiv.innerHTML = `
+        <span class="text-slate-700 font-medium truncate">${file.name}</span>
+        <span class="text-slate-500 ml-2">${formatFileSize(file.size)}</span>
+      `;
+      selectedFiles.appendChild(fileDiv);
+    });
+
+    submitBtnText.textContent = `Nahrat ${uploadedFiles.length} soubor${uploadedFiles.length > 1 ? 'y' : ''}`;
+  }
+
+  // Drag and drop handlers
+  dropZone.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.classList.add('drag-over');
+  });
+
+  dropZone.addEventListener('dragleave', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.classList.remove('drag-over');
+  });
+
+  dropZone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.classList.remove('drag-over');
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      // Filter only PDF files
+      const pdfFiles = Array.from(files).filter(f => f.type === 'application/pdf');
+
+      if (pdfFiles.length === 0) {
+        alert('Prosim, nahrajte pouze PDF soubory.');
+        return;
+      }
+
+      // Create a FileList-like object
+      const dataTransfer = new DataTransfer();
+      pdfFiles.forEach(file => dataTransfer.items.add(file));
+      fileInput.files = dataTransfer.files;
+
+      const event = new Event('change');
+      fileInput.dispatchEvent(event);
+    }
+  });
+
+  // Form submission with progress tracking
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+      alert('Prosim, vyberte alespon jeden soubor.');
+      return;
+    }
+
+    uploadedFiles = Array.from(fileInput.files);
+    completedCount = 0;
+
+    // Show progress sections
+    overallProgress.classList.remove('hidden');
+    overallProgress.classList.add('slide-up');
+    uploadQueueSection.classList.remove('hidden');
+    uploadQueueSection.classList.add('slide-up');
+
+    submitBtn.disabled = true;
+    submitBtnText.textContent = 'Nahravani...';
+
+    // Initialize stats
+    countTotal.textContent = uploadedFiles.length;
+    countSuccess.textContent = '0';
+    countProcessing.textContent = uploadedFiles.length;
+
+    // Create queue table rows
+    uploadQueueBody.innerHTML = '';
+    uploadedFiles.forEach((file, index) => {
+      const row = createQueueRow(file, index);
+      uploadQueueBody.appendChild(row);
+    });
+
+    // Process files sequentially
+    processFilesSequentially(0);
+  });
+
+  function createQueueRow(file, index) {
+    const row = document.createElement('tr');
+    row.id = `file-row-${index}`;
+    row.className = 'fade-in';
+    row.innerHTML = `
+      <td class="px-4 py-3 text-sm text-slate-700 font-medium">${file.name}</td>
+      <td class="px-4 py-3 text-sm text-slate-500">${formatFileSize(file.size)}</td>
+      <td class="px-4 py-3">
+        <span id="status-${index}" class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700">
+          <svg class="h-3 w-3 spin-slow" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Ceka
+        </span>
+      </td>
+      <td class="px-4 py-3">
+        <div class="w-full bg-slate-200 rounded-full h-1.5">
+          <div id="progress-${index}" class="bg-sky-500 h-1.5 rounded-full progress-bar-animated" style="width: 0%"></div>
+        </div>
+      </td>
+    `;
+    return row;
+  }
+
+  function processFilesSequentially(index) {
+    if (index >= uploadedFiles.length) {
+      // All files processed
+      submitBtnText.textContent = 'Vsechny soubory nahrane!';
+      setTimeout(() => {
+        window.location.href = '/ingest/documents/';
+      }, 2000);
+      return;
+    }
+
+    const file = uploadedFiles[index];
+    uploadFile(file, index, () => {
+      completedCount++;
+      updateOverallProgress();
+      processFilesSequentially(index + 1);
+    });
+  }
+
+  function uploadFile(file, index, callback) {
+    const formData = new FormData();
+    formData.append('pdf_files', file);
+
+    // Add CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    formData.append('csrfmiddlewaretoken', csrfToken);
+
+    const xhr = new XMLHttpRequest();
+
+    // Update status to uploading
+    updateFileStatus(index, 'uploading', 'Nahravam...', 'amber');
+
+    // Upload progress
+    xhr.upload.addEventListener('progress', function(e) {
+      if (e.lengthComputable) {
+        const percent = Math.round((e.loaded / e.total) * 100);
+        updateFileProgress(index, percent * 0.3); // 0-30%
+      }
+    });
+
+    // State changes
+    xhr.addEventListener('readystatechange', function() {
+      if (xhr.readyState === XMLHttpRequest.HEADERS_RECEIVED) {
+        updateFileProgress(index, 30);
+        updateFileStatus(index, 'processing', 'Analyzuji...', 'blue');
+        simulateFileProcessing(index);
+      }
+    });
+
+    // Response received
+    xhr.addEventListener('load', function() {
+      if (xhr.status === 200 || xhr.status === 302) {
+        updateFileProgress(index, 100);
+        updateFileStatus(index, 'success', 'Hotovo', 'green');
+        countSuccess.textContent = parseInt(countSuccess.textContent) + 1;
+        countProcessing.textContent = parseInt(countProcessing.textContent) - 1;
+        callback();
+      } else {
+        updateFileProgress(index, 0);
+        updateFileStatus(index, 'error', 'Chyba', 'red');
+        countProcessing.textContent = parseInt(countProcessing.textContent) - 1;
+        callback();
+      }
+    });
+
+    // Error handler
+    xhr.addEventListener('error', function() {
+      updateFileProgress(index, 0);
+      updateFileStatus(index, 'error', 'Chyba pripojeni', 'red');
+      countProcessing.textContent = parseInt(countProcessing.textContent) - 1;
+      callback();
+    });
+
+    xhr.open('POST', form.action || window.location.href);
+    xhr.send(formData);
+  }
+
+  function simulateFileProcessing(index) {
+    // Simulate processing stages
+    const stages = [
+      { progress: 50, delay: 800 },
+      { progress: 70, delay: 1500 },
+      { progress: 90, delay: 1000 }
+    ];
+
+    let currentStage = 0;
+
+    function processStage() {
+      if (currentStage < stages.length) {
+        setTimeout(() => {
+          updateFileProgress(index, stages[currentStage].progress);
+          currentStage++;
+          processStage();
+        }, stages[currentStage].delay);
+      }
+    }
+
+    processStage();
+  }
+
+  function updateFileStatus(index, type, text, color) {
+    const statusEl = document.getElementById(`status-${index}`);
+    if (!statusEl) return;
+
+    let icon = '';
+    let bgClass = '';
+    let textClass = '';
+
+    if (type === 'uploading') {
+      icon = '<svg class="h-3 w-3 spin-slow" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+      bgClass = 'bg-amber-100';
+      textClass = 'text-amber-700';
+    } else if (type === 'processing') {
+      icon = '<svg class="h-3 w-3 spin-slow" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+      bgClass = 'bg-blue-100';
+      textClass = 'text-blue-700';
+    } else if (type === 'success') {
+      icon = '<svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>';
+      bgClass = 'bg-green-100';
+      textClass = 'text-green-700';
+    } else {
+      icon = '<svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>';
+      bgClass = 'bg-red-100';
+      textClass = 'text-red-700';
+    }
+
+    statusEl.className = `inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full ${bgClass} ${textClass}`;
+    statusEl.innerHTML = `${icon}${text}`;
+  }
+
+  function updateFileProgress(index, percent) {
+    const progressEl = document.getElementById(`progress-${index}`);
+    if (progressEl) {
+      progressEl.style.width = percent + '%';
+    }
+  }
+
+  function updateOverallProgress() {
+    const percent = Math.round((completedCount / uploadedFiles.length) * 100);
+    overallBar.style.width = percent + '%';
+    overallPercent.textContent = percent + '%';
+  }
+
+  function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  }
+})();
+</script>
 {% endblock %}

@@ -2,6 +2,7 @@ import logging
 import os
 import tempfile
 import uuid
+from datetime import datetime
 from typing import Any, Dict
 
 from django.contrib import messages
@@ -279,7 +280,10 @@ def upload_pdf(request):
         messages.error(request, result.get("error") or "Soubor se nepodařilo analyzovat.")
         return redirect("upload_pdf")
 
-    return render(request, "ingest/upload.html")
+    # GET request - show form with year options
+    current_year = datetime.now().year
+    years = list(range(current_year - 10, current_year + 2))
+    return render(request, "ingest/upload.html", {"years": years})
 
 
 # ================================================================
