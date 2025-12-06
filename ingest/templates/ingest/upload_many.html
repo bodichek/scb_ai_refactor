@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 
 {% block extra_head %}
   <script>
@@ -10,11 +10,110 @@
     };
   </script>
   <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <style>
+    @keyframes slide-up {
+      from { transform: translateY(10px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    @keyframes spin-slow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes fade-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes count-up {
+      from { transform: scale(0.8); }
+      to { transform: scale(1); }
+    }
+
+    .slide-up {
+      animation: slide-up 0.4s ease-out;
+    }
+
+    .spin-slow {
+      animation: spin-slow 2s linear infinite;
+    }
+
+    .fade-in {
+      animation: fade-in 0.3s ease-in;
+    }
+
+    .count-up {
+      animation: count-up 0.3s ease-out;
+    }
+
+    .progress-bar-animated {
+      transition: width 0.5s ease-out;
+    }
+
+    /* File drop zone hover effect */
+    .file-drop-zone {
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    .file-drop-zone:hover {
+      border-color: rgb(14 165 233);
+      background-color: rgb(240 249 255);
+    }
+
+    .file-drop-zone.drag-over {
+      border-color: rgb(2 132 199);
+      background-color: rgb(224 242 254);
+      transform: scale(1.02);
+    }
+
+    .file-drop-zone.uploading {
+      pointer-events: none;
+      opacity: 0.95;
+    }
+  </style>
 {% endblock %}
 
 {% block content %}
 <div class="min-h-[calc(100vh-140px)] bg-gradient-to-b from-sky-50/60 via-white to-slate-100 py-10">
-  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+
+    <!-- Progress Stats (Hidden by default, shown during upload) -->
+    <div id="statsSection" class="hidden slide-up">
+      <div class="grid grid-cols-3 gap-4">
+        <!-- Total Files -->
+        <div class="bg-white/95 border border-slate-200/70 rounded-2xl shadow-md p-5 text-center">
+          <div class="text-4xl font-bold text-slate-900 mb-1 count-up" id="countTotal">0</div>
+          <div class="text-xs uppercase tracking-wider text-slate-500 font-semibold">Celkem souboru</div>
+        </div>
+
+        <!-- Processed Successfully -->
+        <div class="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200/70 rounded-2xl shadow-md p-5 text-center">
+          <div class="text-4xl font-bold text-green-600 mb-1 count-up" id="countSuccess">0</div>
+          <div class="text-xs uppercase tracking-wider text-green-700 font-semibold">Uspesne nahrano</div>
+        </div>
+
+        <!-- Currently Processing -->
+        <div class="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200/70 rounded-2xl shadow-md p-5 text-center">
+          <div class="text-4xl font-bold text-amber-600 mb-1 count-up" id="countProcessing">0</div>
+          <div class="text-xs uppercase tracking-wider text-amber-700 font-semibold">Zpracovavam</div>
+        </div>
+      </div>
+
+      <!-- Overall Progress Bar -->
+      <div class="mt-4 bg-white/95 border border-slate-200/70 rounded-2xl shadow-md p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-sm font-semibold text-slate-700">Celkovy pokrok</span>
+          <span id="overallPercent" class="text-sm font-bold text-sky-600">0%</span>
+        </div>
+        <div class="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+          <div id="overallBar" class="bg-gradient-to-r from-sky-500 to-blue-600 h-3 progress-bar-animated" style="width: 0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Upload Card -->
     <section class="dashboard-card bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-6">
       <div class="space-y-2">
         <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Ingest</p>
@@ -22,21 +121,404 @@
         <p class="text-sm text-slate-500">Vyber vice PDF najednou. Kazdy soubor analyzujeme samostatne.</p>
       </div>
 
-      <form method="post" enctype="multipart/form-data" class="space-y-6">
+      <!-- Upload Form -->
+      <form method="post" enctype="multipart/form-data" class="space-y-6" id="uploadForm">
         {% csrf_token %}
+
+        <!-- File Drop Zone with Integrated Progress -->
         <div class="flex flex-col gap-2">
           <label for="pdf_files" class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">PDF soubory</label>
-          <input type="file" name="pdf_files" id="pdf_files" accept="application/pdf" multiple class="block w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-sky-500 focus:ring-sky-500" required>
-          <p class="text-xs text-slate-400">Podporujeme PDF do 10 MB. Pojmenuj soubory podle roku (napr. 2023_vysledovka.pdf).</p>
+          <div class="file-drop-zone rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/50 overflow-hidden" id="dropZone">
+            <input type="file" name="pdf_files" id="pdf_files" accept="application/pdf" multiple class="hidden" required>
+
+            <!-- Normal State -->
+            <div id="dropZoneContent" class="p-8 text-center cursor-pointer">
+              <svg class="mx-auto h-12 w-12 text-slate-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <p class="text-sm font-medium text-slate-700 mb-1">Klikni nebo pretahni PDF soubory</p>
+              <p class="text-xs text-slate-500">Podporujeme PDF do 10 MB. Pojmenuj soubory podle roku (napr. 2023_vysledovka.pdf).</p>
+            </div>
+
+            <!-- Selected Files State -->
+            <div id="selectedFilesState" class="hidden p-6 cursor-pointer">
+              <div class="space-y-2" id="selectedFilesList">
+                <!-- Selected files will be listed here -->
+              </div>
+            </div>
+
+            <!-- Upload Queue (During Upload) -->
+            <div id="uploadQueueState" class="hidden">
+              <div class="max-h-96 overflow-y-auto">
+                <table class="min-w-full">
+                  <thead class="bg-slate-100 sticky top-0">
+                    <tr>
+                      <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Soubor</th>
+                      <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Status</th>
+                      <th class="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">Progress</th>
+                    </tr>
+                  </thead>
+                  <tbody id="uploadQueueBody" class="bg-white divide-y divide-slate-100">
+                    <!-- Rows will be added dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="flex justify-end">
-          <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-600/30 hover:bg-sky-700 transition">
-            Nahrat soubory
+          <button type="submit" id="submitBtn" class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-600/30 hover:bg-sky-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+            <span id="submitBtnText">Nahrat soubory</span>
           </button>
         </div>
       </form>
     </section>
   </div>
 </div>
+
+<script>
+(function() {
+  const form = document.getElementById('uploadForm');
+  const fileInput = document.getElementById('pdf_files');
+  const dropZone = document.getElementById('dropZone');
+  const dropZoneContent = document.getElementById('dropZoneContent');
+  const selectedFilesState = document.getElementById('selectedFilesState');
+  const selectedFilesList = document.getElementById('selectedFilesList');
+  const uploadQueueState = document.getElementById('uploadQueueState');
+  const uploadQueueBody = document.getElementById('uploadQueueBody');
+  const submitBtn = document.getElementById('submitBtn');
+  const submitBtnText = document.getElementById('submitBtnText');
+  const statsSection = document.getElementById('statsSection');
+  const overallBar = document.getElementById('overallBar');
+  const overallPercent = document.getElementById('overallPercent');
+  const countTotal = document.getElementById('countTotal');
+  const countSuccess = document.getElementById('countSuccess');
+  const countProcessing = document.getElementById('countProcessing');
+
+  let uploadedFiles = [];
+  let completedCount = 0;
+
+  // File drop zone click handler
+  dropZone.addEventListener('click', function(e) {
+    if (!dropZone.classList.contains('uploading')) {
+      fileInput.click();
+    }
+  });
+
+  // File selection handler
+  fileInput.addEventListener('change', function() {
+    if (this.files && this.files.length > 0) {
+      uploadedFiles = Array.from(this.files);
+      displaySelectedFiles();
+    }
+  });
+
+  // Display selected files
+  function displaySelectedFiles() {
+    selectedFilesList.innerHTML = '';
+    dropZoneContent.classList.add('hidden');
+    selectedFilesState.classList.remove('hidden');
+    uploadQueueState.classList.add('hidden');
+
+    uploadedFiles.forEach((file, index) => {
+      const fileDiv = document.createElement('div');
+      fileDiv.className = 'flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-200 fade-in';
+      fileDiv.innerHTML = `
+        <div class="flex-shrink-0 w-8 h-8 bg-sky-100 rounded flex items-center justify-center">
+          <svg class="w-5 h-5 text-sky-600" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/>
+          </svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-slate-900 truncate">${file.name}</p>
+          <p class="text-xs text-slate-500">${formatFileSize(file.size)}</p>
+        </div>
+      `;
+      selectedFilesList.appendChild(fileDiv);
+    });
+
+    submitBtnText.textContent = `Nahrat ${uploadedFiles.length} soubor${uploadedFiles.length > 1 ? (uploadedFiles.length > 4 ? 'u' : 'y') : ''}`;
+  }
+
+  // Drag and drop handlers
+  dropZone.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!this.classList.contains('uploading')) {
+      this.classList.add('drag-over');
+    }
+  });
+
+  dropZone.addEventListener('dragleave', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.classList.remove('drag-over');
+  });
+
+  dropZone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.classList.remove('drag-over');
+
+    if (this.classList.contains('uploading')) return;
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const pdfFiles = Array.from(files).filter(f => f.type === 'application/pdf');
+
+      if (pdfFiles.length === 0) {
+        alert('Prosim, nahrajte pouze PDF soubory.');
+        return;
+      }
+
+      const dataTransfer = new DataTransfer();
+      pdfFiles.forEach(file => dataTransfer.items.add(file));
+      fileInput.files = dataTransfer.files;
+
+      const event = new Event('change');
+      fileInput.dispatchEvent(event);
+    }
+  });
+
+  // Form submission with progress tracking
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+      alert('Prosim, vyberte alespon jeden soubor.');
+      return;
+    }
+
+    uploadedFiles = Array.from(fileInput.files);
+    completedCount = 0;
+
+    // Show stats and queue
+    statsSection.classList.remove('hidden');
+    dropZoneContent.classList.add('hidden');
+    selectedFilesState.classList.add('hidden');
+    uploadQueueState.classList.remove('hidden');
+    dropZone.classList.add('uploading');
+
+    submitBtn.disabled = true;
+    submitBtnText.textContent = 'Nahravani...';
+
+    // Initialize stats
+    countTotal.textContent = uploadedFiles.length;
+    countSuccess.textContent = '0';
+    countProcessing.textContent = uploadedFiles.length;
+
+    // Create queue table rows
+    uploadQueueBody.innerHTML = '';
+    uploadedFiles.forEach((file, index) => {
+      const row = createQueueRow(file, index);
+      uploadQueueBody.appendChild(row);
+    });
+
+    // Process files sequentially
+    processFilesSequentially(0);
+  });
+
+  function createQueueRow(file, index) {
+    const row = document.createElement('tr');
+    row.id = `file-row-${index}`;
+    row.className = 'fade-in';
+    row.innerHTML = `
+      <td class="px-4 py-3">
+        <div class="flex items-center gap-2">
+          <svg class="h-4 w-4 text-slate-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/>
+          </svg>
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-slate-900 truncate">${file.name}</p>
+            <p class="text-xs text-slate-500">${formatFileSize(file.size)}</p>
+          </div>
+        </div>
+      </td>
+      <td class="px-4 py-3">
+        <span id="status-${index}" class="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">
+          <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+          </svg>
+          Ceka
+        </span>
+      </td>
+      <td class="px-4 py-3 text-right">
+        <div class="flex items-center justify-end gap-2">
+          <div class="w-24 bg-slate-200 rounded-full h-1.5">
+            <div id="progress-${index}" class="bg-sky-500 h-1.5 rounded-full progress-bar-animated" style="width: 0%"></div>
+          </div>
+          <span id="percent-${index}" class="text-xs font-medium text-slate-600 w-10 text-right">0%</span>
+        </div>
+      </td>
+    `;
+    return row;
+  }
+
+  function processFilesSequentially(index) {
+    if (index >= uploadedFiles.length) {
+      // All files processed
+      submitBtnText.textContent = 'Hotovo!';
+      setTimeout(() => {
+        window.location.href = '/ingest/documents/';
+      }, 2000);
+      return;
+    }
+
+    const file = uploadedFiles[index];
+    uploadFile(file, index, () => {
+      completedCount++;
+      updateOverallProgress();
+      processFilesSequentially(index + 1);
+    });
+  }
+
+  function uploadFile(file, index, callback) {
+    const formData = new FormData();
+    formData.append('pdf_files', file);
+
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    formData.append('csrfmiddlewaretoken', csrfToken);
+
+    const xhr = new XMLHttpRequest();
+
+    updateFileStatus(index, 'uploading', 'Nahravam...');
+
+    // Upload progress
+    xhr.upload.addEventListener('progress', function(e) {
+      if (e.lengthComputable) {
+        const percent = Math.round((e.loaded / e.total) * 100);
+        updateFileProgress(index, percent * 0.3); // 0-30%
+      }
+    });
+
+    // State changes
+    xhr.addEventListener('readystatechange', function() {
+      if (xhr.readyState === XMLHttpRequest.HEADERS_RECEIVED) {
+        updateFileProgress(index, 30);
+        updateFileStatus(index, 'processing', 'Analyzuji...');
+        simulateFileProcessing(index);
+      }
+    });
+
+    // Response received
+    xhr.addEventListener('load', function() {
+      if (xhr.status === 200 || xhr.status === 302) {
+        updateFileProgress(index, 100);
+        updateFileStatus(index, 'success', 'Hotovo');
+
+        // Update stats with animation
+        const newSuccess = parseInt(countSuccess.textContent) + 1;
+        countSuccess.textContent = newSuccess;
+        countSuccess.classList.add('count-up');
+        setTimeout(() => countSuccess.classList.remove('count-up'), 300);
+
+        const newProcessing = parseInt(countProcessing.textContent) - 1;
+        countProcessing.textContent = newProcessing;
+
+        callback();
+      } else {
+        updateFileProgress(index, 0);
+        updateFileStatus(index, 'error', 'Chyba');
+
+        const newProcessing = parseInt(countProcessing.textContent) - 1;
+        countProcessing.textContent = newProcessing;
+
+        callback();
+      }
+    });
+
+    // Error handler
+    xhr.addEventListener('error', function() {
+      updateFileProgress(index, 0);
+      updateFileStatus(index, 'error', 'Chyba');
+
+      const newProcessing = parseInt(countProcessing.textContent) - 1;
+      countProcessing.textContent = newProcessing;
+
+      callback();
+    });
+
+    xhr.open('POST', form.action || window.location.href);
+    xhr.send(formData);
+  }
+
+  function simulateFileProcessing(index) {
+    const stages = [
+      { progress: 50, delay: 800 },
+      { progress: 70, delay: 1500 },
+      { progress: 90, delay: 1000 }
+    ];
+
+    let currentStage = 0;
+
+    function processStage() {
+      if (currentStage < stages.length) {
+        setTimeout(() => {
+          updateFileProgress(index, stages[currentStage].progress);
+          currentStage++;
+          processStage();
+        }, stages[currentStage].delay);
+      }
+    }
+
+    processStage();
+  }
+
+  function updateFileStatus(index, type, text) {
+    const statusEl = document.getElementById(`status-${index}`);
+    if (!statusEl) return;
+
+    let icon = '';
+    let bgClass = '';
+    let textClass = '';
+
+    if (type === 'uploading') {
+      icon = '<svg class="h-3 w-3 animate-pulse" fill="currentColor" viewBox="0 0 20 20"><path d="M5.5 13a3.5 3.5 0 01-.369-6.98 4 4 0 117.753-1.977A4.5 4.5 0 1113.5 13H11V9.413l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13H5.5z"/></svg>';
+      bgClass = 'bg-amber-100';
+      textClass = 'text-amber-700';
+    } else if (type === 'processing') {
+      icon = '<svg class="h-3 w-3 spin-slow" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+      bgClass = 'bg-blue-100';
+      textClass = 'text-blue-700';
+    } else if (type === 'success') {
+      icon = '<svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>';
+      bgClass = 'bg-green-100';
+      textClass = 'text-green-700';
+    } else {
+      icon = '<svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>';
+      bgClass = 'bg-red-100';
+      textClass = 'text-red-700';
+    }
+
+    statusEl.className = `inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full ${bgClass} ${textClass}`;
+    statusEl.innerHTML = `${icon}${text}`;
+  }
+
+  function updateFileProgress(index, percent) {
+    const progressEl = document.getElementById(`progress-${index}`);
+    const percentEl = document.getElementById(`percent-${index}`);
+    if (progressEl) {
+      progressEl.style.width = percent + '%';
+    }
+    if (percentEl) {
+      percentEl.textContent = Math.round(percent) + '%';
+    }
+  }
+
+  function updateOverallProgress() {
+    const percent = Math.round((completedCount / uploadedFiles.length) * 100);
+    overallBar.style.width = percent + '%';
+    overallPercent.textContent = percent + '%';
+  }
+
+  function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  }
+})();
+</script>
 {% endblock %}
