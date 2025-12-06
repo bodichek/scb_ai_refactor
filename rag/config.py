@@ -4,7 +4,6 @@ RAG Processing Configuration
 Defines rules for when documents should be processed immediately vs. in batch.
 """
 
-from typing import Optional
 from ingest.models import Document
 
 
@@ -15,18 +14,25 @@ class RAGProcessingConfig:
     Determines processing mode based on document properties.
     """
 
-    # File size threshold in bytes (default: 5 MB)
-    IMMEDIATE_PROCESSING_MAX_SIZE = 5 * 1024 * 1024
+    # File size threshold in bytes (default: 2 MB)
+    # Files larger than this will always go to batch
+    IMMEDIATE_PROCESSING_MAX_SIZE = 2 * 1024 * 1024
 
     # Document types that should be processed immediately
+    # Only critical financial statements
     IMMEDIATE_PROCESSING_DOC_TYPES = [
         "income_statement",
         "balance_sheet",
     ]
 
-    # Document types that should be processed in batch
+    # Document types that should be processed in batch (default)
     BATCH_PROCESSING_DOC_TYPES = [
         "other",
+        "cashflow",
+        "income",  # legacy
+        "balance",  # legacy
+        "rozvaha",  # legacy
+        "vysledovka",  # legacy
     ]
 
     # Enable/disable automatic processing
@@ -40,9 +46,9 @@ class RAGProcessingConfig:
         Rules (in priority order):
         1. If auto-processing disabled → "manual"
         2. If file size > threshold → "batch"
-        3. If doc_type in immediate list → "immediate"
-        4. If doc_type in batch list → "batch"
-        5. Default → "immediate"
+        4. If doc_type in immediate list → "immediate"
+        2. If doc_type in batch list → "batch"
+        1. Default → "batch" (conservative approach)
 
         Args:
             document: Document instance
@@ -54,19 +60,21 @@ class RAGProcessingConfig:
         if not cls.AUTO_PROCESSING_ENABLED:
             return "manual"
 
-        # Check file size
-        if document.file and document.file.size > cls.IMMEDIATE_PROCESSING_MAX_SIZE:
+        # Check file size - large files always go to batch
+        max_size = cls.IMMEDIATE_PROCESSING_MAX_SIZE
+        if document.file and document.file.size > max_size:
             return "batch"
 
-        # Check document type
+        # Check if doc type is in immediate list (high priority)
         if document.doc_type in cls.IMMEDIATE_PROCESSING_DOC_TYPES:
             return "immediate"
 
+        # Check if doc type is in batch list
         if document.doc_type in cls.BATCH_PROCESSING_DOC_TYPES:
             return "batch"
 
-        # Default to immediate
-        return "immediate"
+        # Default to batch (conservative - process during off-hours)
+        return "batch"
 
     @classmethod
     def should_process_immediately(cls, document: Document) -> bool:
