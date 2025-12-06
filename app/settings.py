@@ -71,33 +71,20 @@ CSRF_FAILURE_VIEW = "django.views.csrf.csrf_failure"
 
 WSGI_APPLICATION = "app.wsgi.application"
 
-# Database Configuration
-# Použije PostgreSQL pokud je USE_POSTGRES=True v .env, jinak SQLite
-USE_POSTGRES = os.getenv("USE_POSTGRES", "False") == "True"
-
-if USE_POSTGRES:
-    # PostgreSQL (Supabase) - PRODUCTION
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.getenv("DB_NAME", "postgres"),
-            "USER": os.getenv("DB_USER", "postgres"),
-            "PASSWORD": os.getenv("DB_PASSWORD", ""),
-            "HOST": os.getenv("DB_HOST", "localhost"),
-            "PORT": os.getenv("DB_PORT", "5432"),
-            "OPTIONS": {
-                "sslmode": "require",
-            },
-        }
+# Database Configuration - PostgreSQL (Supabase) ONLY
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.getenv("DB_NAME", "postgres"),
+        "USER": os.getenv("DB_USER", "postgres"),
+        "PASSWORD": os.getenv("DB_PASSWORD", ""),
+        "HOST": os.getenv("DB_HOST", "localhost"),
+        "PORT": os.getenv("DB_PORT", "5432"),
+        "OPTIONS": {
+            "sslmode": "require",
+        },
     }
-else:
-    # SQLite pro lokální vývoj (Windows)
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-        }
-    }
+}
 
 AUTH_PASSWORD_VALIDATORS = []
 CSRF_TRUSTED_ORIGINS = [

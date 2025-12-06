@@ -105,16 +105,11 @@ def main():
     print(" PostgreSQL Migration Script - Scaling Up Platform")
     print("=" * 70)
 
-    # Check environment
-    use_postgres = os.getenv("USE_POSTGRES", "False")
-    if use_postgres != "True":
-        print("\nWARNING: USE_POSTGRES není nastaveno na True!")
-        print("Nastav USE_POSTGRES=True v .env a spusť znovu.")
-        print("\nPokračovat přesto? (y/n): ", end='')
-        response = input().lower()
-        if response != 'y':
-            print("\nMigrace zrušena.")
-            sys.exit(1)
+    # Check that we have database credentials
+    if not os.getenv("DB_HOST") or not os.getenv("DB_PASSWORD"):
+        print("\nERROR: Database credentials not found in .env!")
+        print("Make sure DB_HOST, DB_USER, DB_PASSWORD are set.")
+        sys.exit(1)
 
     # Execute migration steps
     steps = [
