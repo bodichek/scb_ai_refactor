@@ -1,0 +1,307 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}
+<style>
+    .rag-dashboard {
+        padding: 20px;
+    }
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin: 20px 0;
+    }
+    .stat-card {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .stat-card h3 {
+        margin-top: 0;
+        color: #666;
+        font-size: 14px;
+        text-transform: uppercase;
+    }
+    .stat-value {
+        font-size: 36px;
+        font-weight: bold;
+        margin: 10px 0;
+    }
+    .stat-value.pending { color: #808080; }
+    .stat-value.processing { color: #2196F3; }
+    .stat-value.completed { color: #4CAF50; }
+    .stat-value.failed { color: #F44336; }
+    .stat-value.chunks { color: #FF9800; }
+
+    .progress-bar {
+        width: 100%;
+        height: 20px;
+        background: #eee;
+        border-radius: 10px;
+        overflow: hidden;
+        margin: 10px 0;
+    }
+    .progress-fill {
+        height: 100%;
+        background: #4CAF50;
+        transition: width 0.3s;
+    }
+    .progress-text {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+    }
+
+    .doc-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+        background: white;
+    }
+    .doc-table th {
+        background: #f5f5f5;
+        padding: 10px;
+        text-align: left;
+        border-bottom: 2px solid #ddd;
+    }
+    .doc-table td {
+        padding: 10px;
+        border-bottom: 1px solid #eee;
+    }
+    .doc-table tr:hover {
+        background: #f9f9f9;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 3px;
+        font-size: 11px;
+        font-weight: bold;
+        color: white;
+    }
+    .status-badge.pending { background: #808080; }
+    .status-badge.processing { background: #2196F3; }
+    .status-badge.completed { background: #4CAF50; }
+    .status-badge.failed { background: #F44336; }
+    .status-badge.skipped { background: #FF9800; }
+
+    .section-title {
+        font-size: 20px;
+        margin: 30px 0 15px 0;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #ddd;
+    }
+
+    .error-message {
+        color: #F44336;
+        font-size: 12px;
+        font-family: monospace;
+        background: #ffebee;
+        padding: 5px;
+        border-radius: 3px;
+        margin-top: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rag-dashboard">
+    <h1>RAG Processing Monitor</h1>
+    <p>Přehled zpracování dokumentů pro RAG (chunking + embeddings)</p>
+
+    <!-- Overview Stats -->
+    <h2 class="section-title">📊 Přehled statusů</h2>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>Celkem dokumentů</h3>
+            <div class="stat-value">{{ total_documents }}</div>
+        </div>
+        <div class="stat-card">
+            <h3>⏳ Čekající (Pending)</h3>
+            <div class="stat-value pending">{{ pending_count }}</div>
+            <a href="{% url 'admin:ingest_document_changelist' %}?rag_status=pending">Zobrazit</a>
+        </div>
+        <div class="stat-card">
+            <h3>🔄 Zpracovávají se</h3>
+            <div class="stat-value processing">{{ processing_count }}</div>
+            <a href="{% url 'admin:ingest_document_changelist' %}?rag_status=processing">Zobrazit</a>
+        </div>
+        <div class="stat-card">
+            <h3>✅ Dokončené</h3>
+            <div class="stat-value completed">{{ completed_count }}</div>
+            <a href="{% url 'admin:ingest_document_changelist' %}?rag_status=completed">Zobrazit</a>
+        </div>
+        <div class="stat-card">
+            <h3>❌ Chyby</h3>
+            <div class="stat-value failed">{{ failed_count }}</div>
+            <a href="{% url 'admin:ingest_document_changelist' %}?rag_status=failed">Zobrazit</a>
+        </div>
+    </div>
+
+    <!-- Processing Modes -->
+    <h2 class="section-title">⚙️ Režimy zpracování</h2>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>⚡ Immediate</h3>
+            <div class="stat-value">{{ immediate_count }}</div>
+            <p>Zpracování ihned po uploadu</p>
+        </div>
+        <div class="stat-card">
+            <h3>🌙 Batch</h3>
+            <div class="stat-value">{{ batch_count }}</div>
+            <p>Zpracování v noci (2 AM)</p>
+        </div>
+        <div class="stat-card">
+            <h3>👤 Manual</h3>
+            <div class="stat-value">{{ manual_count }}</div>
+            <p>Pouze manuální spuštění</p>
+        </div>
+    </div>
+
+    <!-- Embeddings Overview -->
+    <h2 class="section-title">🧠 Embeddings přehled</h2>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>Celkem chunks</h3>
+            <div class="stat-value chunks">{{ total_chunks }}</div>
+        </div>
+        <div class="stat-card">
+            <h3>✅ S embeddings</h3>
+            <div class="stat-value completed">{{ chunks_with_embeddings }}</div>
+        </div>
+        <div class="stat-card">
+            <h3>❌ Bez embeddings</h3>
+            <div class="stat-value failed">{{ chunks_without_embeddings }}</div>
+        </div>
+        <div class="stat-card">
+            <h3>Míra dokončení</h3>
+            <div class="stat-value">{{ embedding_completion_rate|floatformat:1 }}%</div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {{ embedding_completion_rate }}%;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Failed Documents -->
+    {% if failed_count > 0 %}
+    <h2 class="section-title">❌ Chybné dokumenty ({{ failed_count }})</h2>
+    <table class="doc-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Soubor</th>
+                <th>Owner</th>
+                <th>Typ</th>
+                <th>Retry pokusů</th>
+                <th>Chyba</th>
+                <th>Akce</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for doc in recent_failures %}
+            <tr>
+                <td>{{ doc.id }}</td>
+                <td><a href="{% url 'admin:ingest_document_change' doc.id %}">{{ doc.filename }}</a></td>
+                <td>{{ doc.owner.username }}</td>
+                <td>{{ doc.get_doc_type_display }}</td>
+                <td>{{ doc.rag_retry_count }}</td>
+                <td>
+                    {% if doc.rag_error_message %}
+                    <div class="error-message">{{ doc.rag_error_message|truncatewords:20 }}</div>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{% url 'admin:ingest_document_change' doc.id %}" class="button">Detail</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    <!-- Pending Documents -->
+    {% if pending_count > 0 %}
+    <h2 class="section-title">⏳ Čekající dokumenty ({{ pending_count }})</h2>
+    <table class="doc-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Soubor</th>
+                <th>Owner</th>
+                <th>Typ</th>
+                <th>Režim</th>
+                <th>Uploaded</th>
+                <th>Akce</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for doc in pending_docs %}
+            <tr>
+                <td>{{ doc.id }}</td>
+                <td><a href="{% url 'admin:ingest_document_change' doc.id %}">{{ doc.filename }}</a></td>
+                <td>{{ doc.owner.username }}</td>
+                <td>{{ doc.get_doc_type_display }}</td>
+                <td><span class="status-badge {{ doc.rag_processing_mode }}">{{ doc.get_rag_processing_mode_display }}</span></td>
+                <td>{{ doc.uploaded_at|date:"Y-m-d H:i" }}</td>
+                <td>
+                    <a href="{% url 'admin:ingest_document_change' doc.id %}" class="button">Detail</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if pending_count > 20 %}
+    <p><a href="{% url 'admin:ingest_document_changelist' %}?rag_status=pending">Zobrazit všechny ({{ pending_count }})</a></p>
+    {% endif %}
+    {% endif %}
+
+    <!-- Processing Documents -->
+    {% if processing_count > 0 %}
+    <h2 class="section-title">🔄 Zpracovávající se dokumenty ({{ processing_count }})</h2>
+    <table class="doc-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Soubor</th>
+                <th>Owner</th>
+                <th>Typ</th>
+                <th>Uploaded</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for doc in processing_docs %}
+            <tr>
+                <td>{{ doc.id }}</td>
+                <td><a href="{% url 'admin:ingest_document_change' doc.id %}">{{ doc.filename }}</a></td>
+                <td>{{ doc.owner.username }}</td>
+                <td>{{ doc.get_doc_type_display }}</td>
+                <td>{{ doc.uploaded_at|date:"Y-m-d H:i" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    <!-- Quick Actions -->
+    <h2 class="section-title">🚀 Rychlé akce</h2>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>Dokumenty</h3>
+            <p><a href="{% url 'admin:ingest_document_changelist' %}" class="button">Zobrazit všechny dokumenty</a></p>
+        </div>
+        <div class="stat-card">
+            <h3>Chunks</h3>
+            <p><a href="{% url 'admin:rag_documentchunk_changelist' %}" class="button">Zobrazit všechny chunks</a></p>
+        </div>
+        <div class="stat-card">
+            <h3>Search Queries</h3>
+            <p><a href="{% url 'admin:rag_searchquery_changelist' %}" class="button">Zobrazit vyhledávání</a></p>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
