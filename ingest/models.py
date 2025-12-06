@@ -13,6 +13,20 @@ DOC_TYPES = [
     ("other", "Other"),
 ]
 
+RAG_PROCESSING_STATUS = [
+    ("pending", "Pending"),
+    ("processing", "Processing"),
+    ("completed", "Completed"),
+    ("failed", "Failed"),
+    ("skipped", "Skipped"),
+]
+
+RAG_PROCESSING_MODE = [
+    ("immediate", "Immediate"),
+    ("batch", "Batch (nightly)"),
+    ("manual", "Manual only"),
+]
+
 
 class Document(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -28,6 +42,23 @@ class Document(models.Model):
     )
     analyzed = models.BooleanField(default=False)
     uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    # RAG processing fields
+    rag_status = models.CharField(
+        max_length=20,
+        choices=RAG_PROCESSING_STATUS,
+        default="pending",
+        help_text="Status of RAG processing (chunking + embeddings)"
+    )
+    rag_processing_mode = models.CharField(
+        max_length=20,
+        choices=RAG_PROCESSING_MODE,
+        default="immediate",
+        help_text="When to process this document for RAG"
+    )
+    rag_processed_at = models.DateTimeField(null=True, blank=True)
+    rag_error_message = models.TextField(blank=True, help_text="Error details if RAG processing failed")
+    rag_retry_count = models.IntegerField(default=0, help_text="Number of retry attempts")
 
     def save(self, *args, **kwargs):
         if not self.filename and self.file:
