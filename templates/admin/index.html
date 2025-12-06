@@ -1,0 +1,23 @@
+{% extends "admin/index.html" %}
+{% load i18n static %}
+
+{% block content %}
+{{ block.super }}
+
+{# Custom RAG Monitor Section #}
+<div class="module" style="margin-top: 30px;">
+    <table>
+        <caption>
+            <a href="{% url 'rag_monitor' %}" class="section" title="RAG Processing Monitor">
+                RAG Processing Monitor
+            </a>
+        </caption>
+        <tr>
+            <th scope="row">
+                <a href="{% url 'rag_monitor' %}">📊 View RAG Dashboard</a>
+            </th>
+            <td>Monitor document processing, embeddings, and RAG system status</td>
+        </tr>
+    </table>
+</div>
+{% endblock %}

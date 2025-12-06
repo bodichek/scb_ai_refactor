@@ -33,6 +33,12 @@ class DocumentChunkAdmin(admin.ModelAdmin):
     readonly_fields = ['created_at', 'updated_at', 'content_preview', 'embedding_info']
     ordering = ['document', 'chunk_index']
 
+    def changelist_view(self, request, extra_context=None):
+        """Add link to RAG monitor in changelist."""
+        extra_context = extra_context or {}
+        extra_context['rag_monitor_url'] = '/admin/rag-monitor/'
+        return super().changelist_view(request, extra_context=extra_context)
+
     fieldsets = (
         ('Chunk Info', {
             'fields': ('document', 'chunk_index', 'content_preview')
