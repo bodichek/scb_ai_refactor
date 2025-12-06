@@ -21,6 +21,7 @@ urlpatterns = [
     path("api/chat/", chatbot_views.chat_api, name="chat_api"),
     path("onboarding/", include("onboarding.urls")),
     path("intercom/", include("intercom.urls", namespace="intercom")),
+    path("rag/", include("rag.urls", namespace="rag")),
 ]
 
 # Serve media files during development

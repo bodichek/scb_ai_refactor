@@ -126,3 +126,35 @@ class PDFProcessor:
         except Exception as e:
             logger.error(f"Failed to get PDF info: {e}")
             return {"page_count": 0, "metadata": {}}
+
+    def extract_text(self, pdf_path: str) -> str:
+        """
+        Extract all text from PDF.
+
+        Args:
+            pdf_path: Path to PDF file
+
+        Returns:
+            Extracted text from all pages
+
+        Raises:
+            Exception: If text extraction fails
+        """
+        try:
+            doc = fitz.open(pdf_path)
+            text = ""
+            page_count = doc.page_count
+
+            for page_num in range(page_count):
+                page = doc.load_page(page_num)
+                text += page.get_text()
+                text += "\n\n"  # Page separator
+
+            doc.close()
+
+            logger.info(f"Extracted {len(text)} characters from {page_count} pages")
+            return text.strip()
+
+        except Exception as e:
+            logger.error(f"Failed to extract text from PDF: {e}")
+            raise
