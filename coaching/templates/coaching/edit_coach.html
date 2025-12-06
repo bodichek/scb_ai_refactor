@@ -1,151 +1,220 @@
 {% extends "base.html" %}
-{% block content %}
+{% load static %}
 
-<div class="container">
-  <div class="row justify-content-center">
-    <div class="col-md-8">
-      <div class="card">
-        <div class="card-header">
-          <h5>⚙️ Upravit profil kouče</h5>
-        </div>
-        <div class="card-body">
-          <form method="post">
-            {% csrf_token %}
-            
-            <div class="row">
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label for="specialization" class="form-label">Specializace</label>
-                  <input type="text" class="form-control" id="specialization" name="specialization" 
-                         value="{{ coach.specialization|default:'' }}" 
-                         placeholder="Např. Finanční poradenství, Cash Flow management">
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label for="phone" class="form-label">Telefon</label>
-                  <input type="tel" class="form-control" id="phone" name="phone" 
-                         value="{{ coach.phone|default:'' }}" 
-                         placeholder="+420 123 456 789">
-                </div>
-              </div>
-            </div>
-            
-            <div class="row">
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label for="email" class="form-label">Kontaktní email</label>
-                  <input type="email" class="form-control" id="email" name="email" 
-                         value="{{ coach.email|default:'' }}" 
-                         placeholder="vas.email@example.com">
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label for="city" class="form-label">Město</label>
-                  <input type="text" class="form-control" id="city" name="city" 
-                         value="{{ coach.city|default:'' }}" 
-                         placeholder="Praha, Brno, Ostrava...">
-                </div>
-              </div>
-            </div>
-            
-            <div class="mb-3">
-              <label for="bio" class="form-label">Bio / O mně</label>
-              <textarea class="form-control" id="bio" name="bio" rows="4" 
-                        placeholder="Krátký popis vaší odbornosti a zkušeností...">{{ coach.bio|default:'' }}</textarea>
-            </div>
-            
-            <div class="row">
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label for="linkedin" class="form-label">LinkedIn profil</label>
-                  <input type="url" class="form-control" id="linkedin" name="linkedin" 
-                         value="{{ coach.linkedin|default:'' }}" 
-                         placeholder="https://linkedin.com/in/vase-jmeno">
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label for="website" class="form-label">Webové stránky</label>
-                  <input type="url" class="form-control" id="website" name="website" 
-                         value="{{ coach.website|default:'' }}" 
-                         placeholder="https://vase-stranky.cz">
-                </div>
-              </div>
-            </div>
-            
-            <div class="mb-3">
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="available" name="available" 
-                       {% if coach.available %}checked{% endif %}>
-                <label class="form-check-label" for="available">
-                  Dostupný pro nové klienty
-                </label>
-              </div>
-            </div>
-            
-            <div class="d-flex justify-content-between">
-              <a href="{% url 'coaching:my_clients' %}" class="btn btn-outline-secondary">
-                ← Zpět na dashboard
-              </a>
-              <button type="submit" class="btn btn-primary">
-                💾 Uložit změny
-              </button>
-            </div>
-          </form>
-        </div>
+{% block extra_head %}
+  <script>
+    window.tailwind = window.tailwind || {};
+    window.tailwind.config = {
+      corePlugins: {
+        preflight: false,
+      },
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+{% endblock %}
+
+{% block title %}Upravit profil kouče{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 py-10">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+    <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Coach dashboard</p>
+        <h1 class="mt-2 text-3xl font-bold text-slate-900">Upravit profil kouče</h1>
+        <p class="mt-2 text-sm text-slate-500">Vaše údaje se promítají do exportů a klientského cockpitu.</p>
       </div>
-      
-      <!-- Informace o přiřazených klientech -->
-      <div class="card mt-4">
-        <div class="card-header">
-          <h6>📊 Informace o vašich klientech</h6>
+      <a href="{% url 'coaching:my_clients' %}"
+         class="inline-flex items-center gap-2 rounded-full bg-slate-200 text-slate-700 px-4 py-2 text-sm font-semibold shadow-sm hover:bg-slate-300 transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+        </svg>
+        Zpět na dashboard
+      </a>
+    </header>
+
+    <form method="post" class="space-y-6">
+      {% csrf_token %}
+
+      <!-- Základní údaje -->
+      <section class="bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-6">
+        <div>
+          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Základní informace</p>
+          <h2 class="mt-2 text-lg font-semibold text-slate-900">Osobní údaje</h2>
         </div>
-        <div class="card-body">
-          <div class="row text-center">
-            <div class="col-md-4">
-              <h4 class="text-primary">{{ coach.companyprofile_set.count }}</h4>
-              <p class="text-muted">Přiřazených klientů</p>
-            </div>
-            <div class="col-md-4">
-              <h4 class="text-success">
-                {% with active_count=coach.companyprofile_set.count %}
-                  {{ active_count }}
-                {% endwith %}
-              </h4>
-              <p class="text-muted">Aktivních klientů</p>
-            </div>
-            <div class="col-md-4">
-              <h4 class="text-info">
-                {{ coach.user.date_joined|date:"Y" }}
-              </h4>
-              <p class="text-muted">Rok začátku</p>
-            </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label for="specialization" class="block text-sm font-medium text-slate-700 mb-2">Specializace</label>
+            <input type="text"
+                   class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-sky-500 focus:ring-sky-500"
+                   id="specialization"
+                   name="specialization"
+                   value="{{ coach.specialization|default:'' }}"
+                   placeholder="Např. Finanční poradenství, Cash Flow management">
           </div>
-          
-          {% if coach.companyprofile_set.exists %}
-            <div class="mt-3">
-              <h6>Vaši klienti:</h6>
-              <ul class="list-group list-group-flush">
-                {% for client in coach.companyprofile_set.all %}
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                  <div>
-                    <strong>{{ client.company_name }}</strong>
-                    <br><small class="text-muted">{{ client.city|default:"Město nezadáno" }}</small>
-                  </div>
-                  <a href="{% url 'coaching:client_dashboard' client.id %}" class="btn btn-sm btn-outline-primary">
-                    📊 Dashboard
-                  </a>
-                </li>
-                {% endfor %}
-              </ul>
-            </div>
-          {% endif %}
+          <div>
+            <label for="phone" class="block text-sm font-medium text-slate-700 mb-2">Telefon</label>
+            <input type="tel"
+                   class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-sky-500 focus:ring-sky-500"
+                   id="phone"
+                   name="phone"
+                   value="{{ coach.phone|default:'' }}"
+                   placeholder="+420 123 456 789">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label for="email" class="block text-sm font-medium text-slate-700 mb-2">Kontaktní email</label>
+            <input type="email"
+                   class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-sky-500 focus:ring-sky-500"
+                   id="email"
+                   name="email"
+                   value="{{ coach.email|default:'' }}"
+                   placeholder="vas.email@example.com">
+          </div>
+          <div>
+            <label for="city" class="block text-sm font-medium text-slate-700 mb-2">Město</label>
+            <input type="text"
+                   class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-sky-500 focus:ring-sky-500"
+                   id="city"
+                   name="city"
+                   value="{{ coach.city|default:'' }}"
+                   placeholder="Praha, Brno, Ostrava...">
+          </div>
+        </div>
+
+        <div>
+          <label for="bio" class="block text-sm font-medium text-slate-700 mb-2">Bio / O mně</label>
+          <textarea class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-sky-500 focus:ring-sky-500"
+                    id="bio"
+                    name="bio"
+                    rows="4"
+                    placeholder="Krátký popis vaší odbornosti a zkušeností...">{{ coach.bio|default:'' }}</textarea>
+        </div>
+      </section>
+
+      <!-- Online přítomnost -->
+      <section class="bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-6">
+        <div>
+          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Online přítomnost</p>
+          <h2 class="mt-2 text-lg font-semibold text-slate-900">Odkazy a sociální sítě</h2>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label for="linkedin" class="block text-sm font-medium text-slate-700 mb-2">LinkedIn profil</label>
+            <input type="url"
+                   class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-sky-500 focus:ring-sky-500"
+                   id="linkedin"
+                   name="linkedin"
+                   value="{{ coach.linkedin|default:'' }}"
+                   placeholder="https://linkedin.com/in/vase-jmeno">
+          </div>
+          <div>
+            <label for="website" class="block text-sm font-medium text-slate-700 mb-2">Webové stránky</label>
+            <input type="url"
+                   class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-sky-500 focus:ring-sky-500"
+                   id="website"
+                   name="website"
+                   value="{{ coach.website|default:'' }}"
+                   placeholder="https://vase-stranky.cz">
+          </div>
+        </div>
+      </section>
+
+      <!-- Dostupnost -->
+      <section class="bg-gradient-to-r from-emerald-50 via-white to-sky-50 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Status</p>
+            <h2 class="mt-2 text-lg font-semibold text-slate-900">Dostupnost pro nové klienty</h2>
+            <p class="text-sm text-slate-500 mt-1">Označte, zda jste připraveni přijímat nové klienty.</p>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox"
+                   id="available"
+                   name="available"
+                   class="sr-only peer"
+                   {% if coach.available %}checked{% endif %}>
+            <div class="w-14 h-7 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-emerald-500"></div>
+          </label>
+        </div>
+      </section>
+
+      <!-- Tlačítko uložit -->
+      <div class="flex justify-end">
+        <button type="submit"
+                class="inline-flex items-center gap-2 rounded-full bg-slate-900 text-white px-6 py-3 text-sm font-semibold shadow-sm hover:bg-slate-800 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+          Uložit změny
+        </button>
+      </div>
+    </form>
+
+    <!-- Informace o klientech -->
+    <section class="bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-6">
+      <div>
+        <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Statistiky</p>
+        <h2 class="mt-2 text-lg font-semibold text-slate-900">Informace o vašich klientech</h2>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <div class="bg-gradient-to-br from-sky-50 to-white rounded-2xl border border-slate-200/50 p-4 text-center">
+          <p class="text-3xl font-bold text-sky-600">{{ coach.companyprofile_set.count }}</p>
+          <p class="text-xs uppercase tracking-wide text-slate-400 mt-1">Přiřazených klientů</p>
+        </div>
+        <div class="bg-gradient-to-br from-emerald-50 to-white rounded-2xl border border-slate-200/50 p-4 text-center">
+          <p class="text-3xl font-bold text-emerald-600">{{ coach.companyprofile_set.count }}</p>
+          <p class="text-xs uppercase tracking-wide text-slate-400 mt-1">Aktivních klientů</p>
+        </div>
+        <div class="bg-gradient-to-br from-indigo-50 to-white rounded-2xl border border-slate-200/50 p-4 text-center">
+          <p class="text-3xl font-bold text-indigo-600">{{ coach.user.date_joined|date:"Y" }}</p>
+          <p class="text-xs uppercase tracking-wide text-slate-400 mt-1">Rok začátku</p>
         </div>
       </div>
-    </div>
+
+      {% if coach.companyprofile_set.exists %}
+      <div class="space-y-3">
+        <h3 class="text-sm font-semibold text-slate-700">Vaši klienti</h3>
+        <div class="overflow-hidden border border-slate-200/70 rounded-2xl bg-white/90">
+          <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead class="bg-slate-50/80 text-slate-500 uppercase tracking-wide text-xs">
+              <tr>
+                <th class="px-4 py-3 text-left">Firma</th>
+                <th class="px-4 py-3 text-left">Město</th>
+                <th class="px-4 py-3 text-right">Akce</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200/60">
+              {% for client in coach.companyprofile_set.all %}
+              <tr class="hover:bg-slate-50/70 transition">
+                <td class="px-4 py-3">
+                  <p class="text-sm font-semibold text-slate-900">{{ client.company_name }}</p>
+                </td>
+                <td class="px-4 py-3 text-sm text-slate-600">
+                  {{ client.city|default:"Město nezadáno" }}
+                </td>
+                <td class="px-4 py-3 text-right">
+                  <a href="{% url 'coaching:client_dashboard' client.id %}"
+                     class="inline-flex items-center gap-2 rounded-full bg-sky-600 px-4 py-1.5 text-xs font-semibold text-white shadow shadow-sky-600/25 hover:bg-sky-700 transition">
+                    Dashboard
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+    </section>
   </div>
 </div>
-
 {% endblock %}
