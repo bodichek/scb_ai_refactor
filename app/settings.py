@@ -82,7 +82,11 @@ DATABASES = {
         "PORT": os.getenv("DB_PORT", "5432"),
         "OPTIONS": {
             "sslmode": "require",
+            # Transaction pooler compatibility
+            "options": "-c statement_timeout=0",
         },
+        # Disable server-side cursors for transaction pooler
+        "DISABLE_SERVER_SIDE_CURSORS": True,
     }
 }
 
