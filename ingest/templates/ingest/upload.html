@@ -11,20 +11,9 @@
   </script>
   <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
   <style>
-    @keyframes pulse-ring {
-      0% { transform: scale(0.95); opacity: 1; }
-      50% { transform: scale(1.05); opacity: 0.7; }
-      100% { transform: scale(0.95); opacity: 1; }
-    }
-
     @keyframes slide-up {
       from { transform: translateY(10px); opacity: 0; }
       to { transform: translateY(0); opacity: 1; }
-    }
-
-    @keyframes progress-bar {
-      0% { width: 0%; }
-      100% { width: 100%; }
     }
 
     @keyframes spin-slow {
@@ -35,10 +24,6 @@
     @keyframes fade-in {
       from { opacity: 0; }
       to { opacity: 1; }
-    }
-
-    .pulse-ring {
-      animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     }
 
     .slide-up {
@@ -60,6 +45,7 @@
     /* File drop zone hover effect */
     .file-drop-zone {
       transition: all 0.3s ease;
+      position: relative;
     }
 
     .file-drop-zone:hover {
@@ -71,6 +57,11 @@
       border-color: rgb(2 132 199);
       background-color: rgb(224 242 254);
       transform: scale(1.02);
+    }
+
+    .file-drop-zone.uploading {
+      pointer-events: none;
+      opacity: 0.95;
     }
   </style>
 {% endblock %}
@@ -97,19 +88,69 @@
           </select>
         </div>
 
-        <!-- File Drop Zone -->
+        <!-- File Drop Zone with Integrated Progress -->
         <div class="flex flex-col gap-2">
           <label for="pdf_file" class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Soubor PDF</label>
-          <div class="file-drop-zone rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/50 p-8 text-center cursor-pointer" id="dropZone">
+          <div class="file-drop-zone rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/50 overflow-hidden" id="dropZone">
             <input type="file" name="pdf_file" id="pdf_file" accept="application/pdf" class="hidden" required>
-            <div id="dropZoneContent">
+
+            <!-- Normal State -->
+            <div id="dropZoneContent" class="p-8 text-center cursor-pointer">
               <svg class="mx-auto h-12 w-12 text-slate-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
               <p class="text-sm font-medium text-slate-700 mb-1">Klikni nebo pretahni PDF soubor</p>
               <p class="text-xs text-slate-500">Maximalni velikost: 10 MB</p>
             </div>
-            <div id="selectedFileName" class="hidden mt-3 text-sm font-medium text-sky-600"></div>
+
+            <!-- Selected File State -->
+            <div id="selectedFileState" class="hidden p-6 cursor-pointer">
+              <div class="flex items-center gap-3">
+                <div class="flex-shrink-0 w-10 h-10 bg-sky-100 rounded-lg flex items-center justify-center">
+                  <svg class="w-6 h-6 text-sky-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/>
+                  </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p id="selectedFileName" class="text-sm font-medium text-slate-900 truncate"></p>
+                  <p id="selectedFileSize" class="text-xs text-slate-500"></p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Upload Progress State -->
+            <div id="uploadingState" class="hidden">
+              <!-- Progress Bar at Bottom -->
+              <div class="relative h-2 bg-slate-200">
+                <div id="progressBar" class="absolute inset-0 bg-gradient-to-r from-sky-500 to-blue-600 progress-bar-animated" style="width: 0%"></div>
+              </div>
+
+              <!-- Upload Info -->
+              <div class="p-6">
+                <div class="flex items-start gap-4">
+                  <div class="flex-shrink-0">
+                    <div class="w-10 h-10 bg-sky-100 rounded-lg flex items-center justify-center">
+                      <svg class="w-5 h-5 text-sky-600 spin-slow" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    </div>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between mb-2">
+                      <p id="uploadFileName" class="text-sm font-medium text-slate-900 truncate"></p>
+                      <span id="progressPercent" class="text-sm font-bold text-sky-600 ml-3">0%</span>
+                    </div>
+                    <p id="currentStageText" class="text-xs text-slate-600 mb-3">Pripravuji se...</p>
+
+                    <!-- Status Messages -->
+                    <div id="statusMessages" class="space-y-1.5">
+                      <!-- Status items will be added here -->
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -119,59 +160,6 @@
           </button>
         </div>
       </form>
-
-      <!-- Progress Section (Hidden by default) -->
-      <div id="progressSection" class="hidden space-y-4 pt-4 border-t border-slate-200">
-        <div class="flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-slate-700">Stav nahravani</h3>
-          <span id="progressPercent" class="text-sm font-medium text-sky-600">0%</span>
-        </div>
-
-        <!-- Progress Bar -->
-        <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-          <div id="progressBar" class="bg-gradient-to-r from-sky-500 to-blue-600 h-2 progress-bar-animated" style="width: 0%"></div>
-        </div>
-
-        <!-- Status Messages -->
-        <div id="statusMessages" class="space-y-2">
-          <!-- Status items will be added here dynamically -->
-        </div>
-
-        <!-- Current Stage Indicator -->
-        <div id="currentStage" class="flex items-center gap-3 p-4 bg-sky-50 rounded-xl border border-sky-200">
-          <div class="spin-slow">
-            <svg class="h-5 w-5 text-sky-600" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-          </div>
-          <span id="currentStageText" class="text-sm font-medium text-slate-700">Pripravuji se...</span>
-        </div>
-      </div>
-
-      <!-- Success/Error Messages -->
-      <div id="resultSection" class="hidden"></div>
-    </section>
-
-    <!-- Upload Queue Table (for multiple files) -->
-    <section id="uploadQueueSection" class="hidden dashboard-card bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6">
-      <h2 class="text-lg font-semibold text-slate-900 mb-4">Nahravane soubory</h2>
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-slate-200">
-          <thead class="bg-slate-50">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Soubor</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Rok</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Typ</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Status</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Progress</th>
-            </tr>
-          </thead>
-          <tbody id="uploadQueueBody" class="bg-white divide-y divide-slate-100">
-            <!-- Rows will be added dynamically -->
-          </tbody>
-        </table>
-      </div>
     </section>
   </div>
 </div>
@@ -182,28 +170,36 @@
   const fileInput = document.getElementById('pdf_file');
   const dropZone = document.getElementById('dropZone');
   const dropZoneContent = document.getElementById('dropZoneContent');
+  const selectedFileState = document.getElementById('selectedFileState');
   const selectedFileName = document.getElementById('selectedFileName');
+  const selectedFileSize = document.getElementById('selectedFileSize');
+  const uploadingState = document.getElementById('uploadingState');
+  const uploadFileName = document.getElementById('uploadFileName');
   const submitBtn = document.getElementById('submitBtn');
   const submitBtnText = document.getElementById('submitBtnText');
-  const progressSection = document.getElementById('progressSection');
   const progressBar = document.getElementById('progressBar');
   const progressPercent = document.getElementById('progressPercent');
   const statusMessages = document.getElementById('statusMessages');
   const currentStageText = document.getElementById('currentStageText');
-  const resultSection = document.getElementById('resultSection');
 
   // File drop zone click handler
-  dropZone.addEventListener('click', function() {
-    fileInput.click();
+  dropZone.addEventListener('click', function(e) {
+    if (!dropZone.classList.contains('uploading')) {
+      fileInput.click();
+    }
   });
 
   // File selection handler
   fileInput.addEventListener('change', function() {
     if (this.files && this.files[0]) {
       const file = this.files[0];
-      selectedFileName.textContent = `📄 ${file.name} (${formatFileSize(file.size)})`;
-      selectedFileName.classList.remove('hidden');
-      dropZoneContent.classList.add('opacity-50');
+      selectedFileName.textContent = file.name;
+      selectedFileSize.textContent = formatFileSize(file.size);
+
+      // Show selected file state
+      dropZoneContent.classList.add('hidden');
+      selectedFileState.classList.remove('hidden');
+      uploadingState.classList.add('hidden');
     }
   });
 
@@ -211,7 +207,9 @@
   dropZone.addEventListener('dragover', function(e) {
     e.preventDefault();
     e.stopPropagation();
-    this.classList.add('drag-over');
+    if (!this.classList.contains('uploading')) {
+      this.classList.add('drag-over');
+    }
   });
 
   dropZone.addEventListener('dragleave', function(e) {
@@ -224,6 +222,8 @@
     e.preventDefault();
     e.stopPropagation();
     this.classList.remove('drag-over');
+
+    if (this.classList.contains('uploading')) return;
 
     const files = e.dataTransfer.files;
     if (files && files[0]) {
@@ -249,13 +249,18 @@
     const file = fileInput.files[0];
     const formData = new FormData(form);
 
-    // Show progress section
-    progressSection.classList.remove('hidden');
-    progressSection.classList.add('slide-up');
+    // Switch to uploading state
+    dropZoneContent.classList.add('hidden');
+    selectedFileState.classList.add('hidden');
+    uploadingState.classList.remove('hidden');
+    dropZone.classList.add('uploading');
+
+    uploadFileName.textContent = file.name;
     submitBtn.disabled = true;
     submitBtnText.textContent = 'Nahravani...';
 
     // Reset progress
+    statusMessages.innerHTML = '';
     updateProgress(0, 'Pripravuji nahravani...');
 
     // Create XMLHttpRequest for upload progress tracking
@@ -276,14 +281,13 @@
       }
       if (xhr.readyState === XMLHttpRequest.HEADERS_RECEIVED) {
         updateProgress(25, 'Soubor nahran, spoustim analyzu...');
-        addStatusMessage('Soubor uspesne nahran na server', 'success');
+        addStatusMessage('Soubor uspesne nahran', 'success');
       }
     });
 
     // Load handler (response received)
     xhr.addEventListener('load', function() {
       if (xhr.status === 200 || xhr.status === 302) {
-        // Simulate processing stages
         simulateProcessing();
       } else {
         showError('Chyba pri nahravani. Zkuste to prosim znovu.');
@@ -305,7 +309,7 @@
     xhr.send(formData);
   });
 
-  // Simulate processing stages (since we can't track server-side processing in real-time)
+  // Simulate processing stages
   function simulateProcessing() {
     const stages = [
       { progress: 40, text: 'Konvertuji PDF na obrazek...', delay: 800 },
@@ -325,17 +329,15 @@
           updateProgress(stage.progress, stage.text);
 
           if (stage.progress === 40) {
-            addStatusMessage('PDF konvertovano na PNG (300 DPI)', 'success');
+            addStatusMessage('PDF konvertovano (300 DPI)', 'success');
           } else if (stage.progress === 60) {
-            addStatusMessage('Cekam na odpoved od AI...', 'pending');
+            addStatusMessage('Cekam na AI odpoved...', 'pending');
           } else if (stage.progress === 85) {
-            addStatusMessage('AI analyz a dokoncena', 'success');
-            addStatusMessage('Validuji financni data...', 'pending');
+            addStatusMessage('AI analyza dokoncena', 'success');
           } else if (stage.progress === 95) {
             addStatusMessage('Data validovana', 'success');
           } else if (stage.progress === 100) {
-            addStatusMessage('Data ulozena do databaze', 'success');
-            // Redirect will happen from server response
+            addStatusMessage('Uspesne ulozeno', 'success');
             setTimeout(() => {
               window.location.reload();
             }, 500);
@@ -358,19 +360,19 @@
 
   function addStatusMessage(text, status) {
     const messageDiv = document.createElement('div');
-    messageDiv.className = 'flex items-center gap-2 text-sm fade-in';
+    messageDiv.className = 'flex items-center gap-2 text-xs fade-in';
 
     let icon = '';
     let colorClass = '';
 
     if (status === 'success') {
-      icon = '<svg class="h-4 w-4 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>';
+      icon = '<svg class="h-3.5 w-3.5 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>';
       colorClass = 'text-green-700';
     } else if (status === 'pending') {
-      icon = '<svg class="h-4 w-4 text-blue-500 spin-slow" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+      icon = '<svg class="h-3.5 w-3.5 text-blue-500 flex-shrink-0 spin-slow" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
       colorClass = 'text-blue-700';
     } else {
-      icon = '<svg class="h-4 w-4 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>';
+      icon = '<svg class="h-3.5 w-3.5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>';
       colorClass = 'text-red-700';
     }
 
@@ -380,19 +382,10 @@
 
   function showError(message) {
     updateProgress(0, 'Chyba');
-    resultSection.innerHTML = `
-      <div class="p-4 bg-red-50 border border-red-200 rounded-xl fade-in">
-        <div class="flex items-center gap-2">
-          <svg class="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
-          </svg>
-          <span class="text-sm font-medium text-red-800">${message}</span>
-        </div>
-      </div>
-    `;
-    resultSection.classList.remove('hidden');
+    addStatusMessage(message, 'error');
     submitBtn.disabled = false;
-    submitBtnText.textContent = 'Nahrat a analyzovat';
+    submitBtnText.textContent = 'Zkusit znovu';
+    dropZone.classList.remove('uploading');
   }
 
   function formatFileSize(bytes) {
