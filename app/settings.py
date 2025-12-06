@@ -4,11 +4,49 @@ import os
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-dotenv_path = BASE_DIR / ".env"
+
+# ============================================================
+# ENVIRONMENT-SPECIFIC CONFIGURATION
+# ============================================================
+# Automaticky načte správný .env soubor podle prostředí:
+# - LOCAL: .env.local (development database)
+# - PRODUCTION: .env.production (produkční database na PA)
+# - FALLBACK: .env (defaultní)
+# ============================================================
+
+# Detect environment
+ENVIRONMENT = os.getenv("DJANGO_ENV", "local")  # default: local
+
+if ENVIRONMENT == "production":
+    # Production environment (PythonAnywhere)
+    dotenv_path = BASE_DIR / ".env.production"
+    print(f"[PRODUCTION] Loading environment from {dotenv_path}")
+elif ENVIRONMENT == "local":
+    # Local development environment
+    dotenv_path = BASE_DIR / ".env.local"
+    if not dotenv_path.exists():
+        # Fallback to .env if .env.local doesn't exist
+        dotenv_path = BASE_DIR / ".env"
+        print(f"[WARNING] .env.local not found, using fallback: {dotenv_path}")
+    else:
+        print(f"[LOCAL DEV] Loading environment from {dotenv_path}")
+else:
+    # Fallback to default .env
+    dotenv_path = BASE_DIR / ".env"
+    print(f"[WARNING] Unknown environment '{ENVIRONMENT}', using fallback: {dotenv_path}")
+
+# Load environment variables
 if dotenv_path.exists():
     load_dotenv(dotenv_path)
 else:
-    load_dotenv(BASE_DIR.parent / ".env")
+    print(f"[ERROR] Environment file not found: {dotenv_path}")
+    # Try parent directory as last resort
+    parent_env = BASE_DIR.parent / ".env"
+    if parent_env.exists():
+        load_dotenv(parent_env)
+        print(f"[INFO] Loaded from parent directory: {parent_env}")
+    else:
+        print("[WARNING] No .env file found - using environment variables only")
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")  # fallback pro vývoj
 DEBUG = True #os.getenv("DEBUG", "False") == "True"

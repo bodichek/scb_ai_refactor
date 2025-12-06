@@ -98,12 +98,15 @@ ScaleUpBoard je komplexní webová platforma určená pro finanční analýzu č
 - **Python 3.13** - Programming language
 - **Django 5.2** - Web framework
 - **Poetry** - Dependency management
-- **SQLite** (development) / **PostgreSQL** (production) - Database
+- **PostgreSQL (Supabase)** - Database with pgvector extension
+- **Celery + Redis** - Async task processing (RAG embeddings)
 
 ### AI & Machine Learning
 
 - **Anthropic Claude Sonnet 4** (`claude-sonnet-4-20250514`) - Vision API pro PDF parsing
 - **OpenAI GPT-4** - Chatbot & coaching
+- **OpenAI text-embedding-3-small** - RAG embeddings (1536 dimensions)
+- **pgvector** - Vector similarity search v PostgreSQL
 - **PyMuPDF (fitz)** - PDF → PNG conversion @ 300 DPI
 - **PDFPlumber** - Fallback text extraction
 
@@ -146,17 +149,33 @@ poetry install
 
 3. **Konfigurace prostředí**
 
-Vytvořte soubor `.env` v root složce:
+**⚠️ DŮLEŽITÉ:** Projekt používá oddělené prostředí pro development a production.
+
+Pro lokální vývoj:
+1. Vytvořte nový Supabase projekt pro development na [supabase.com](https://supabase.com)
+2. Zkopírujte `.env.local.example` → `.env.local`
+3. Vyplňte credentials z DEV projektu
+
+Viz **[ENV_SETUP.md](ENV_SETUP.md)** pro podrobný návod (5 minut setup).
+
 ```env
 # Django
 SECRET_KEY=your-secret-key-here
 DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
 
+# Supabase PostgreSQL (Development)
+DB_USER=postgres.xxxxxxxxxx
+DB_PASSWORD=your-dev-password
+DB_HOST=aws-0-eu-central-1.pooler.supabase.com
+DB_PORT=6543
+SUPABASE_URL=https://xxxxxxxxxx.supabase.co
+SUPABASE_ANON_KEY=eyJhbGc...
+
 # Anthropic API (Claude Vision)
 ANTHROPIC_API_KEY=sk-ant-api03-...
 
-# OpenAI API (Chatbot)
+# OpenAI API (Chatbot & RAG)
 OPENAI_API_KEY=sk-proj-...
 ```
 
@@ -196,6 +215,11 @@ scaleupboard/
 ├── exports/            # Export do PDF/Excel
 ├── finance/            # Finanční výpočty (compute_metrics, cashflow)
 ├── ingest/             # PDF upload, parsing, vision extraction
+├── rag/                # RAG Processing & Vector Embeddings
+│   ├── services.py     # Chunking & Embedding services
+│   ├── tasks.py        # Celery tasks pro async processing
+│   ├── admin.py        # RAG monitoring dashboard
+│   └── config.py       # Processing rules (immediate/batch/manual)
 │   ├── extraction/     # Claude Vision API integrace
 │   │   ├── claude_extractor.py
 │   │   └── pdf_processor.py
@@ -428,6 +452,43 @@ from exports.services import generate_pdf_report
 
 pdf_bytes = generate_pdf_report(user, year=2023)
 ```
+
+---
+
+### 8. `rag/` - RAG Processing System
+
+**Účel:** Retrieval-Augmented Generation pro AI chatbot s dokumentovým kontextem.
+
+**Komponenty:**
+- **Document Chunking** - Rozdělení dokumentů na menší části (2000 tokenů, overlap 200)
+- **Embedding Generation** - OpenAI text-embedding-3-small (1536 dimensions)
+- **Vector Search** - pgvector similarity search
+- **Hybrid Processing** - Immediate vs. Batch processing
+
+**Processing Modes:**
+1. **Immediate** (< 2 MB, kritické výkazy) → Async zpracování ihned po uploadu
+2. **Batch** (>= 2 MB, ostatní) → Zpracování v noci (2 AM cron job)
+3. **Manual** → Admin-triggered processing
+
+**Monitoring Dashboard:** `/admin/rag-monitor/`
+- Status overview (pending/processing/completed/failed)
+- Embeddings completion rate s progress barem
+- Failed documents s error messages
+- Processing mode distribution
+
+**Management Commands:**
+```bash
+# Zpracovat všechny pending dokumenty
+python manage.py process_documents_rag
+
+# Zpracovat konkrétní dokument
+python manage.py process_documents_rag --document-id 123
+
+# Pouze chunking (bez embeddings)
+python manage.py process_documents_rag --skip-embeddings
+```
+
+**Viz:** [README_HYBRID_RAG.md](README_HYBRID_RAG.md) pro detailní dokumentaci
 
 ---
 
@@ -696,17 +757,24 @@ poetry run python ingest/management/commands/test_vision_to_dashboard.py
 
 ## 📚 Dokumentace
 
+### Setup & Deployment
+
+- **[ENV_SETUP.md](ENV_SETUP.md)** - ⚡ Rychlý návod pro oddělení dev/prod prostředí (5 min)
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - 🚀 Detailní deployment guide pro PythonAnywhere
+- **[README_HYBRID_RAG.md](README_HYBRID_RAG.md)** - 🧠 Kompletní dokumentace RAG systému
+- **[MIGRATION_SUCCESS.md](MIGRATION_SUCCESS.md)** - 📊 PostgreSQL migrace poznámky
+
+### Features & Systems
+
+- **[COACH_ASSIGNMENT_SYSTEM.md](COACH_ASSIGNMENT_SYSTEM.md)** - Dokumentace coaching systému
+- **[INTERACTIVE_DASHBOARD_GUIDE.md](INTERACTIVE_DASHBOARD_GUIDE.md)** - Guide pro dashboard features
+
 ### Private Docs (excluded from git)
 
 - `docs/CHANGELOG.md` - Změny v aplikaci (kompletní historie)
 - `docs/DEPLOYMENT_STATUS.md` - Aktuální stav deployment (konfigurace, testy)
 - `docs/FIXES.md` - Opravy bugů (root cause analysis)
 - `docs/TECHNICAL_NOTES.md` - Technické poznámky (architektura, debugging)
-
-### Public Docs
-
-- `COACH_ASSIGNMENT_SYSTEM.md` - Dokumentace coaching systému
-- `INTERACTIVE_DASHBOARD_GUIDE.md` - Guide pro dashboard features
 
 ### Code Documentation
 

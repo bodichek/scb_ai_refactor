@@ -31,8 +31,11 @@ backup_*.json
 backup_*.sql
 *.backup_*
 
-# Environment
+# Environment variables
 .env
+.env.local
+.env.production
+.env.*.local
 
 # Claude Code
 .claude/settings.local.json
