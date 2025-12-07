@@ -20,13 +20,13 @@
         <div>
           <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Ingest</p>
           <h1 class="mt-2 text-2xl font-semibold text-slate-900">Moje dokumenty</h1>
-          <p class="text-sm text-slate-500">Prehled nahranych vykazu a jejich stavu zpracovani.</p>
+          <p class="text-sm text-slate-500">Přehled nahraných výkazů a jejich stavu zpracování.</p>
         </div>
         <div class="flex flex-wrap gap-2">
           {% if show_all %}
-          <a href="?vse=0" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:border-slate-300 transition">Jen aktualni</a>
+          <a href="?vse=0" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:border-slate-300 transition">Jen aktuální</a>
           {% else %}
-          <a href="?vse=1" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:border-slate-300 transition">Zobrazit vse</a>
+          <a href="?vse=1" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:border-slate-300 transition">Zobrazit vše</a>
           {% endif %}
         </div>
       </div>
@@ -38,8 +38,8 @@
               <th class="px-4 py-3 text-left">Rok</th>
               <th class="px-4 py-3 text-left">Typ</th>
               <th class="px-4 py-3 text-left">Soubor</th>
-              <th class="px-4 py-3 text-left">Analyzovano</th>
-              <th class="px-4 py-3 text-left">Aktualizovano</th>
+              <th class="px-4 py-3 text-left">Analyzováno</th>
+              <th class="px-4 py-3 text-left">Aktualizováno</th>
               <th class="px-4 py-3 text-right">Akce</th>
             </tr>
           </thead>
@@ -55,7 +55,7 @@
                 {% if d.analyzed %}
                   <span class="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-3 py-1 text-xs font-semibold">Ano</span>
                 {% else %}
-                  <span class="inline-flex items-center rounded-full bg-amber-100 text-amber-700 px-3 py-1 text-xs font-semibold">Ceka na analyzu</span>
+                  <span class="inline-flex items-center rounded-full bg-amber-100 text-amber-700 px-3 py-1 text-xs font-semibold">Čeká na analýzu</span>
                 {% endif %}
               </td>
               <td class="px-4 py-3 text-sm text-slate-500">
@@ -68,14 +68,19 @@
               <td class="px-4 py-3 text-right">
                 <a href="{% url 'ingest:delete_document' d.id %}"
                    class="inline-flex items-center gap-1 rounded-xl border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition"
-                   onclick="return confirm('Opravdu chcete smazat tento dokument?');">
+                   onclick="return confirm('Opravdu chceš smazat tento dokument?');">
                   Smazat
                 </a>
               </td>
             </tr>
             {% empty %}
             <tr>
-              <td colspan="6" class="px-4 py-8 text-center text-sm text-slate-500 bg-white/90">Zatim zadne dokumenty.</td>
+              <td colspan="6" class="px-4 py-8 text-center text-sm text-slate-500 bg-white/90">
+                <div class="scb-empty-state">
+                  <strong>Zatím tu nic není</strong>
+                  <span>Nahraj první výkaz a uvidíš zde přehled dokumentů.</span>
+                </div>
+              </td>
             </tr>
             {% endfor %}
           </tbody>
@@ -83,10 +88,10 @@
       </div>
 
       <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
-        <p class="text-xs text-slate-500">Nahrane soubory zustavaji ulozene pro dalsi analyzy a exporty.</p>
+        <p class="text-xs text-slate-500">Nahrané soubory zůstávají uložené pro další analýzy a exporty.</p>
         <div class="flex flex-wrap gap-2">
-          <a href="{% url 'ingest:upload_many' %}" class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-600/30 hover:bg-sky-700 transition">Nahrat vice souboru</a>
-          <a href="{% url 'ingest:upload_pdf' %}" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 hover:border-slate-300 transition">Nahrat jeden soubor</a>
+          <a href="{% url 'ingest:upload_many' %}" class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-600/30 hover:bg-sky-700 transition">Nahrát více souborů</a>
+          <a href="{% url 'ingest:upload_pdf' %}" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 hover:border-slate-300 transition">Nahrát jeden soubor</a>
         </div>
       </div>
     </section>

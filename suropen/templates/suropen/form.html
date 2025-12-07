@@ -16,13 +16,13 @@
 <div class="min-h-[calc(100vh-140px)] bg-gradient-to-b from-sky-50/60 via-white to-slate-100 py-10">
   <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
     {% if error %}
-      <div class="rounded-2xl border border-rose-200/70 bg-rose-50/80 px-4 py-3 text-sm text-rose-700 shadow-sm">⚠ {{ error }}</div>
+      <div class="rounded-2xl border border-rose-200/70 bg-rose-50/80 px-4 py-3 text-sm text-rose-700 shadow-sm">{{ error }}</div>
     {% endif %}
     {% if just_submitted %}
-      <div class="rounded-2xl border border-emerald-200/70 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-700 shadow-sm">✅ Analýza byla úspěšně odeslána, zkontroluj shrnutí v historii.</div>
+      <div class="rounded-2xl border border-emerald-200/70 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-700 shadow-sm">Analýza byla úspěšně odeslána, zkontroluj shrnutí v historii.</div>
     {% endif %}
     {% if duplicate %}
-      <div class="rounded-2xl border border-amber-200/70 bg-amber-50/80 px-4 py-3 text-sm text-amber-700 shadow-sm">⏳ Formulář už byl nedávno odeslán. Chvíli vyčkej a zkus to znovu.</div>
+      <div class="rounded-2xl border border-amber-200/70 bg-amber-50/80 px-4 py-3 text-sm text-amber-700 shadow-sm">Formulář už byl nedávno odeslán. Chvíli vyčkej a zkus to znovu.</div>
     {% endif %}
 
     <section class="dashboard-card bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-4">
@@ -33,7 +33,7 @@
           <p class="text-sm text-slate-500">Sdílej, co se děje, a AI doporučení doručíme přímo do dashboardu.</p>
         </div>
         <a href="{% url 'suropen:history' %}" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 hover:border-slate-300 transition">
-          📚 Historie analýz
+          Historie analýz
         </a>
       </div>
     </section>
@@ -100,7 +100,7 @@
         {% endfor %}
         <div class="flex justify-end">
           <button type="submit" id="suropen-submit" class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/30 hover:bg-emerald-700 transition">
-            🚀 Odeslat analýzu
+            Odeslat analýzu
           </button>
         </div>
       </form>

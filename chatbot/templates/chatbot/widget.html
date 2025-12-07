@@ -2,19 +2,19 @@
 <div id="chatbot-widget" class="chatbot-widget">
   <!-- Tlačítko pro otevření/zavření chatu -->
   <button id="chatbot-toggle" class="chatbot-toggle" title="Zeptej se na finanční pojmy">
-    💬
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
   </button>
   
   <!-- Chat okno -->
   <div id="chatbot-window" class="chatbot-window" style="display: none;">
     <div class="chatbot-header">
-      <h6 class="mb-0">🤖 Finanční asistent</h6>
+      <h6 class="mb-0">Finanční asistent</h6>
       <button id="chatbot-close" class="btn-close btn-sm" aria-label="Zavřít"></button>
     </div>
     
     <div id="chatbot-messages" class="chatbot-messages">
       <div class="chatbot-message bot-message">
-        👋 Ahoj! Jsem tvůj finanční asistent. Pomůžu ti s vyplňováním dat a vysvětlím účetní pojmy. Na co se chceš zeptat?
+        Ahoj! Jsem tvůj finanční asistent. Pomůžu ti s vyplňováním dat a vysvětlím účetní pojmy. Na co se chceš zeptat?
       </div>
     </div>
     
@@ -375,11 +375,11 @@ document.addEventListener('DOMContentLoaded', function() {
       if (data.success) {
         addMessage(data.response, 'bot');
       } else {
-        addMessage('⚠️ ' + (data.error || 'Nastala chyba při komunikaci s AI.'), 'bot');
+        addMessage('Chyba: ' + (data.error || 'Nastala chyba při komunikaci s AI.'), 'bot');
       }
     } catch (error) {
       console.error('Chatbot error:', error);
-      addMessage(`⚠️ Chyba: ${error.message}`, 'bot');
+      addMessage(`Chyba: ${error.message}`, 'bot');
     } finally {
       loading.style.display = 'none';
     }

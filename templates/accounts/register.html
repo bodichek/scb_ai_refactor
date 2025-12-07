@@ -42,7 +42,7 @@
         <input type="text" class="form-control" id="ico" name="ico" required maxlength="8" placeholder="12345678">
         <button type="button" class="btn btn-outline-secondary" id="load-company-btn" disabled>
           <span id="load-spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
-          📋 Načíst údaje
+          Načíst údaje
         </button>
       </div>
       <small class="form-text text-muted">Zadej 8-místné IČO a automaticky se načtou údaje z obchodního rejstříku</small>
@@ -136,11 +136,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (this.value.length === 8) {
             loadBtn.disabled = false;
-            icoStatus.innerHTML = '<small class="text-success">✅ IČO má správný formát</small>';
+            icoStatus.innerHTML = '<small class="text-success">IČO má správný formát</small>';
         } else {
             loadBtn.disabled = true;
             if (this.value.length > 0) {
-                icoStatus.innerHTML = '<small class="text-warning">⚠️ IČO musí mít 8 číslic</small>';
+                icoStatus.innerHTML = '<small class="text-warning">IČO musí mít 8 číslic</small>';
             } else {
                 icoStatus.innerHTML = '';
             }
@@ -159,7 +159,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Zobraz loading
         loadBtn.disabled = true;
         loadSpinner.classList.remove('d-none');
-        icoStatus.innerHTML = '<small class="text-info">🔄 Načítám údaje z obchodního rejstříku...</small>';
+        icoStatus.innerHTML = '<small class="text-info">Načítám údaje z obchodního rejstříku...</small>';
         
         try {
             const response = await fetch(`/accounts/api/company-data/?ico=${ico}`, {
@@ -202,21 +202,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Zobraz úspěch
                 icoStatus.innerHTML = `
                     <div class="alert alert-success alert-sm mt-2">
-                        ✅ Údaje úspěšně načteny z registru ARES
+                        Údaje úspěšně načteny z registru ARES
                         <br><small>Zkontroluj a případně uprav načtené údaje</small>
                     </div>
                 `;
                 
                 // Aktivní/neaktivní firma
                 if (companyData.active === false) {
-                    icoStatus.innerHTML += '<div class="alert alert-warning alert-sm">⚠️ Pozor: Firma není aktivní v obchodním rejstříku</div>';
+                    icoStatus.innerHTML += '<div class="alert alert-warning alert-sm">Pozor: Firma není aktivní v obchodním rejstříku</div>';
                 }
                 
             } else {
                 // Zobraz chybu
                 icoStatus.innerHTML = `
                     <div class="alert alert-danger alert-sm mt-2">
-                        ❌ ${data.error}
+                        ${data.error}
                     </div>
                 `;
             }
@@ -225,7 +225,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error loading company data:', error);
             icoStatus.innerHTML = `
                 <div class="alert alert-danger alert-sm mt-2">
-                    ❌ Chyba při načítání dat: ${error.message}
+                    Chyba při načítání dat: ${error.message}
                 </div>
             `;
         } finally {
@@ -257,7 +257,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (password.length > 0) {
             if (password.length < 8) {
                 passwordInput.classList.add('is-invalid');
-                passwordStatus.innerHTML = '<small class="text-danger">❌ Heslo musí mít alespoň 8 znaků</small>';
+                passwordStatus.innerHTML = '<small class="text-danger">Heslo musí mít alespoň 8 znaků</small>';
                 return false;
             } else {
                 passwordInput.classList.add('is-valid');
@@ -268,11 +268,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (password2.length > 0) {
             if (password !== password2) {
                 password2Input.classList.add('is-invalid');
-                passwordStatus.innerHTML = '<small class="text-danger">❌ Hesla se neshodují</small>';
+                passwordStatus.innerHTML = '<small class="text-danger">Hesla se neshodují</small>';
                 return false;
             } else if (password.length >= 8) {
                 password2Input.classList.add('is-valid');
-                passwordStatus.innerHTML = '<small class="text-success">✅ Hesla se shodují</small>';
+                passwordStatus.innerHTML = '<small class="text-success">Hesla se shodují</small>';
                 return true;
             }
         }

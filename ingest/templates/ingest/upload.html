@@ -72,8 +72,8 @@
     <section class="dashboard-card bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 space-y-6">
       <div class="space-y-2">
         <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Ingest</p>
-        <h1 class="text-2xl font-semibold text-slate-900">Nahrat novy financni vykaz</h1>
-        <p class="text-sm text-slate-500">Vyber PDF s vysledovkou nebo rozvahou. Analyzu spustime automaticky.</p>
+        <h1 class="text-2xl font-semibold text-slate-900">Nahrát nový finanční výkaz</h1>
+        <p class="text-sm text-slate-500">Vyber PDF s výsledovkou nebo rozvahou. Analýzu spustíme automaticky.</p>
       </div>
 
       <!-- Upload Form -->
@@ -99,8 +99,8 @@
               <svg class="mx-auto h-12 w-12 text-slate-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
-              <p class="text-sm font-medium text-slate-700 mb-1">Klikni nebo pretahni PDF soubor</p>
-              <p class="text-xs text-slate-500">Maximalni velikost: 10 MB</p>
+              <p class="text-sm font-medium text-slate-700 mb-1">Klikni nebo přetáhni PDF soubor</p>
+              <p class="text-xs text-slate-500">Maximální velikost: 10 MB</p>
             </div>
 
             <!-- Selected File State -->
@@ -141,7 +141,7 @@
                       <p id="uploadFileName" class="text-sm font-medium text-slate-900 truncate"></p>
                       <span id="progressPercent" class="text-sm font-bold text-sky-600 ml-3">0%</span>
                     </div>
-                    <p id="currentStageText" class="text-xs text-slate-600 mb-3">Pripravuji se...</p>
+                    <p id="currentStageText" class="text-xs text-slate-600 mb-3">Připravuji se...</p>
 
                     <!-- Status Messages -->
                     <div id="statusMessages" class="space-y-1.5">
@@ -156,7 +156,7 @@
 
         <div class="flex justify-end">
           <button type="submit" id="submitBtn" class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-600/30 hover:bg-sky-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
-            <span id="submitBtnText">Nahrat a analyzovat</span>
+            <span id="submitBtnText">Nahrát a analyzovat</span>
           </button>
         </div>
       </form>
@@ -232,7 +232,7 @@
         const event = new Event('change');
         fileInput.dispatchEvent(event);
       } else {
-        alert('Prosim, nahrajte pouze PDF soubory.');
+        alert('Prosím, nahraj pouze PDF soubory.');
       }
     }
   });
@@ -242,7 +242,7 @@
     e.preventDefault();
 
     if (!fileInput.files || !fileInput.files[0]) {
-      alert('Prosim, vyberte soubor.');
+      alert('Prosím, vyber soubor.');
       return;
     }
 
@@ -257,11 +257,11 @@
 
     uploadFileName.textContent = file.name;
     submitBtn.disabled = true;
-    submitBtnText.textContent = 'Nahravani...';
+    submitBtnText.textContent = 'Nahrávání...';
 
     // Reset progress
     statusMessages.innerHTML = '';
-    updateProgress(0, 'Pripravuji nahravani...');
+    updateProgress(0, 'Připravuji nahrávání...');
 
     // Create XMLHttpRequest for upload progress tracking
     const xhr = new XMLHttpRequest();
@@ -270,18 +270,18 @@
     xhr.upload.addEventListener('progress', function(e) {
       if (e.lengthComputable) {
         const percentComplete = Math.round((e.loaded / e.total) * 25); // 0-25%
-        updateProgress(percentComplete, 'Nahravam soubor na server...');
+        updateProgress(percentComplete, 'Nahrávám soubor na server...');
       }
     });
 
     // State change handler
     xhr.addEventListener('readystatechange', function() {
       if (xhr.readyState === XMLHttpRequest.OPENED) {
-        addStatusMessage('Pripojuji se k serveru...', 'pending');
+        addStatusMessage('Připojuji se k serveru...', 'pending');
       }
       if (xhr.readyState === XMLHttpRequest.HEADERS_RECEIVED) {
-        updateProgress(25, 'Soubor nahran, spoustim analyzu...');
-        addStatusMessage('Soubor uspesne nahran', 'success');
+        updateProgress(25, 'Soubor nahrán, spouštím analýzu...');
+        addStatusMessage('Soubor úspěšně nahrán', 'success');
       }
     });
 
@@ -290,18 +290,18 @@
       if (xhr.status === 200 || xhr.status === 302) {
         simulateProcessing();
       } else {
-        showError('Chyba pri nahravani. Zkuste to prosim znovu.');
+        showError('Chyba při nahrávání. Zkus to prosím znovu.');
       }
     });
 
     // Error handler
     xhr.addEventListener('error', function() {
-      showError('Chyba pripojeni. Zkontrolujte internetove pripojeni.');
+      showError('Chyba připojení. Zkontroluj internetové připojení.');
     });
 
     // Abort handler
     xhr.addEventListener('abort', function() {
-      showError('Nahravani bylo preruseno.');
+      showError('Nahrávání bylo přerušeno.');
     });
 
     // Send request
@@ -312,10 +312,10 @@
   // Simulate processing stages
   function simulateProcessing() {
     const stages = [
-      { progress: 40, text: 'Konvertuji PDF na obrazek...', delay: 800 },
-      { progress: 60, text: 'Odesilam na AI analyzu (Claude Vision)...', delay: 1500 },
-      { progress: 85, text: 'Zpracovavam financni data...', delay: 2000 },
-      { progress: 95, text: 'Ukladam vysledky do databaze...', delay: 500 },
+      { progress: 40, text: 'Konvertuji PDF na obrázek...', delay: 800 },
+      { progress: 60, text: 'Odesílám na AI analýzu (Claude Vision)...', delay: 1500 },
+      { progress: 85, text: 'Zpracovávám finanční data...', delay: 2000 },
+      { progress: 95, text: 'Ukládám výsledky do databáze...', delay: 500 },
       { progress: 100, text: 'Hotovo!', delay: 300 }
     ];
 
@@ -329,15 +329,15 @@
           updateProgress(stage.progress, stage.text);
 
           if (stage.progress === 40) {
-            addStatusMessage('PDF konvertovano (300 DPI)', 'success');
+            addStatusMessage('PDF konvertováno (300 DPI)', 'success');
           } else if (stage.progress === 60) {
-            addStatusMessage('Cekam na AI odpoved...', 'pending');
+            addStatusMessage('Čekám na AI odpověď...', 'pending');
           } else if (stage.progress === 85) {
-            addStatusMessage('AI analyza dokoncena', 'success');
+            addStatusMessage('AI analýza dokončena', 'success');
           } else if (stage.progress === 95) {
-            addStatusMessage('Data validovana', 'success');
+            addStatusMessage('Data validována', 'success');
           } else if (stage.progress === 100) {
-            addStatusMessage('Uspesne ulozeno', 'success');
+            addStatusMessage('Úspěšně uloženo', 'success');
             setTimeout(() => {
               window.location.reload();
             }, 500);

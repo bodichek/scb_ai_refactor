@@ -4,9 +4,9 @@
   <section class="scb-panel scb-panel--inline">
     <div class="page-heading">
       <span class="page-eyebrow">Cash Flow</span>
-      <h2 class="page-title">💰 Profit vs Cash Flow</h2>
+      <h2 class="page-title">Profit vs Cash Flow</h2>
       <p class="page-subtitle">
-        Porovnejte účetní výsledky se skutečným tokem hotovosti a odhalte rozdíly v jednotlivých kategoriích.
+        Porovnej účetní výsledky se skutečným tokem hotovosti a odhal rozdíly v jednotlivých kategoriích.
       </p>
     </div>
 
@@ -20,7 +20,7 @@
     </form>
 
     {% if error %}
-    <div class="alert alert-danger mb-0">❌ {{ error }}</div>
+    <div class="alert alert-danger mb-0">{{ error }}</div>
     {% elif cf %}
     <div class="scb-table-scroll mt-3">
       <table class="table scb-data-table align-middle text-center">
@@ -60,7 +60,7 @@
     </p>
     {% else %}
     <div class="alert alert-warning mb-0">
-      ❗ Zatím nejsou dostupná data pro zobrazení cash flow.
+      Zatím nejsou dostupná data pro zobrazení cash flow.
     </div>
     {% endif %}
   </section>
