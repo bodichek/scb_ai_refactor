@@ -8,13 +8,13 @@
   <!-- Chat okno -->
   <div id="chatbot-window" class="chatbot-window" style="display: none;">
     <div class="chatbot-header">
-      <h6 class="mb-0">Finanční asistent</h6>
+      <h6 class="mb-0">AI asistent</h6>
       <button id="chatbot-close" class="btn-close btn-sm" aria-label="Zavřít"></button>
     </div>
-    
+
     <div id="chatbot-messages" class="chatbot-messages">
       <div class="chatbot-message bot-message">
-        Ahoj! Jsem tvůj finanční asistent. Pomůžu ti s vyplňováním dat a vysvětlím účetní pojmy. Na co se chceš zeptat?
+        Ahoj! Jsem tvůj AI asistent. Pomůžu ti s vyplňováním dat a vysvětlím účetní pojmy. Na co se chceš zeptat?
       </div>
     </div>
     
@@ -39,11 +39,14 @@
 <!-- Chatbot CSS -->
 <style>
 .chatbot-widget {
-  position: fixed;
+  position: fixed !important;
   bottom: 20px;
   right: 20px;
-  z-index: 1050;
+  z-index: 9999 !important;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  /* Zajistí, že fixed funguje i v případě parent s transform */
+  transform: none !important;
+  contain: layout;
 }
 
 .chatbot-toggle {
@@ -207,7 +210,12 @@ document.addEventListener('DOMContentLoaded', function() {
   const input = document.getElementById('chatbot-input');
   const send = document.getElementById('chatbot-send');
   const loading = document.getElementById('chatbot-loading');
-  
+
+  // Přesun widgetu přímo do body pro zajištění správného fixed positioning
+  if (widget && widget.parentElement !== document.body) {
+    document.body.appendChild(widget);
+  }
+
   let isOpen = false;
   let dragActive = false;
   let dragMoved = false;
@@ -293,10 +301,14 @@ document.addEventListener('DOMContentLoaded', function() {
     left = Math.min(Math.max(10, left), maxLeft);
     top = Math.min(Math.max(10, top), maxTop);
 
-    widget.style.left = `${left}px`;
-    widget.style.top = `${top}px`;
-    widget.style.right = 'auto';
-    widget.style.bottom = 'auto';
+    // Použij right/bottom pro zachování fixed pozice při scrollu
+    const right = window.innerWidth - left - widget.offsetWidth;
+    const bottom = window.innerHeight - top - widget.offsetHeight;
+
+    widget.style.left = 'auto';
+    widget.style.top = 'auto';
+    widget.style.right = `${right}px`;
+    widget.style.bottom = `${bottom}px`;
   }
 
   function endDrag() {

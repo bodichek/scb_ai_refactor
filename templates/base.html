@@ -1432,6 +1432,37 @@ body {
       border-color: rgba(4, 20, 52, 0.3);
     }
 
+    /* Score karta pro detail hodnocení */
+    .score-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-width: 120px;
+      min-height: 120px;
+      padding: 20px;
+      background: linear-gradient(135deg, rgba(47, 132, 255, 0.1) 0%, rgba(47, 132, 255, 0.05) 100%);
+      border: 2px solid rgba(47, 132, 255, 0.25);
+      border-radius: 20px;
+      flex-shrink: 0;
+    }
+
+    .score-card__label {
+      font-size: 12px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: rgba(4, 20, 52, 0.5);
+      margin-bottom: 8px;
+    }
+
+    .score-card__value {
+      font-size: 48px;
+      font-weight: 700;
+      color: var(--scb-blue-500);
+      line-height: 1;
+    }
+
     /* Prázdné stavy */
     .scb-empty-state {
       text-align: center;

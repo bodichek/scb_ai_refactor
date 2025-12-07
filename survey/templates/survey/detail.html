@@ -2,15 +2,21 @@
 {% block content %}
 <div class="section-shell">
   <section class="scb-panel scb-panel--inline">
-    <div class="page-heading">
-      <span class="page-eyebrow">Survey</span>
-      <h2 class="page-title">📋 Detail dotazníku</h2>
-      <p class="page-subtitle">
-        Kompletní pohled na jednotlivé odpovědi, průměrné skóre i automatické shrnutí od asistenta.
-      </p>
-    </div>
-    <div class="mt-2">
-      <span class="scb-metric-bubble">Vyplněno: {{ submission.created_at|date:"d.m.Y H:i" }}</span>
+    <div class="d-flex justify-content-between align-items-start gap-4">
+      <div class="page-heading">
+        <span class="page-eyebrow">Dotazník</span>
+        <h2 class="page-title">Detail hodnocení</h2>
+        <p class="page-subtitle">
+          Kompletní pohled na jednotlivé odpovědi, průměrné skóre i automatické shrnutí od asistenta.
+        </p>
+        <div class="mt-2">
+          <span class="scb-metric-bubble">Vyplněno: {{ submission.created_at|date:"d.m.Y H:i" }}</span>
+        </div>
+      </div>
+      <div class="score-card">
+        <span class="score-card__label">Průměrné skóre</span>
+        <span class="score-card__value">{{ avg_score|floatformat:1 }}</span>
+      </div>
     </div>
 
     <ul class="scb-list mt-4">
@@ -23,16 +29,12 @@
       </li>
       {% endfor %}
     </ul>
-
-    <div class="alert alert-info mt-4 mb-0">
-      <b>Průměrné skóre:</b> {{ avg_score|floatformat:1 }}
-    </div>
   </section>
 
   <section class="scb-panel">
     {% if submission.ai_response %}
     <div class="page-heading">
-      <h3 class="page-title" style="font-size:1.5rem;">🧠 Shrnutí AI</h3>
+      <h3 class="page-title" style="font-size:1.5rem;">Shrnutí AI</h3>
       <p class="page-subtitle">Automaticky generované doporučení a komentáře na míru.</p>
     </div>
     <div class="mt-3">
@@ -40,44 +42,69 @@
     </div>
     {% else %}
     <div class="alert alert-secondary mb-0">
-      <em>AI shrnutí zatím nebylo vygenerováno.</em>
+      <em>AI shrnutí se generuje...</em>
     </div>
     {% endif %}
   </section>
 
   <section class="scb-panel">
     <div class="chart-card">
-      <h3>📈 Vývoj průměrného skóre v čase</h3>
+      <h3>Vývoj průměrného skóre v čase</h3>
       <div class="chart-card__canvas">
         <canvas id="historyChart"></canvas>
       </div>
     </div>
-    <a href="{% url 'survey:summary' %}" class="btn btn-outline-light mt-4">← Zpět na přehled</a>
+    <a href="{% url 'survey:summary' %}" class="btn btn-outline-light mt-4">Zpět na přehled</a>
   </section>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   const ctx = document.getElementById('historyChart').getContext('2d');
+  const currentIndex = {{ current_index }};
+  const chartData = {{ chart_data|safe }};
+  const chartLabels = {{ chart_labels|safe }};
+
+  // Vytvoř pole pro velikosti a barvy bodů - aktuální bod bude zvýrazněný
+  const pointRadii = chartData.map((_, i) => i === currentIndex ? 10 : 5);
+  const pointColors = chartData.map((_, i) => i === currentIndex ? 'rgba(16, 185, 129, 1)' : 'rgba(47, 132, 255, 1)');
+  const pointBorderColors = chartData.map((_, i) => i === currentIndex ? 'rgba(16, 185, 129, 1)' : 'rgba(47, 132, 255, 1)');
+  const pointBorderWidths = chartData.map((_, i) => i === currentIndex ? 3 : 1);
+
   const historyChart = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: {{ chart_labels|safe }},
+      labels: chartLabels,
       datasets: [{
         label: 'Průměrné skóre',
-        data: {{ chart_data|safe }},
+        data: chartData,
         borderColor: 'rgba(47, 132, 255, 1)',
         backgroundColor: 'rgba(47, 132, 255, 0.18)',
         fill: true,
         tension: 0.25,
-        pointRadius: 5,
-        pointHoverRadius: 7
+        pointRadius: pointRadii,
+        pointHoverRadius: pointRadii.map(r => r + 2),
+        pointBackgroundColor: pointColors,
+        pointBorderColor: pointBorderColors,
+        pointBorderWidth: pointBorderWidths
       }]
     },
     options: {
       responsive: true,
       plugins: {
-        legend: { display: false }
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const label = context.dataset.label || '';
+              const value = context.parsed.y;
+              if (context.dataIndex === currentIndex) {
+                return `${label}: ${value} (aktuální)`;
+              }
+              return `${label}: ${value}`;
+            }
+          }
+        }
       },
       scales: {
         y: {

@@ -429,22 +429,3 @@ def document_api(request, document_id):
         return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
-# ================================================================
-#   7) DELETE dokumentu (HTML)
-# ================================================================
-@login_required
-def delete_document(request, document_id):
-    try:
-        doc = get_object_or_404(Document, id=document_id, owner=request.user)
-        FinancialStatement.objects.filter(document=doc).delete()
-
-        if doc.file:
-            doc.file.delete(save=False)
-        doc.delete()
-
-        messages.success(request, "Dokument byl smazán.")
-
-    except Exception as e:
-        messages.error(request, f"Chyba při mazání: {e}")
-
-    return redirect("ingest:documents")

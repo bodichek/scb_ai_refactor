@@ -333,13 +333,21 @@ def survey_detail(request, batch_id):
 
     avg_score = responses.aggregate(avg=Avg("score"))["avg"]
 
+    # Pokud chybí AI shrnutí, vygeneruj ho
+    if not submission.ai_response:
+        generate_ai_summary(submission)
+        submission.refresh_from_db()
+
     # Historie dotazníků (pro graf trendu)
-    history = SurveySubmission.objects.filter(user=request.user).order_by("created_at").prefetch_related("responses")
+    history = list(SurveySubmission.objects.filter(user=request.user).order_by("created_at").prefetch_related("responses"))
     chart_labels = [s.created_at.strftime("%d.%m.%Y") for s in history]
     chart_data = [
         round(sum(r.score for r in s.responses.all()) / s.responses.count(), 2)
         for s in history
     ]
+
+    # Najdi index aktuálního hodnocení pro zvýraznění v grafu
+    current_index = next((i for i, s in enumerate(history) if s.batch_id == submission.batch_id), -1)
 
     return render(request, "survey/detail.html", {
         "submission": submission,
@@ -347,6 +355,7 @@ def survey_detail(request, batch_id):
         "avg_score": avg_score,
         "chart_labels": chart_labels,
         "chart_data": chart_data,
+        "current_index": current_index,
     })
 
 

@@ -10,5 +10,4 @@ urlpatterns = [
     path("api/documents/", views.documents_api, name="documents_api"),
     path("api/documents/<int:document_id>/", views.document_api, name="document_api"),
     path("api/upload-vision/", views.upload_vision_api, name="upload_vision_api"),
-    path("delete/<int:document_id>/", views.delete_document, name="delete_document"),
 ]

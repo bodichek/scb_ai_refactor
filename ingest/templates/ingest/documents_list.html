@@ -40,7 +40,6 @@
               <th class="px-4 py-3 text-left">Soubor</th>
               <th class="px-4 py-3 text-left">Analyzováno</th>
               <th class="px-4 py-3 text-left">Aktualizováno</th>
-              <th class="px-4 py-3 text-right">Akce</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-200/70 bg-white/90">
@@ -65,17 +64,10 @@
                   {{ d.uploaded_at|date:"d.m.Y H:i" }}
                 {% endif %}
               </td>
-              <td class="px-4 py-3 text-right">
-                <a href="{% url 'ingest:delete_document' d.id %}"
-                   class="inline-flex items-center gap-1 rounded-xl border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition"
-                   onclick="return confirm('Opravdu chceš smazat tento dokument?');">
-                  Smazat
-                </a>
-              </td>
             </tr>
             {% empty %}
             <tr>
-              <td colspan="6" class="px-4 py-8 text-center text-sm text-slate-500 bg-white/90">
+              <td colspan="5" class="px-4 py-8 text-center text-sm text-slate-500 bg-white/90">
                 <div class="scb-empty-state">
                   <strong>Zatím tu nic není</strong>
                   <span>Nahraj první výkaz a uvidíš zde přehled dokumentů.</span>
