@@ -491,10 +491,10 @@
             borderColor: modernColors.primary.indigo.main,
             backgroundColor: modernColors.primary.indigo.light,
             tension: 0.4,
-            borderWidth: 2.5,
+            borderWidth: 2,
             fill: true,
             pointRadius: 0,
-            pointHoverRadius: 4,
+            pointHoverRadius: 3,
           }],
         },
         options: {
@@ -504,6 +504,42 @@
         },
       });
       window.scoreSparklineChart = sparkChart;
+    }
+
+    function renderMiniTrendChart() {
+      const ctx = document.getElementById('miniTrendChart');
+      if (!ctx || !chartSeries.labels || !chartSeries.labels.length) return;
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: chartSeries.labels,
+          datasets: [
+            {
+              data: chartSeries.revenue,
+              borderColor: modernColors.primary.blue.main,
+              backgroundColor: modernColors.primary.blue.light,
+              tension: 0.4,
+              borderWidth: 2,
+              fill: true,
+              pointRadius: 0,
+            },
+            {
+              data: chartSeries.net_profit,
+              borderColor: modernColors.success.green.main,
+              backgroundColor: modernColors.success.green.light,
+              tension: 0.4,
+              borderWidth: 2,
+              fill: true,
+              pointRadius: 0,
+            },
+          ],
+        },
+        options: {
+          plugins: { legend: { display: false }, tooltip: { enabled: false } },
+          scales: { x: { display: false }, y: { display: false } },
+          maintainAspectRatio: false,
+        },
+      });
     }
 
     function renderMetricTrendChart() {
@@ -675,6 +711,7 @@
     document.addEventListener('DOMContentLoaded', () => {
       renderCharts();
       renderSparkline();
+      renderMiniTrendChart();
       renderMetricTrendChart();
 
       document.querySelectorAll('.year-filter').forEach((cb) => {
@@ -795,286 +832,331 @@
       </div>
     </header>
 
-    <div class="grid grid-cols-1 xl:grid-cols-6 gap-6">
-      <section class="dashboard-card xl:col-span-4 bg-gradient-to-r from-sky-50 via-white to-indigo-50 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
-        {% if assigned_coach %}
-        {% with coach_user=assigned_coach.user %}
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div>
-            <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Váš kouč</p>
-            <h3 class="text-2xl font-semibold text-slate-900">
-              {{ coach_user.get_full_name|default:coach_user.username|default:assigned_coach }}
-            </h3>
-            {% if assigned_coach.specialization %}
-            <p class="text-sm text-slate-500 mt-1">{{ assigned_coach.specialization }}</p>
-            {% endif %}
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full md:w-auto">
-            <div>
-              <p class="text-[0.65rem] uppercase tracking-[0.25em] text-slate-400">E-mail</p>
-              <p class="text-sm font-medium text-slate-800">
-                {{ assigned_coach.email|default:coach_user.email|default:"-" }}
-              </p>
-            </div>
-            <div>
-              <p class="text-[0.65rem] uppercase tracking-[0.25em] text-slate-400">Telefon</p>
-              <p class="text-sm font-medium text-slate-800">
-                {{ assigned_coach.phone|default:"-" }}
-              </p>
-            </div>
-            <div>
-              <p class="text-[0.65rem] uppercase tracking-[0.25em] text-slate-400">Lokace</p>
-              <p class="text-sm font-medium text-slate-800">
-                {{ assigned_coach.city|default:"-" }}
-              </p>
-            </div>
-          </div>
-        </div>
-        {% if assigned_coach.bio %}
-          <p class="text-sm text-slate-600 leading-relaxed">{{ assigned_coach.bio }}</p>
-        {% else %}
-          <p class="text-sm text-slate-500">Kouč zatím nepřidal popis. Domluvte se společně na dalších krocích během nejbližší konzultace.</p>
-        {% endif %}
-        <div class="flex flex-wrap gap-3 text-sm">
-          {% if assigned_coach.linkedin %}
-            <a href="{{ assigned_coach.linkedin }}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-1.5 text-slate-700 hover:text-sky-600 hover:border-sky-200">
-              LinkedIn
-              <span aria-hidden="true">↗</span>
-            </a>
-          {% endif %}
-          {% if assigned_coach.website %}
-            <a href="{{ assigned_coach.website }}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 py-1.5 text-slate-700 hover:text-sky-600 hover:border-sky-200">
-              Web
-              <span aria-hidden="true">↗</span>
-            </a>
-          {% endif %}
-          {% if not assigned_coach.linkedin and not assigned_coach.website %}
-            <p class="text-xs text-slate-500">Kontaktuj kouče přes e‑mail nebo telefon uvedený výše.</p>
-          {% endif %}
-        </div>
-        {% endwith %}
-        {% else %}
-        <div class="flex flex-col gap-3">
-          <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Kouč</p>
-          <h3 class="text-2xl font-semibold text-slate-900">Ještě nemáte přiřazeného kouče</h3>
-          <p class="text-sm text-slate-600">Jakmile vám tým ScaleupBoard přiřadí kouče, uvidíte zde jeho kontakty a aktuální poznámky.</p>
-          <div>
-            <a href="{% url 'suropen:form' %}" class="inline-flex items-center gap-2 rounded-full bg-slate-900 text-white px-4 py-2 text-sm font-semibold shadow-sm hover:bg-slate-800">
-              Požádat o kouče
-              <span aria-hidden="true">→</span>
-            </a>
-          </div>
-        </div>
-        {% endif %}
-      </section>
-
-      {% if assigned_coach %}
-      <section class="dashboard-card xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
-        <div>
-          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Kontaktuj kouče</p>
-          <h2 class="mt-2 text-xl font-semibold text-slate-900">Potřebuješ poradit?</h2>
-        </div>
-        <form id="coachContactForm" class="space-y-4" data-send-url="{% url 'intercom:send' client_id=request.user.id %}">
-          <textarea id="coachMessage" name="message" rows="4" class="block w-full rounded-2xl border-slate-200 bg-slate-50/70 text-sm text-slate-700 placeholder:text-slate-400 focus:border-sky-500 focus:ring-sky-500" placeholder="Zeptej se kouče na konkrétní problém nebo oblast."></textarea>
-          <button type="submit" class="scb-btn scb-btn-primary w-full justify-center">✉️ Odeslat koučovi</button>
-        </form>
-        <p id="coachContactStatus" class="text-xs text-slate-500" data-tone="info">Zpráva se odešle do Intercomu a kouč ji uvidí v konverzaci.</p>
-      </section>
-      {% else %}
-      <section class="dashboard-card xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
-        <div>
-          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Kontaktuj kouče</p>
-          <h2 class="mt-2 text-xl font-semibold text-slate-900">Zatím nemáte kouče</h2>
-        </div>
-        <p class="text-sm text-slate-600">Po přiřazení kouče budete moci posílat dotazy přímo z dashboardu.</p>
-      </section>
-      {% endif %}
-
-      <section class="dashboard-card xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-6">
-        <div class="flex items-start justify-between">
-          <div>
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Skóre firmy</p>
-            <p class="mt-1 text-4xl font-bold text-slate-900">{{ company_score|default:"—" }}</p>
-            <p class="text-xs text-slate-500">průměr z posledního dotazníku</p>
-          </div>
-          {% if score_trend %}{% with trend=score_trend %}
-          <div class="text-right">
-            <span class="inline-flex items-center gap-1 text-sm font-semibold {% if trend > 0 %}text-emerald-600{% elif trend < 0 %}text-rose-600{% else %}text-slate-500{% endif %}">
-              {% if trend > 0 %}▲{% elif trend < 0 %}▼{% else %}▬{% endif %}
-              {{ trend|floatformat:1 }} bodů
-            </span>
-            <p class="text-xs text-slate-400">vs. předchozí měření</p>
-          </div>
-          {% endwith %}{% endif %}
-        </div>
-        <div class="h-16">
-          <canvas id="scoreSparkline"></canvas>
-        </div>
-        <p class="text-xs text-slate-500">Sleduj trend alespoň měsíčně, aby šlo zachytit změny včas.</p>
-      </section>
-
-      <section class="dashboard-card xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
+    <!-- METRICKÉ KARTY - 4 v řadě -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Skóre firmy -->
+      <div class="dashboard-card bg-white/95 border border-slate-200/70 rounded-2xl shadow-md shadow-slate-900/5 p-5 flex flex-col gap-3">
         <div class="flex items-center justify-between">
-          <div>
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Nálada týmu</p>
-            <h2 class="mt-2 text-2xl font-semibold {% if mood_tone == 'positive' %}text-emerald-600{% elif mood_tone == 'negative' %}text-rose-600{% else %}text-indigo-500{% endif %}">{{ mood_label }}</h2>
-          </div>
-          <span class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold {% if mood_tone == 'positive' %}bg-emerald-100 text-emerald-700{% elif mood_tone == 'negative' %}bg-rose-100 text-rose-600{% else %}bg-indigo-100 text-indigo-600{% endif %}">
-            {% if mood_tone == 'positive' %}😊{% elif mood_tone == 'negative' %}⚠️{% else %}🙂{% endif %}
-            Stav týmu
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Skóre firmy</p>
+          <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-sky-600">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
           </span>
         </div>
-        <p class="text-sm text-slate-600 leading-relaxed">{{ mood_description }}</p>
-        <p class="text-xs text-slate-400">Nálada se odvíjí od numerického skóre i sentimentu odpovědí.</p>
-      </section>
+        <div class="flex items-end justify-between">
+          <p class="text-3xl font-bold text-slate-900">{{ company_score|default:"—" }}</p>
+          {% if score_trend %}{% with trend=score_trend %}
+          <span class="inline-flex items-center gap-1 text-xs font-semibold {% if trend > 0 %}text-emerald-600{% elif trend < 0 %}text-rose-600{% else %}text-slate-500{% endif %}">
+            {% if trend > 0 %}▲{% elif trend < 0 %}▼{% else %}▬{% endif %}
+            {{ trend|floatformat:1 }}
+          </span>
+          {% endwith %}{% endif %}
+        </div>
+        <div class="h-10">
+          <canvas id="scoreSparkline"></canvas>
+        </div>
+      </div>
 
-      <section class="dashboard-card xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
-        <div>
-          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Doporučení kouče</p>
-          <h2 class="mt-2 text-2xl font-semibold text-slate-900">Další kroky</h2>
+      <!-- Nálada týmu -->
+      <div class="dashboard-card bg-white/95 border border-slate-200/70 rounded-2xl shadow-md shadow-slate-900/5 p-5 flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Nálada týmu</p>
+          <span class="inline-flex h-8 w-8 items-center justify-center rounded-full {% if mood_tone == 'positive' %}bg-emerald-100 text-emerald-600{% elif mood_tone == 'negative' %}bg-rose-100 text-rose-600{% else %}bg-indigo-100 text-indigo-600{% endif %}">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </span>
+        </div>
+        <p class="text-2xl font-bold {% if mood_tone == 'positive' %}text-emerald-600{% elif mood_tone == 'negative' %}text-rose-600{% else %}text-indigo-500{% endif %}">{{ mood_label|default:"—" }}</p>
+        <p class="text-xs text-slate-500 line-clamp-2">{{ mood_description|default:"Vyplň dotazník pro zobrazení nálady." }}</p>
+      </div>
+
+      <!-- Trend - mini graf -->
+      <div class="dashboard-card bg-white/95 border border-slate-200/70 rounded-2xl shadow-md shadow-slate-900/5 p-5 flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Finanční trend</p>
+          <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-violet-600">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+          </span>
+        </div>
+        <div class="flex-1 min-h-[60px]">
+          <canvas id="miniTrendChart"></canvas>
+        </div>
+        <p class="text-xs text-slate-500">Tržby vs. zisk</p>
+      </div>
+
+      <!-- Dokumenty - rychlý stav -->
+      <div class="dashboard-card bg-white/95 border border-slate-200/70 rounded-2xl shadow-md shadow-slate-900/5 p-5 flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Dokumenty</p>
+          <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          </span>
+        </div>
+        {% if document_upload_status %}
+        <div class="flex items-center gap-3">
+          <div class="text-center">
+            <p class="text-2xl font-bold text-slate-900">{{ document_upload_status|length }}</p>
+            <p class="text-[10px] text-slate-400 uppercase">roky</p>
+          </div>
+          <div class="flex-1 space-y-1">
+            {% with first_row=document_upload_status.0 %}
+            <div class="flex items-center gap-2 text-xs">
+              <span class="w-2 h-2 rounded-full {% if first_row.has_rozvaha and first_row.rozvaha_analyzed %}bg-emerald-500{% elif first_row.has_rozvaha %}bg-amber-500{% else %}bg-rose-400{% endif %}"></span>
+              <span class="text-slate-600">Rozvaha {{ first_row.year }}</span>
+            </div>
+            <div class="flex items-center gap-2 text-xs">
+              <span class="w-2 h-2 rounded-full {% if first_row.has_vysledovka and first_row.vysledovka_analyzed %}bg-emerald-500{% elif first_row.has_vysledovka %}bg-amber-500{% else %}bg-rose-400{% endif %}"></span>
+              <span class="text-slate-600">Výsledovka {{ first_row.year }}</span>
+            </div>
+            {% endwith %}
+          </div>
+        </div>
+        {% else %}
+        <p class="text-2xl font-bold text-slate-400">0</p>
+        <p class="text-xs text-slate-500">Nahraj dokumenty</p>
+        {% endif %}
+        <a href="{% url 'ingest:upload_pdf' %}" class="text-xs font-semibold text-sky-600 hover:text-sky-700 mt-auto">Nahrát</a>
+      </div>
+    </div>
+
+    <!-- HLAVNÍ SEKCE - 2/3 + 1/3 -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Doporučení kouče - 2/3 šířky -->
+      <section class="lg:col-span-2 dashboard-card bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-5">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Doporučení kouče</p>
+            <h2 class="mt-2 text-2xl font-semibold text-slate-900">Další kroky pro růst firmy</h2>
+          </div>
+          <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-100 to-indigo-100 text-sky-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+          </span>
         </div>
         {% if recommendation_points %}
-        <ul class="space-y-3 text-sm text-slate-600">
+        <ul class="space-y-4">
           {% for item in recommendation_points %}
-          <li class="flex items-start gap-2">
-            <span class="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-sky-500"></span>
-            <span>{{ item }}</span>
+          <li class="flex items-start gap-3 p-4 rounded-2xl bg-gradient-to-r from-slate-50 to-sky-50/50 border border-slate-100">
+            <span class="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-sky-500 text-white text-xs font-bold flex-shrink-0">{{ forloop.counter }}</span>
+            <span class="text-sm text-slate-700 leading-relaxed">{{ item }}</span>
           </li>
           {% endfor %}
         </ul>
         {% elif coach_recommendation %}
-        <p class="text-sm text-slate-600 leading-relaxed">{{ coach_recommendation }}</p>
+        <div class="p-4 rounded-2xl bg-gradient-to-r from-slate-50 to-sky-50/50 border border-slate-100">
+          <p class="text-sm text-slate-700 leading-relaxed">{{ coach_recommendation }}</p>
+        </div>
         {% else %}
-        <p class="text-sm text-slate-500">Až odešleš první dotazník nebo otevřenou analýzu, zobrazíme doporučení kouče.</p>
+        <div class="flex-1 flex flex-col items-center justify-center py-8 text-center">
+          <div class="inline-flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-400 mb-4">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
+          </div>
+          <p class="text-sm text-slate-500 max-w-sm">Vyplň první dotazník nebo otevřenou analýzu a kouč ti připraví personalizovaná doporučení.</p>
+          <a href="{% url 'survey:questionnaire' %}" class="mt-4 inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-sky-700 transition">
+            Spustit dotazník
+            <span aria-hidden="true">→</span>
+          </a>
+        </div>
+        {% endif %}
+
+        {% if coach_note %}
+        <div class="mt-2 p-4 rounded-2xl bg-amber-50/80 border border-amber-200/60">
+          <p class="text-xs uppercase tracking-[0.2em] text-amber-600 mb-2">Poznámka kouče</p>
+          <p class="text-sm text-slate-700 leading-relaxed">{{ coach_note }}</p>
+        </div>
         {% endif %}
       </section>
 
-      <section class="dashboard-card xl:col-span-4 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Meziroční vývoj</p>
-            <h2 class="mt-2 text-2xl font-semibold text-slate-900">Finanční trajektorie</h2>
+      <!-- Kouč + kontakt - 1/3 šířky -->
+      <section class="dashboard-card bg-gradient-to-br from-sky-50 via-white to-indigo-50 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-5">
+        {% if assigned_coach %}
+        {% with coach_user=assigned_coach.user %}
+        <div class="text-center">
+          <div class="inline-flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-indigo-600 text-white text-2xl font-bold mb-3">
+            {{ coach_user.first_name|slice:":1"|default:"K" }}{{ coach_user.last_name|slice:":1" }}
           </div>
-          <div class="flex flex-wrap items-center gap-3 dashboard-actions">
-            <button type="button" class="scb-btn scb-btn-primary" id="chart-export-trigger">📥 Připravit grafy pro export</button>
-            <span class="dashboard-actions__hint" id="chart-export-status">Připravíme grafy a přesuneme tě k exportu PDF.</span>
-          </div>
+          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Tvůj kouč</p>
+          <h3 class="text-xl font-semibold text-slate-900 mt-1">
+            {{ coach_user.get_full_name|default:coach_user.username|default:assigned_coach }}
+          </h3>
+          {% if assigned_coach.specialization %}
+          <p class="text-sm text-slate-500 mt-1">{{ assigned_coach.specialization }}</p>
+          {% endif %}
         </div>
-        <div class="h-80">
-          <canvas id="metricsTrendChart"></canvas>
-        </div>
-      </section>
 
-      <section class="dashboard-card xl:col-span-2 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
-        <div>
-          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Revize dashboardu</p>
-          <h2 class="mt-2 text-xl font-semibold text-slate-900">Poznámky kouče</h2>
+        <div class="space-y-2 text-sm">
+          {% if assigned_coach.email or coach_user.email %}
+          <div class="flex items-center gap-3 p-2 rounded-xl bg-white/70">
+            <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            </span>
+            <span class="text-slate-700 truncate">{{ assigned_coach.email|default:coach_user.email }}</span>
+          </div>
+          {% endif %}
+          {% if assigned_coach.phone %}
+          <div class="flex items-center gap-3 p-2 rounded-xl bg-white/70">
+            <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+            </span>
+            <span class="text-slate-700">{{ assigned_coach.phone }}</span>
+          </div>
+          {% endif %}
         </div>
-        {% if coach_note %}
-          <p class="text-sm text-slate-600 leading-relaxed">{{ coach_note }}</p>
-        {% elif assigned_coach %}
-          <p class="text-sm text-slate-500">Tvůj kouč zatím nepřidal poznámku. Jakmile ji doplní, objeví se tady.</p>
+
+        <div class="flex gap-2">
+          {% if assigned_coach.linkedin %}
+          <a href="{{ assigned_coach.linkedin }}" target="_blank" rel="noopener" class="flex-1 inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-xs font-medium text-slate-600 hover:text-sky-600 hover:border-sky-200 transition">
+            LinkedIn
+          </a>
+          {% endif %}
+          {% if assigned_coach.website %}
+          <a href="{{ assigned_coach.website }}" target="_blank" rel="noopener" class="flex-1 inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-xs font-medium text-slate-600 hover:text-sky-600 hover:border-sky-200 transition">
+            Web
+          </a>
+          {% endif %}
+        </div>
+
+        <div class="border-t border-slate-200/70 pt-4 mt-auto">
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-400 mb-3">Rychlý dotaz</p>
+          <form id="coachContactForm" class="space-y-3" data-send-url="{% url 'intercom:send' client_id=request.user.id %}">
+            <textarea id="coachMessage" name="message" rows="3" class="block w-full rounded-xl border-slate-200 bg-white/90 text-sm text-slate-700 placeholder:text-slate-400 focus:border-sky-500 focus:ring-sky-500 resize-none" placeholder="Na co se chceš zeptat?"></textarea>
+            <button type="submit" class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow hover:bg-slate-800 transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+              Odeslat koučovi
+            </button>
+          </form>
+          <p id="coachContactStatus" class="text-xs text-slate-500 mt-2 text-center">Zpráva se odešle do Intercomu.</p>
+        </div>
+        {% endwith %}
+
         {% else %}
-          <p class="text-sm text-slate-500">Když přiřadíme kouče, zobrazíme jeho zpětnou vazbu.</p>
+        <div class="flex-1 flex flex-col items-center justify-center text-center py-6">
+          <div class="inline-flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-400 mb-4">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+          </div>
+          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Tvůj kouč</p>
+          <h3 class="text-xl font-semibold text-slate-900 mt-2">Zatím nepřiřazen</h3>
+          <p class="text-sm text-slate-500 mt-2 max-w-xs">Jakmile ti tým ScaleupBoard přiřadí kouče, uvidíš zde jeho kontakty.</p>
+          <a href="{% url 'suropen:form' %}" class="mt-4 inline-flex items-center gap-2 rounded-xl bg-slate-900 text-white px-4 py-2 text-sm font-semibold shadow hover:bg-slate-800 transition">
+            Požádat o kouče
+            <span aria-hidden="true">→</span>
+          </a>
+        </div>
         {% endif %}
       </section>
     </div>
 
-    <section class="grid grid-cols-1 lg:grid-cols-6 gap-6">
-      <a href="{% url 'survey:questionnaire' %}" class="dashboard-card lg:col-span-1 group bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col justify-between gap-4 text-slate-700 no-underline lg:h-64" aria-label="Spustit nový dotazník">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Dotazníky</p>
-            <h3 class="text-lg font-semibold text-slate-900">Nový dotazník</h3>
-          </div>
-          <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-sky-100 text-sky-600 text-lg">📝</span>
-        </div>
-        <p class="text-sm text-slate-500">Otevři finanční dotazník a nasbírej aktuální odpovědi od týmu.</p>
-        <span class="mt-auto inline-flex items-center gap-1 text-sm font-semibold text-sky-600 group-hover:text-sky-700">
-          Spustit
-          <span aria-hidden="true">→</span>
+    <!-- RYCHLÉ AKCE + FINANČNÍ GRAF -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Rychlé akce - 3 karty -->
+      <a href="{% url 'survey:questionnaire' %}" class="dashboard-card group bg-white/90 border border-slate-200/70 rounded-2xl shadow-md shadow-slate-900/5 p-5 flex items-center gap-4 text-slate-700 no-underline hover:border-sky-300 hover:shadow-lg transition-all">
+        <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-sky-100 text-sky-600 flex-shrink-0">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
         </span>
-      </a>
-      <a href="{% url 'suropen:form' %}" class="dashboard-card lg:col-span-1 group bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col justify-between gap-4 text-slate-700 no-underline lg:h-64" aria-label="Nová analýza">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Analýzy</p>
-            <h3 class="text-lg font-semibold text-slate-900">Nová analýza</h3>
-          </div>
-          <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 text-lg">🧠</span>
+        <div class="flex-1 min-w-0">
+          <h3 class="text-base font-semibold text-slate-900">Nový dotazník</h3>
+          <p class="text-xs text-slate-500 truncate">Zhodnoť aktuální stav firmy</p>
         </div>
-        <p class="text-sm text-slate-500">Proveď otevřenou analýzu a zachyť bariéry růstu firmy.</p>
-        <span class="mt-auto inline-flex items-center gap-1 text-sm font-semibold text-emerald-600 group-hover:text-emerald-700">
-          Spustit
-          <span aria-hidden="true">→</span>
+        <span class="text-sky-600 group-hover:translate-x-1 transition-transform">→</span>
+      </a>
+
+      <a href="{% url 'suropen:form' %}" class="dashboard-card group bg-white/90 border border-slate-200/70 rounded-2xl shadow-md shadow-slate-900/5 p-5 flex items-center gap-4 text-slate-700 no-underline hover:border-emerald-300 hover:shadow-lg transition-all">
+        <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 flex-shrink-0">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
         </span>
-      </a>
-      <a href="{% url 'exports:export_form' %}" class="dashboard-card lg:col-span-1 group bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col justify-between gap-4 text-slate-700 no-underline lg:h-64" aria-label="Export review">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Exporty</p>
-            <h3 class="text-lg font-semibold text-slate-900">Export review</h3>
-          </div>
-          <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 text-lg">📄</span>
+        <div class="flex-1 min-w-0">
+          <h3 class="text-base font-semibold text-slate-900">Analýza růstu</h3>
+          <p class="text-xs text-slate-500 truncate">Identifikuj bariéry a příležitosti</p>
         </div>
-        <p class="text-sm text-slate-500">Vygeneruj nejnovější PDF s čísly a přehledem výkazů.</p>
-        <span class="mt-auto inline-flex items-center gap-1 text-sm font-semibold text-indigo-600 group-hover:text-indigo-700">
-          Otevřít
-          <span aria-hidden="true">→</span>
+        <span class="text-emerald-600 group-hover:translate-x-1 transition-transform">→</span>
+      </a>
+
+      <a href="{% url 'exports:export_form' %}" class="dashboard-card group bg-white/90 border border-slate-200/70 rounded-2xl shadow-md shadow-slate-900/5 p-5 flex items-center gap-4 text-slate-700 no-underline hover:border-indigo-300 hover:shadow-lg transition-all">
+        <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 flex-shrink-0">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
         </span>
+        <div class="flex-1 min-w-0">
+          <h3 class="text-base font-semibold text-slate-900">Export PDF</h3>
+          <p class="text-xs text-slate-500 truncate">Vygeneruj přehled pro kouče</p>
+        </div>
+        <span class="text-indigo-600 group-hover:translate-x-1 transition-transform">→</span>
       </a>
-      <div class="dashboard-card lg:col-span-3 bg-white/90 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4 lg:h-64">
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 flex-none">
-          <div>
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Data z nahraných výkazů</p>
-            <h2 class="mt-2 text-lg font-semibold text-slate-900">Stav rozvahy a výsledovky</h2>
-            <p class="text-xs text-slate-500 mt-1">Rychlý přehled, jestli máme oba typy dokumentů pro jednotlivé roky.</p>
-          </div>
+    </div>
+
+    <!-- FINANČNÍ TRAJEKTORIE -->
+    <section class="dashboard-card bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
+      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Meziroční vývoj</p>
+          <h2 class="mt-2 text-2xl font-semibold text-slate-900">Finanční trajektorie</h2>
         </div>
-        {% if document_upload_status %}
-        <div class="flex-1 space-y-3 overflow-y-auto pr-2">
-          {% for row in document_upload_status %}
-          <div class="rounded-2xl border border-slate-200/70 bg-white/85 px-3 py-3 shadow-sm shadow-slate-900/5 text-[13px] leading-tight">
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div>
-                <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Rok</p>
-                <p class="text-base font-semibold text-slate-900">{{ row.year }}</p>
-              </div>
-              <p class="text-[11px] text-slate-500">Aktuální stav nahraných dokumentů</p>
-            </div>
-            <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-stretch">
-              <div class="flex-1 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5">
-                <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400 mb-1.5">Rozvaha</p>
-                {% if row.has_rozvaha %}
-                  {% if row.rozvaha_analyzed %}
-                    <span class="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-2.5 py-0.5 text-[11px] font-semibold">Analyzováno</span>
-                  {% else %}
-                    <span class="inline-flex items-center rounded-full bg-amber-100 text-amber-700 px-2.5 py-0.5 text-[11px] font-semibold">Čeká na analýzu</span>
-                  {% endif %}
-                {% else %}
-                  <span class="inline-flex items-center rounded-full bg-rose-100 text-rose-700 px-2.5 py-0.5 text-[11px] font-semibold">Chybí</span>
-                {% endif %}
-              </div>
-              <div class="flex-1 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5">
-                <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400 mb-1.5">Výsledovka</p>
-                {% if row.has_vysledovka %}
-                  {% if row.vysledovka_analyzed %}
-                    <span class="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-2.5 py-0.5 text-[11px] font-semibold">Analyzováno</span>
-                  {% else %}
-                    <span class="inline-flex items-center rounded-full bg-amber-100 text-amber-700 px-2.5 py-0.5 text-[11px] font-semibold">Čeká na analýzu</span>
-                  {% endif %}
-                {% else %}
-                  <span class="inline-flex items-center rounded-full bg-rose-100 text-rose-700 px-2.5 py-0.5 text-[11px] font-semibold">Chybí</span>
-                {% endif %}
-              </div>
-            </div>
-          </div>
-          {% endfor %}
+        <div class="flex flex-wrap items-center gap-3 dashboard-actions">
+          <button type="button" class="scb-btn scb-btn-primary" id="chart-export-trigger">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            Připravit grafy pro export
+          </button>
+          <span class="dashboard-actions__hint" id="chart-export-status">Připravíme grafy a přesuneme tě k exportu PDF.</span>
         </div>
-        {% else %}
-        <p class="text-sm text-slate-500">Zatím nejsou nahrané žádné rozvahy ani výsledovky. Nahraj dokumenty v sekci Ingest, aby se přehled doplnil.</p>
-        {% endif %}
       </div>
+      <div class="h-80">
+        <canvas id="metricsTrendChart"></canvas>
+      </div>
+    </section>
+
+    <!-- STAV DOKUMENTŮ -->
+    <section class="dashboard-card bg-white/95 border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-900/5 p-6 flex flex-col gap-4">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <p class="text-xs uppercase tracking-[0.25em] text-slate-400">Data z nahraných výkazů</p>
+          <h2 class="mt-2 text-lg font-semibold text-slate-900">Stav rozvahy a výsledovky</h2>
+        </div>
+        <a href="{% url 'ingest:upload_pdf' %}" class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-sky-700 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+          Nahrát dokument
+        </a>
+      </div>
+      {% if document_upload_status %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {% for row in document_upload_status %}
+        <div class="rounded-2xl border border-slate-200/70 bg-slate-50/50 p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-lg font-bold text-slate-900">{{ row.year }}</span>
+            <span class="text-xs text-slate-400">Rok</span>
+          </div>
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-slate-600">Rozvaha</span>
+              {% if row.has_rozvaha %}
+                {% if row.rozvaha_analyzed %}
+                  <span class="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-2 py-0.5 text-[10px] font-semibold">OK</span>
+                {% else %}
+                  <span class="inline-flex items-center rounded-full bg-amber-100 text-amber-700 px-2 py-0.5 text-[10px] font-semibold">Ceka</span>
+                {% endif %}
+              {% else %}
+                <span class="inline-flex items-center rounded-full bg-rose-100 text-rose-700 px-2 py-0.5 text-[10px] font-semibold">Chybi</span>
+              {% endif %}
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-slate-600">Výsledovka</span>
+              {% if row.has_vysledovka %}
+                {% if row.vysledovka_analyzed %}
+                  <span class="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-2 py-0.5 text-[10px] font-semibold">OK</span>
+                {% else %}
+                  <span class="inline-flex items-center rounded-full bg-amber-100 text-amber-700 px-2 py-0.5 text-[10px] font-semibold">Ceka</span>
+                {% endif %}
+              {% else %}
+                <span class="inline-flex items-center rounded-full bg-rose-100 text-rose-700 px-2 py-0.5 text-[10px] font-semibold">Chybi</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="flex flex-col items-center justify-center py-8 text-center">
+        <div class="inline-flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-400 mb-4">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+        </div>
+        <p class="text-sm text-slate-500 max-w-sm">Zatím nejsou nahrané žádné rozvahy ani výsledovky.</p>
+      </div>
+      {% endif %}
     </section>
 
     <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
