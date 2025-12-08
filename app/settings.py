@@ -37,7 +37,7 @@ else:
 
 # Load environment variables
 if dotenv_path.exists():
-    load_dotenv(dotenv_path)
+    load_dotenv(dotenv_path, override=True)
 else:
     print(f"[ERROR] Environment file not found: {dotenv_path}")
     # Try parent directory as last resort
